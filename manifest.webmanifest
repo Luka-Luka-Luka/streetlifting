@@ -1,0 +1,16 @@
+{
+  "name": "Charges & programmes",
+  "short_name": "Charges",
+  "description": "Calculateur de charges lestées et générateur de programmes, tractions et dips.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E9EBEE",
+  "theme_color": "#14171C",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
