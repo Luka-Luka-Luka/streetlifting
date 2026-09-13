@@ -102,6 +102,11 @@ details .note{margin-top:5px}
 .day{padding:6px 0;border-bottom:1px dashed var(--rule)}
 .day:last-child{border-bottom:0}
 .dayn{font:600 12.5px/1 var(--txt);margin-bottom:4px;color:var(--muted)}
+.wk.folded .wkb{display:none}
+.day.folded .line{display:none}
+.day.folded .dayn{margin-bottom:0}
+[data-fold]{cursor:pointer;-webkit-user-select:none;user-select:none}
+.fchev{display:inline-block;width:12px;font-size:9px;color:var(--muted);transform:translateY(-1px)}
 
 .line{display:flex;gap:8px;align-items:baseline;padding:4px 0;cursor:pointer;
   border-left:3px solid transparent;padding-left:6px;margin-left:-6px}
@@ -303,7 +308,7 @@ function newProg(inc){return {tpl:'novice',inc:inc,startMode:'rir',rir:3,top:nul
   accDay:'J1',accSets:3,accLo:8,accHi:10,accLoad:60,accMode:'double',accEvery:3};}
 var S={
   v:SCHEMA, theme:'auto', bw:86, active:0, nwk:6, sep:'*', jours:'dim,mar,jeu', start:'',
-  blockNote:'', dayNotes:{},
+  blockNote:'', dayNotes:{}, fold:{},
   lifts:[
     {name:'Tractions',useBw:true,step:1.25,k:0.025,ref:{load:46.25,reps:3,rir:0},prog:newProg(1.25)},
     {name:'Dips',useBw:true,step:1.25,k:0.025,ref:{load:58.75,reps:3,rir:0},prog:newProg(2.5)}
@@ -321,7 +326,7 @@ function load(){
     S=d; S.v=SCHEMA;
     if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
-    if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote='';
+    if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
     S.lifts.forEach(function(L){
       var p=newProg(1.25); if(!L.prog)L.prog=p;
       for(var key in p){if(L.prog[key]===undefined)L.prog[key]=p[key];}
@@ -344,6 +349,10 @@ function rirOf(L,lo,reps){ /* réserve implicite d'une charge à un nombre de re
   var r=(rmOf(L)/(eff(L)+lo)-1)/L.k+1; return r-reps;
 }
 function cur(){return S.lifts[S.active]||S.lifts[0];}
+function fold(k){return !!(S.fold&&S.fold[k]);}
+function chev(k){return '<span class="fchev">'+(fold(k)?'\u25b8':'\u25be')+'</span>';}
+function loadLab(L,v){return (L&&L.useBw&&Math.abs(v)<0.01)?'PDC':F(v);}
+function loadKg(L,v){return (L&&L.useBw&&Math.abs(v)<0.01)?'PDC':F(v)+' kg';}
 function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ================= ajustements =================
@@ -684,8 +693,8 @@ function renderAssign(){
           '<div class="field sm"><label>Incrément</label><input data-i="'+i+'" data-f="inc" type="number" step="0.5" value="'+P.inc+'"></div>'+
           (P.accMode==='calendrier'?'<div class="field sm"><label>Toutes les</label><input data-i="'+i+'" data-f="accEvery" type="number" min="1" step="1" value="'+(+P.accEvery||3)+'"></div>':'')+
         '</div>'+
-        '<p class="note">Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+' à '+F(+P.accLoad||0)+' kg</b>'+
-          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+' à '+F(last.load)+' kg</b> si tout passe.</p>'+
+        '<p class="note">Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
+          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
         '<p class="note">'+t.note+' <b>Source : '+t.src+'.</b></p>'+
         '<details><summary>Comment lire ce programme</summary>'+
           t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details></div>';
@@ -940,21 +949,26 @@ function lineState(key,date){
   if(!e)return '';
   return e.state||'';
 }
-function renderPlan(into,weeks){
+function renderPlan(into,weeks,pfx){
+  pfx=pfx||'p';
   var sep=S.sep, html='', txt='';
   weeks.forEach(function(week){
-    html+='<div class="wk"><div class="wkh"><b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span></div><div class="wkb">';
+    var kw=pfx+'w'+week.w;
+    html+='<div class="wk'+(fold(kw)?' folded':'')+'"><div class="wkh" data-fold="'+kw+'">'+chev(kw)+
+      '<b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span></div><div class="wkb">';
     txt+='\n[Semaine '+(week.w+1)+']\n';
     week.days.forEach(function(day){
-      html+='<div class="day"><div class="dayn">'+day.label+dayDate(week.w,day.label)+'</div>';
+      var kd=pfx+'d'+week.w+'-'+day.label;
+      html+='<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
+        day.label+dayDate(week.w,day.label)+'</div>';
       txt+=day.label+'\n';
       day.lines.forEach(function(x){
         var st=lineState(x.key);
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
           '<span class="nm n'+(x.li%4)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':'')+'</span>'+
-          '<span class="pr">'+F(x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
+          '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
           '<span class="in">'+x.info+'</span></div>';
-        txt+='  '+x.name+' '+F(x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
+        txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
       html+='</div>';
     });
@@ -1040,7 +1054,7 @@ function panelHTML(key){
   var nxt='';
   if(x.role==='acc'){
     var pl=accPlan(L,x.li), n=pl[f.w+1];
-    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+' à '+F(rnd(n.load,L.step))+' kg</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
+    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
   var uKey=keyUnit(key);
@@ -1086,6 +1100,9 @@ function closePanel(){
   var p=document.querySelector('[data-panel]'); if(p)p.remove(); OPENKEY=null;
 }
 function panelClick(e){
+  var fd=e.target.closest('[data-fold]');
+  if(fd){ if(!S.fold)S.fold={}; var kk=fd.dataset.fold; S.fold[kk]=!S.fold[kk];
+    save(); closePanel(); refreshPlans(); e.stopPropagation(); return; }
   var p=e.target.closest('[data-panel]');
   if(p){
     var b=e.target.closest('button'); if(!b)return;
@@ -1176,7 +1193,7 @@ function renderToday(){
   var weeks=PLAN.filter(function(wk){return wk.w===wIdx;}).map(function(wk){
     return {w:wk.w,days:wk.days.filter(function(dd){return dd.label===sel;})};
   }).filter(function(wk){return wk.days.length;});
-  renderPlan($('todayout'),weeks);
+  renderPlan($('todayout'),weeks,'t');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
 }
@@ -1188,7 +1205,9 @@ function warmCard(weeks){
   var body=Object.keys(top).map(function(k){
     var x=top[k], L=S.lifts[x.li], st=warmSteps(L,x.load);
     if(!st.length)return '';
-    return '<div class="day"><div class="dayn">'+esc(L.name)+' — jusqu\'à '+F(x.load)+' kg</div>'+
+    var kf='warm'+x.li;
+    return '<div class="day'+(fold(kf)?' folded':'')+'"><div class="dayn" data-fold="'+kf+'">'+chev(kf)+
+      esc(L.name)+' — jusqu\'à '+loadKg(L,x.load)+'</div>'+
       st.map(function(w,q){
         return '<div class="line"><span class="nm n'+(x.li%4)+'">Montée '+(q+1)+'</span>'+
           '<span class="pr">'+(w.load==null?'à vide':F(w.load)+' kg')+' '+S.sep+' '+w.reps+'</span>'+
@@ -1196,7 +1215,8 @@ function warmCard(weeks){
       }).join('')+'</div>';
   }).join('');
   if(!body)return '';
-  return '<div class="wk"><div class="wkh"><b>Échauffement</b><span>modifiable par mouvement, onglet Programme</span></div>'+
+  return '<div class="wk'+(fold('warm')?' folded':'')+'"><div class="wkh" data-fold="warm">'+chev('warm')+
+    '<b>Échauffement</b><span>modifiable par mouvement, onglet Programme</span></div>'+
     '<div class="wkb">'+body+'</div></div>';
 }
 function notesCard(wIdx,sel){
