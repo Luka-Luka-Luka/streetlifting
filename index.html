@@ -60,6 +60,7 @@ label{display:block;font:400 11.5px/1.2 var(--txt);color:var(--muted);margin-bot
 input,select,textarea{width:100%;padding:7px 8px;border:1px solid var(--rule);border-radius:var(--r);
   background:var(--surface);color:var(--ink);font:600 16px/1.2 var(--num)}
 input[type=text],input[type=date]{font:400 14px/1.3 var(--txt)}
+input.numin{font:600 16px/1.2 var(--num)}
 textarea{font:400 14px/1.35 var(--txt);resize:vertical;min-height:50px;background:var(--bg);color:inherit}
 select{font-family:var(--txt);font-size:13.5px;font-weight:500}
 input:focus,select:focus,button:focus-visible{outline:2px solid var(--a2);outline-offset:-1px}
@@ -95,7 +96,10 @@ details .note{margin-top:5px}
 .n0{color:var(--a1)} .n1{color:var(--a2)} .n2{color:var(--a3)} .n3{color:var(--a4)}
 
 .wk{border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);margin-bottom:9px}
-.wkh{display:flex;align-items:baseline;gap:8px;padding:7px 11px;background:var(--soft);border-bottom:1px solid var(--rule)}
+.wkh{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:7px 11px;background:var(--soft);border-bottom:1px solid var(--rule)}
+.inol{flex:1 1 100%;font:400 11px/1.4 var(--txt);color:var(--muted);margin-top:2px}
+.inol b{font:600 13px/1 var(--num);margin:0 1px}
+.inol b.ok{color:var(--ok)} .inol b.warn{color:var(--warn)} .inol b.bad{color:var(--bad)}
 .wkh b{font:600 15px/1 var(--num);letter-spacing:.02em}
 .wkh span{font:400 11.5px/1 var(--txt);color:var(--muted);margin-left:auto}
 .wkb{padding:2px 11px 8px}
@@ -128,6 +132,8 @@ details .note{margin-top:5px}
 .pill.set{min-width:52px}
 .pill.set.done{background:var(--ok);border-color:var(--ok);color:#fff}
 .pill.set.short{background:var(--warn);border-color:var(--warn);color:#fff}
+.pill.half{min-width:34px}
+.pill.cat{min-width:auto;text-align:left;font:400 12px/1.3 var(--txt);padding:6px 8px}
 
 .logrow{display:grid;grid-template-columns:58px 1fr auto;gap:8px;align-items:start;
   padding:6px 0;border-bottom:1px solid var(--rule);font-size:13px}
@@ -155,7 +161,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <button class="iconbtn" id="theme">Thème</button>
   </div>
   <div class="bwline">
-    <div class="field sm"><label for="bw">Poids de corps</label><input id="bw" type="number" step="0.25" value="86"></div>
+    <div class="field sm"><label for="bw">Poids de corps</label><input id="bw" class="numin" type="text" inputmode="decimal" value="86"></div>
     <div class="field md"><label for="lift">Mouvement affiché</label><select id="lift"></select></div>
     <div class="field" style="flex:1 1 auto"><label>&nbsp;</label><div class="big" id="rmhead">—</div></div>
   </div>
@@ -175,7 +181,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <h2>Aujourd'hui <em id="todaydate"></em></h2>
     <div class="row">
       <div class="field md"><label for="start">Début du bloc</label><input id="start" type="date"></div>
-      <div class="field sm"><label for="tbw">PdC du jour</label><input id="tbw" type="number" step="0.25"></div>
+      <div class="field sm"><label for="tbw">PdC du jour</label><input id="tbw" class="numin" type="text" inputmode="decimal"></div>
       <div class="field sm"><label for="tday">Séance</label><select id="tday"></select></div>
     </div>
     <p class="note">Le poids de corps saisi ici s'applique à toutes les séries enregistrées aujourd'hui.
@@ -248,14 +254,16 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div class="row">
       <div class="field md"><label for="ldate">Date</label><input id="ldate" type="date"></div>
       <div class="field md"><label for="llift">Mouvement</label><select id="llift"></select></div>
-      <div class="field sm"><label for="lbw">PdC habillé</label><input id="lbw" type="number" step="0.25"></div>
+      <div class="field sm"><label for="lbw">PdC habillé</label><input id="lbw" class="numin" type="text" inputmode="decimal"></div>
     </div>
     <div class="row" style="margin-top:8px">
       <div class="field sm"><label for="lload">Lest</label><input id="lload" type="number" step="0.25"></div>
       <div class="field sm"><label for="lreps">Reps</label><input id="lreps" type="number" step="1" min="1"></div>
       <div class="field md"><label for="lrir">Reps en réserve</label>
-        <select id="lrir"><option value="0">0 — à l'échec</option><option value="1">1</option><option value="2">2</option>
-          <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+        <select id="lrir"><option value="0">0 — à l'échec</option><option value="0.5">0,5</option>
+          <option value="1">1</option><option value="1.5">1,5</option><option value="2">2</option>
+          <option value="2.5">2,5</option><option value="3">3</option><option value="3.5">3,5</option>
+          <option value="4">4</option><option value="4.5">4,5</option><option value="5">5</option>
           <option value="">inconnue</option></select></div>
     </div>
     <div class="row" style="margin-top:8px">
@@ -281,7 +289,41 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 <!-- ======================= MOUVEMENTS ======================= -->
 <section class="page" id="p-lifts">
   <div id="liftlist"></div>
-  <div class="btnrow"><button class="act" id="addlift">Ajouter un mouvement</button></div>
+
+  <div class="card">
+    <h2>Ajouter un mouvement <em>catalogue ou création libre</em></h2>
+    <div class="row">
+      <div class="field w"><label for="catsel">Mouvement</label><select id="catsel"></select></div>
+    </div>
+    <div class="row" id="catcustom" style="margin-top:8px">
+      <div class="field"><label for="catname">Nom</label><input id="catname" type="text" placeholder="Nom du mouvement"></div>
+      <div class="field sm"><label for="catbw">Poids de corps</label>
+        <select id="catbw"><option value="0">ne compte pas</option><option value="1">compte</option></select></div>
+      <div class="field md"><label for="catkeep">Dans la liste ensuite</label>
+        <select id="catkeep"><option value="0">non, une seule fois</option><option value="1">oui, garder au catalogue</option></select></div>
+    </div>
+    <div class="row" id="catanchor" style="margin-top:8px">
+      <div class="field w"><label for="catfrom">Estimer la référence depuis</label><select id="catfrom"></select></div>
+    </div>
+    <p class="note" id="catnote"></p>
+    <div class="btnrow"><button class="act" id="addlift">Ajouter</button></div>
+    <details>
+      <summary>Ce que vaut une estimation</summary>
+      <p class="note">— Les rapports viennent de la matrice de Jovanović (fig. 3.28, d'après Dan Baker 2015), exprimés en
+      charge système. Ils servent à <b>amorcer</b> un mouvement jamais testé. L'auteur écarte explicitement l'autre usage :
+      en déduire un point faible.</p>
+      <p class="note">— La prédiction ne tient que dans le même schéma moteur. Les dips sont le seul mouvement que le livre
+      rattache aux deux groupes à la fois, ce qui permet de passer du tirage à la poussée — l'outil le signale quand ça arrive,
+      parce que ce passage est aussi l'endroit où la matrice se contredit le plus avec le reste du livre.</p>
+      <p class="note">— Une référence estimée est marquée comme telle. Remplacez-la par une vraie série dès que vous en avez une.</p>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Catalogue <em>ce qui apparaît dans la liste</em></h2>
+    <div id="catlist"></div>
+  </div>
+
   <p class="note"><b>Le poids de corps compte</b> : coché pour les tractions et les dips, décoché pour un mouvement
   où seule la barre bouge. Décoché, tous les calculs tournent sur la charge seule.</p>
   <p class="note"><b>Coefficient</b> : coût d'une répétition, en fraction du 1RM. 2,5 % reproduit exactement RPE Calculator.
@@ -295,7 +337,13 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 'use strict';
 var $=function(id){return document.getElementById(id);};
 var F=function(n){return Number(Number(n).toFixed(2)).toString().replace('.',',');};
-var RC=30/29, SCHEMA=2;
+/* Lecture tolérante d'un champ : accepte la virgule comme séparateur décimal, ne force
+   aucun pas d'arrondi, et rend la valeur de repli plutôt que 0 quand la saisie est en cours. */
+var num=function(v,fb){
+  var n=parseFloat(String(v==null?'':v).replace(',','.').replace(/[^\d.\-]/g,''));
+  return isFinite(n)?n:fb;
+};
+var RC=30/29, SCHEMA=3;
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -310,9 +358,10 @@ var S={
   v:SCHEMA, theme:'auto', bw:86, active:0, nwk:6, sep:'*', jours:'dim,mar,jeu', start:'',
   blockNote:'', dayNotes:{}, fold:{},
   lifts:[
-    {name:'Tractions',useBw:true,step:1.25,k:0.025,ref:{load:46.25,reps:3,rir:0},prog:newProg(1.25)},
-    {name:'Dips',useBw:true,step:1.25,k:0.025,ref:{load:58.75,reps:3,rir:0},prog:newProg(2.5)}
+    {name:'Tractions',catId:'pullup',useBw:true,step:1.25,k:0.025,ref:{load:46.25,reps:3,rir:0},prog:newProg(1.25)},
+    {name:'Dips',catId:'dip',useBw:true,step:1.25,k:0.025,ref:{load:58.75,reps:3,rir:0},prog:newProg(2.5)}
   ],
+  cat:[], catHide:{}, tbw:null,
   log:[]
 };
 S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
@@ -327,6 +376,8 @@ function load(){
     if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
+    if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null;
+    S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
     S.lifts.forEach(function(L){
       var p=newProg(1.25); if(!L.prog)L.prog=p;
       for(var key in p){if(L.prog[key]===undefined)L.prog[key]=p[key];}
@@ -533,6 +584,76 @@ function accInfo(P){
   if(P.accMode==='calendrier')return '+'+F(P.inc)+' / '+(+P.accEvery||3)+' sem.';
   return 'double progression '+(+P.accLo||8)+'-'+(+P.accHi||10);
 }
+/* ================= catalogue de mouvements =================
+   Rapports de 1RM entre exercices, en charge systeme, d'apres la matrice de Jovanovic
+   (fig. 3.28, elle-meme tiree de la table de Dan Baker 2015). Chaque groupe a sa propre
+   reference a 100. Usage revendique par l'auteur : amorcer un mouvement jamais teste.
+   Usage qu'il refuse : diagnostiquer un point faible.
+   Les dips sont le seul mouvement rattache aux deux groupes du haut du corps (120 % des
+   tractions ET 120 % du couche) : c'est le seul pont possible entre tirage et poussee. */
+var GRP={pull:'Référence tractions',push:'Référence développé couché',leg:'Référence squat',mine:'Mes mouvements'};
+var CAT=[
+ {id:'pullup',   g:'pull',r:100,bw:1,n:'Tractions pronation',a:['tractions','traction','tractions pronation','pull up','pull-up']},
+ {id:'chinup',   g:'pull',r:105,bw:1,n:'Tractions supination',a:['chin up','chin-up','supination']},
+ {id:'dip',      g:'pull',r:120,bw:1,g2:'push',r2:120,n:'Dips',a:['dips','dip','dips barre']},
+ {id:'ringpullN',g:'pull',r:95, bw:1,n:'Tractions anneaux, neutre ou supination'},
+ {id:'ringpullP',g:'pull',r:90, bw:1,n:'Tractions anneaux, pronation'},
+ {id:'ringpullW',g:'pull',r:85, bw:1,n:'Tractions anneaux, prise large'},
+ {id:'towel',    g:'pull',r:90, bw:1,n:'Tractions serviette ou corde'},
+ {id:'pdN',      g:'pull',r:90, bw:0,n:'Tirage vertical, neutre ou pronation'},
+ {id:'pdS',      g:'pull',r:95, bw:0,n:'Tirage vertical, supination'},
+ {id:'pdW',      g:'pull',r:85, bw:0,n:'Tirage vertical, prise large'},
+ {id:'benchpull',g:'pull',r:70, bw:0,n:'Bench pull'},
+ {id:'row',      g:'pull',r:65, bw:0,n:'Rowing buste penché'},
+ {id:'cablerow', g:'pull',r:60, bw:0,n:'Rowing poulie'},
+ {id:'csrow',    g:'pull',r:70, bw:0,n:'Rowing appui poitrine'},
+ {id:'dbrow',    g:'pull',r:35, bw:0,n:'Rowing haltère, un bras'},
+ {id:'curlbb',   g:'pull',r:35, bw:0,n:'Curl barre'},
+ {id:'curldb',   g:'pull',r:20, bw:0,n:'Curl haltères'},
+ {id:'bench',    g:'push',r:100,bw:0,n:'Développé couché',a:['developpe couche','développé couché','couché','bench']},
+ {id:'decline',  g:'push',r:105,bw:0,n:'Développé décliné'},
+ {id:'incline',  g:'push',r:80, bw:0,n:'Développé incliné'},
+ {id:'cgbench',  g:'push',r:80, bw:0,n:'Développé couché prise serrée'},
+ {id:'dbbench',  g:'push',r:33, bw:0,n:'Développé haltères, par haltère'},
+ {id:'pushpress',g:'push',r:75, bw:0,n:'Push press'},
+ {id:'ohp',      g:'push',r:55, bw:0,n:'Développé militaire',a:['ohp','militaire','overhead press']},
+ {id:'ringdip',  g:'push',r:105,bw:1,n:'Dips anneaux'},
+ {id:'squat',    g:'leg', r:100,bw:0,n:'Squat complet',a:['squat']},
+ {id:'front',    g:'leg', r:80, bw:0,n:'Front squat'},
+ {id:'ohs',      g:'leg', r:70, bw:0,n:'Overhead squat'},
+ {id:'lunge',    g:'leg', r:40, bw:0,n:'Fente'},
+ {id:'unil',     g:'leg', r:40, bw:0,n:'Squat unilatéral'},
+ {id:'rdl',      g:'leg', r:75, bw:0,n:'Soulevé de terre jambes tendues'},
+ {id:'shrug',    g:'leg', r:85, bw:0,n:'Shrug'},
+ {id:'cleanpull',g:'leg', r:85, bw:0,n:'Clean pull'}
+];
+/* Estimations de depart a partir du poids de corps (table 4.6, hommes). Volontairement
+   tres conservatrices : elles servent de garde-fou quand la matrice donne un chiffre etrange. */
+var CATBW={pullup:1.0, squat:1.2, bench:0.75};
+function allCat(){return CAT.concat(S.cat||[]);}
+function catOf(id){var a=allCat();for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];return null;}
+function catByName(nm){
+  var k=String(nm||'').toLowerCase().trim();
+  var a=allCat();
+  for(var i=0;i<a.length;i++){
+    if(a[i].n.toLowerCase()===k)return a[i];
+    if(a[i].a&&a[i].a.indexOf(k)>=0)return a[i];
+  }
+  return null;
+}
+function catVisible(c){return !(S.catHide&&S.catHide[c.id]);}
+function catGroups(c){var o=[];if(c.g)o.push({g:c.g,r:c.r});if(c.g2)o.push({g:c.g2,r:c.r2});return o;}
+/* Facteur a appliquer au 1RM systeme de l'ancre pour obtenir celui de la cible.
+   crossed = le passage a du emprunter le second groupe d'un des deux mouvements. */
+function catLink(anchorId,targetId){
+  var A=catOf(anchorId), B=catOf(targetId);
+  if(!A||!B||!A.r||!B.r)return null;
+  var ga=catGroups(A), gb=catGroups(B);
+  for(var i=0;i<ga.length;i++)for(var j=0;j<gb.length;j++)
+    if(ga[i].g===gb[j].g)
+      return {g:ga[i].g, f:gb[j].r/ga[i].r, crossed:(ga[i].g!==A.g)||(gb[j].g!==B.g)};
+  return null;
+}
 var PAIRS=[['',''],['7','9'],['5','7'],['3','5']];
 function tplOf(id){return id==='advpeak'?ADVPEAK:(id==='acc'?ACC:(ZLAT[id]||HELMS[id]));}
 function isZlat(id){return !!ZLAT[id];}
@@ -579,9 +700,9 @@ function renderHead(){
 function renderLifts(){
   $('liftlist').innerHTML=S.lifts.map(function(L,i){
     return '<div class="card liftcard c'+(i%4)+'">'+
-      '<h2><span class="tagname n'+(i%4)+'">'+L.name+'</span><em>'+(L.useBw?'poids de corps inclus':'charge seule')+'</em></h2>'+
+      '<h2><span class="tagname n'+(i%4)+'">'+esc(L.name)+'</span><em>'+(L.useBw?'poids de corps inclus':'charge seule')+'</em></h2>'+
       '<div class="row">'+
-        '<div class="field"><label>Nom</label><input type="text" data-i="'+i+'" data-f="name" value="'+L.name+'"></div>'+
+        '<div class="field"><label>Nom</label><input type="text" data-i="'+i+'" data-f="name" value="'+esc(L.name)+'"></div>'+
         '<div class="field sm"><label>Pas de lestage</label><select data-i="'+i+'" data-f="step">'+
           [0.25,0.5,1.25,2.5].map(function(v){return '<option value="'+v+'"'+(L.step==v?' selected':'')+'>'+F(v)+'</option>';}).join('')+'</select></div>'+
         '<div class="field sm"><label>Coefficient</label><input data-i="'+i+'" data-f="k" type="number" step="0.0001" value="'+L.k+'"></div>'+
@@ -589,11 +710,15 @@ function renderLifts(){
           '<option value="1"'+(L.useBw?' selected':'')+'>compte</option><option value="0"'+(!L.useBw?' selected':'')+'>ne compte pas</option></select></div>'+
       '</div>'+
       '<div class="row" style="margin-top:8px">'+
+        '<div class="field md"><label>Équivalent catalogue</label><select data-i="'+i+'" data-f="catId">'+catOptions(L.catId)+'</select></div>'+
+      '</div>'+
+      '<div class="row" style="margin-top:8px">'+
         '<div class="field sm"><label>Réf. lest</label><input data-i="'+i+'" data-f="rload" type="number" step="0.25" value="'+L.ref.load+'"></div>'+
         '<div class="field sm"><label>Réf. reps</label><input data-i="'+i+'" data-f="rreps" type="number" step="1" min="1" value="'+L.ref.reps+'"></div>'+
         '<div class="field sm"><label>Réf. réserve</label><input data-i="'+i+'" data-f="rrir" type="number" step="0.5" min="0" value="'+L.ref.rir+'"></div>'+
       '</div>'+
-      '<p class="note">1RM estimé <b>'+F(rnd(rmOf(L)-eff(L),0.25))+' kg</b> de lest · une rep coûte '+F(L.k*100)+' %</p>'+
+      '<p class="note">1RM estimé <b>'+F(rnd(rmOf(L)-eff(L),0.25))+' kg</b> de lest · une rep coûte '+F(L.k*100)+' %'+
+        (L.ref.est?' · <b>référence estimée</b>, à remplacer par une vraie série':'')+'</p>'+
       (S.lifts.length>1?'<div class="btnrow"><button class="act ghost mini" data-del="'+i+'">Supprimer</button></div>':'')+
     '</div>';
   }).join('');
@@ -601,26 +726,124 @@ function renderLifts(){
 $('liftlist').addEventListener('input',function(e){
   var t=e.target, i=t.dataset.i; if(i==null)return; var L=S.lifts[+i], f=t.dataset.f, v=t.value;
   if(f==='name')L.name=v||'Sans nom';
-  else if(f==='step')L.step=+v;
-  else if(f==='k')L.k=Math.max(0.001,+v||0.025);
-  else if(f==='rload')L.ref.load=+v||0;
-  else if(f==='rreps')L.ref.reps=Math.max(1,+v||1);
-  else if(f==='rrir')L.ref.rir=+v||0;
+  else if(f==='step')L.step=num(v,1.25);
+  else if(f==='k')L.k=Math.max(0.001,num(v,0.025));
+  else if(f==='rload'){L.ref.load=num(v,L.ref.load);L.ref.est=false;}
+  else if(f==='rreps'){L.ref.reps=Math.max(1,num(v,L.ref.reps));L.ref.est=false;}
+  else if(f==='rrir'){L.ref.rir=num(v,L.ref.rir);L.ref.est=false;}
   else if(f==='useBw')L.useBw=(v==='1');
-  save(); fillSelects(); renderHead(); renderCharges(); renderAssign();
+  else if(f==='catId')L.catId=v||null;
+  save(); fillSelects(); renderHead(); renderCharges(); renderAssign(); renderCatPick();
 });
 $('liftlist').addEventListener('click',function(e){
   var b=e.target.closest('[data-del]'); if(!b)return;
   S.lifts.splice(+b.dataset.del,1); if(S.active>=S.lifts.length)S.active=0; save(); renderAll();
 });
+function catOptions(sel){
+  var out='<option value="">aucun</option>';
+  ['pull','push','leg','mine'].forEach(function(g){
+    var list=allCat().filter(function(c){return c.g===g;});
+    if(!list.length)return;
+    out+='<optgroup label="'+esc(GRP[g])+'">'+list.map(function(c){
+      return '<option value="'+c.id+'"'+(sel===c.id?' selected':'')+'>'+esc(c.n)+'</option>';
+    }).join('')+'</optgroup>';
+  });
+  return out;
+}
+function catPickOptions(){
+  var out='<option value="">Mouvement personnalis\u00e9</option>';
+  ['pull','push','leg','mine'].forEach(function(g){
+    var list=allCat().filter(function(c){return c.g===g&&catVisible(c);});
+    if(!list.length)return;
+    out+='<optgroup label="'+esc(GRP[g])+'">'+list.map(function(c){
+      return '<option value="'+c.id+'">'+esc(c.n)+(c.r?' \u00b7 '+F(c.r)+' %':'')+'</option>';
+    }).join('')+'</optgroup>';
+  });
+  return out;
+}
+function anchorsFor(id){
+  if(!id)return [];
+  return S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){
+    return o.L.catId&&o.L.catId!==id&&catLink(o.L.catId,id);
+  });
+}
+function catNote(sel,from){
+  if(!sel)return 'Cr\u00e9e un mouvement vide : sa r\u00e9f\u00e9rence est \u00e0 saisir \u00e0 la main dans sa fiche.';
+  var e=catOf(sel);
+  var A=(from!==''&&from!=null&&S.lifts[+from])?S.lifts[+from]:null;
+  var lk=A?catLink(A.catId,sel):null;
+  if(!lk)return 'Pas d\'estimation possible ici : la r\u00e9f\u00e9rence sera \u00e0 saisir \u00e0 la main.';
+  var rm=rmOf(A)*lk.f, effN=e.bw?S.bw*RC:0, lo=rm/(1+0.025*4)-effN;
+  var t='Rapport appliqu\u00e9 <b>'+F(Math.round(lk.f*1000)/10)+' %</b> de '+esc(A.name)+
+    ' \u2192 1RM syst\u00e8me estim\u00e9 <b>'+F(rnd(rm,0.25))+' kg</b>, r\u00e9f\u00e9rence de d\u00e9part <b>'+
+    (lo<0?'0 kg, sous le poids de corps':F(rnd(lo,0.25))+' kg')+'</b> pour 5 reps \u00e0 l\'\u00e9chec.';
+  if(lk.crossed)t+=' <b>Ce calcul traverse le tirage et la poussée en passant par les dips</b> \u2014 c\'est le seul pont '+
+    'que donne la matrice, et c\'est l\u00e0 qu\'elle est la plus fragile.';
+  if(CATBW[sel])t+=' Pour comparaison, la table de d\u00e9part au poids de corps du m\u00eame livre donnerait '+
+    F(rnd(S.bw*CATBW[sel],0.25))+' kg de 1RM syst\u00e8me. Un \u00e9cart large entre les deux veut dire : testez avant de programmer.';
+  return t;
+}
+function renderCatPick(){
+  var keep=$('catsel').value;
+  $('catsel').innerHTML=catPickOptions();
+  if(keep&&$('catsel').querySelector('option[value="'+keep+'"]'))$('catsel').value=keep;
+  var sel=$('catsel').value;
+  $('catcustom').style.display=sel?'none':'';
+  var an=anchorsFor(sel);
+  $('catanchor').style.display=an.length?'':'none';
+  var kf=$('catfrom').value;
+  $('catfrom').innerHTML=an.map(function(o){
+    return '<option value="'+o.i+'">'+esc(o.L.name)+'</option>';
+  }).join('')+'<option value="">ne pas estimer, je saisirai la r\u00e9f\u00e9rence</option>';
+  if(kf!==''&&$('catfrom').querySelector('option[value="'+kf+'"]'))$('catfrom').value=kf;
+  $('catnote').innerHTML=catNote(sel,$('catfrom').value);
+}
+function renderCatList(){
+  $('catlist').innerHTML=['pull','push','leg','mine'].map(function(g){
+    var list=allCat().filter(function(c){return c.g===g;});
+    if(!list.length)return '';
+    return '<p class="note" style="margin:10px 0 4px"><b>'+esc(GRP[g])+'</b></p><div class="pillrow">'+
+      list.map(function(c){
+        return '<button class="pill cat" data-cat="'+c.id+'" aria-pressed="'+catVisible(c)+'">'+
+          esc(c.n)+(c.r?' \u00b7 '+F(c.r)+' %':'')+'</button>';
+      }).join('')+'</div>';
+  }).join('')+
+  '<p class="note">Touchez pour retirer un mouvement de la liste d\'ajout, ou l\'y remettre. '+
+  'Les pourcentages sont des rapports de 1RM en charge syst\u00e8me, chaque groupe rapport\u00e9 \u00e0 sa propre r\u00e9f\u00e9rence \u00e0 100.</p>';
+}
+$('catlist').addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-cat]'); if(!b)return;
+  var id=b.dataset.cat; if(!S.catHide)S.catHide={};
+  if(S.catHide[id])delete S.catHide[id]; else S.catHide[id]=1;
+  save(); renderCatList(); renderCatPick();
+});
+$('catsel').addEventListener('change',renderCatPick);
+$('catfrom').addEventListener('change',function(){$('catnote').innerHTML=catNote($('catsel').value,this.value);});
 $('addlift').addEventListener('click',function(){
-  S.lifts.push({name:'Nouveau mouvement',useBw:false,step:1.25,k:0.025,ref:{load:40,reps:5,rir:0},prog:newProg(2.5)});
-  save(); renderAll();
+  var sel=$('catsel').value, from=$('catfrom').value, L;
+  if(!sel){
+    var nm=($('catname').value||'').trim()||'Nouveau mouvement', bw=$('catbw').value==='1';
+    L={name:nm,catId:null,useBw:bw,step:bw?1.25:2.5,k:0.025,
+       ref:{load:bw?10:40,reps:5,rir:0,est:true},prog:newProg(bw?1.25:2.5)};
+    if($('catkeep').value==='1'){
+      var id='u'+Date.now();
+      S.cat.push({id:id,g:'mine',r:null,bw:bw?1:0,n:nm});
+      L.catId=id;
+    }
+    $('catname').value='';
+  }else{
+    var e=catOf(sel);
+    L={name:e.n,catId:e.id,useBw:!!e.bw,step:e.bw?1.25:2.5,k:0.025,
+       ref:{load:e.bw?10:40,reps:5,rir:0,est:true},prog:newProg(e.bw?1.25:2.5)};
+    var A=(from!==''&&S.lifts[+from])?S.lifts[+from]:null, lk=A?catLink(A.catId,sel):null;
+    if(lk)L.ref.load=Math.max(0,Math.round((rmOf(A)*lk.f/(1+L.k*4)-(L.useBw?S.bw*RC:0))*4)/4);
+  }
+  S.lifts.push(L); save(); renderAll();
 });
 
 /* ================= Charges ================= */
 function renderCharges(){
-  var L=cur(), lo=+$('cload').value||0, reps=Math.max(1,+$('creps').value||1), rir=+$('crir').value||0;
+  var L=cur(), lo=num($('cload').value,0), reps=Math.max(1,num($('creps').value,1)), rir=num($('crir').value,0);
   var rm=e1rm(L,lo,reps,rir);
   $('cout').innerHTML=F(rnd(rm-eff(L),0.25))+'<small>kg de lest</small>';
   $('cnote').innerHTML='Série de '+reps+' reps'+(rir?' à '+F(rir)+' en réserve, équivalente à une série de '+F(reps+rir)+' menée à l\'échec':' menée à l\'échec')+
@@ -729,7 +952,7 @@ function renderAssign(){
           '<option value="libre"'+(P.startMode==='libre'?' selected':'')+'>libre</option></select></div>';
       if(P.startMode==='rir'){
         h+='<div class="field sm"><label>Réserve au 1er top set</label><select data-i="'+i+'" data-f="rir">'+
-          [0,1,2,3,4,5].map(function(v){return '<option value="'+v+'"'+(P.rir==v?' selected':'')+'>'+v+'</option>';}).join('')+'</select></div>';
+          [0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){return '<option value="'+v+'"'+(P.rir==v?' selected':'')+'>'+F(v)+'</option>';}).join('')+'</select></div>';
       }else if(P.startMode==='pr'){
         h+='<div class="field sm"><label>Semaine</label><select data-i="'+i+'" data-f="prWeek">'+
             Array.apply(null,{length:S.nwk}).map(function(_,k){return '<option value="'+(k+1)+'"'+(P.prWeek==k+1?' selected':'')+'>S'+(k+1)+'</option>';}).join('')+'</select></div>'+
@@ -944,18 +1167,76 @@ function apLines(L,idx,w,lab,day){
     }
   }
 }
+/* ================= charge cumulee (INOL) =================
+   INOL = somme sur les series de reps / (100 - %1RM), d'apres Hristov, repris par Jovanovic.
+   Reperes par mouvement : par seance <0,4 insuffisant, 0,4-1 confortable, 1-2 dur mais bon
+   en phase de charge, >2 brutal. Par semaine : <2 facile, 2-3 dur mais tenable, 3-4 brutal,
+   >4 deraisonnable.
+   RESERVE : ces seuils ont ete etablis sur charge externe de barre. En charge systeme les
+   pourcentages sont comprimes vers le haut, donc les chiffres sortent plus gros a effort egal.
+   A recalibrer sur vos propres blocs avant de s'en servir pour decider quoi que ce soit. */
+function inolPct(L,load){var rm=rmOf(L);if(!rm)return 0;return Math.min(0.98,(eff(L)+load)/rm);}
+function inolReps(L,x){
+  if(/^\d/.test(String(x.reps)))return repMin(x.reps);
+  var r=(rmOf(L)/(eff(L)+x.load)-1)/L.k+1;   /* serie maximale : reps predites a cette charge */
+  return Math.max(1,Math.round(r));
+}
+function inolLine(L,x){
+  var p=inolPct(L,x.load); if(p<=0)return 0;
+  return (x.sets||1)*inolReps(L,x)/(100-100*p);
+}
+function inolWeek(week){
+  var o={};
+  week.days.forEach(function(d){
+    d.lines.forEach(function(x){
+      var L=S.lifts[x.li], rm=rmOf(L); if(!L||!rm)return;
+      if(!o[x.li])o[x.li]={v:0,over:false};
+      if((eff(L)+x.load)/rm>0.95)o[x.li].over=true;   /* au-dela, la formule diverge */
+      o[x.li].v+=inolLine(L,x);
+    });
+  });
+  return o;
+}
+function inolTag(v,scope){
+  if(scope==='day'){
+    if(v<0.4)return {t:'stimulus faible',c:'warn'};
+    if(v<1)  return {t:'confortable',c:'ok'};
+    if(v<2)  return {t:'dur',c:''};
+    return {t:'brutal',c:'bad'};
+  }
+  if(v<2)return {t:'facile',c:'ok'};
+  if(v<3)return {t:'dur mais tenable',c:''};
+  if(v<4)return {t:'brutal',c:'warn'};
+  return {t:'déraisonnable',c:'bad'};
+}
+function inolHTML(week,scope){
+  var q=inolWeek(week), keys=Object.keys(q);
+  if(!keys.length)return '';
+  var over=false;
+  var parts=keys.map(function(k){
+    var L=S.lifts[+k]; if(!L)return '';
+    var nm='<span class="n'+(+k%4)+'">'+esc(L.name)+'</span> ';
+    if(q[k].over){over=true;return nm+'<b class="bad">hors \u00e9chelle</b>';}
+    var g=inolTag(q[k].v,scope);
+    return nm+'<b class="'+g.c+'">'+F(Math.round(q[k].v*10)/10)+'</b> '+g.t;
+  }).filter(Boolean).join(' &nbsp;\u00b7&nbsp; ');
+  if(!parts)return '';
+  return '<div class="inol">Charge cumul\u00e9e '+(scope==='day'?'de la s\u00e9ance':'de la semaine')+' \u2014 '+parts+
+    (over?'<br>Hors \u00e9chelle : une charge d\u00e9passe 95 % du 1RM estim\u00e9, o\u00f9 la formule diverge. Sur un bloc de singles, ce chiffre ne veut rien dire.':'')+
+    '</div>';
+}
 function lineState(key,date){
   var e=S.log.filter(function(x){return x.key===key;})[0];
   if(!e)return '';
   return e.state||'';
 }
-function renderPlan(into,weeks,pfx){
-  pfx=pfx||'p';
+function renderPlan(into,weeks,pfx,scope){
+  pfx=pfx||'p'; scope=scope||'week';
   var sep=S.sep, html='', txt='';
   weeks.forEach(function(week){
     var kw=pfx+'w'+week.w;
     html+='<div class="wk'+(fold(kw)?' folded':'')+'"><div class="wkh" data-fold="'+kw+'">'+chev(kw)+
-      '<b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span></div><div class="wkb">';
+      '<b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span>'+inolHTML(week,scope)+'</div><div class="wkb">';
     txt+='\n[Semaine '+(week.w+1)+']\n';
     week.days.forEach(function(day){
       var kd=pfx+'d'+week.w+'-'+day.label;
@@ -1060,9 +1341,12 @@ function panelHTML(key){
   var uKey=keyUnit(key);
   var fail=(uKey!=null&&(x.role==='top'||x.role==='amrap'))?((L.prog.adj||[]).indexOf(uKey)>=0):null;
   var rirNow=e&&e.rir!=null?e.rir:null;
+  var rirBase=rirNow==null?null:Math.floor(rirNow), rirHalf=rirNow!=null&&(rirNow-Math.floor(rirNow))>0.01;
   var rirs=[0,1,2,3,4,5].map(function(q){
-    return '<button class="pill" data-rir="'+q+'" aria-pressed="'+(rirNow===q)+'">'+q+'</button>';
-  }).join('')+'<button class="pill" data-rir="x" aria-pressed="'+(e&&e.rir===null)+'">?</button>';
+    return '<button class="pill" data-rir="'+q+'" aria-pressed="'+(rirBase===q)+'">'+q+'</button>';
+  }).join('')+
+    '<button class="pill half" data-rir="h" aria-pressed="'+rirHalf+'">\u00bd</button>'+
+    '<button class="pill" data-rir="x" aria-pressed="'+(!!(e&&e.rir===null))+'">?</button>';
   return '<div class="panel" data-panel="'+key+'">'+
     '<h4 class="n'+(x.li%4)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
     '<div class="row">'+
@@ -1116,7 +1400,17 @@ function panelClick(e){
       e.stopPropagation(); return;
     }
     if(b.dataset.rir!=null){
-      Array.prototype.forEach.call(p.querySelectorAll('[data-rir]'),function(x){x.setAttribute('aria-pressed',x===b);});
+      var dr=b.dataset.rir;
+      if(dr==='h'){                                  /* modificateur : s'ajoute au chiffre choisi */
+        var on=b.getAttribute('aria-pressed')==='true';
+        b.setAttribute('aria-pressed',on?'false':'true');
+        var xb=p.querySelector('[data-rir=x]'); if(xb)xb.setAttribute('aria-pressed','false');
+      }else{
+        Array.prototype.forEach.call(p.querySelectorAll('[data-rir]'),function(x){
+          if(x.dataset.rir==='h'){ if(dr==='x')x.setAttribute('aria-pressed','false'); return; }
+          x.setAttribute('aria-pressed',x===b);
+        });
+      }
       e.stopPropagation(); return;
     }
     if(b.dataset.fail){toggleFail(b.dataset.fail);e.stopPropagation();return;}
@@ -1148,16 +1442,21 @@ function saveLine(p,key){
   else Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(b){
     var t=b.textContent.replace(' reps',''); sets.push(/^\d+$/.test(t)?+t:null);
   });
-  var rirB=p.querySelector('[data-rir][aria-pressed=true]');
-  var rir=rirB?(rirB.dataset.rir==='x'?null:+rirB.dataset.rir):null;
+  var unkB=p.querySelector('[data-rir=x][aria-pressed=true]');
+  var halfB=p.querySelector('[data-rir=h][aria-pressed=true]');
+  var baseB=null;
+  Array.prototype.forEach.call(p.querySelectorAll('[data-rir][aria-pressed=true]'),function(x){
+    if(x.dataset.rir!=='x'&&x.dataset.rir!=='h')baseB=x;
+  });
+  var rir = unkB ? null : (baseB ? +baseB.dataset.rir+(halfB?0.5:0) : (halfB?0.5:null));
   var setNotes=[];
   Array.prototype.forEach.call(p.querySelectorAll('[data-setnote]'),function(el){setNotes[+el.dataset.setnote]=el.value.trim();});
-  var min=repMin(x.reps), load=+loadEl.value||0;
+  var min=repMin(x.reps), load=num(loadEl.value,x.load);
   var okLoad=load>=x.load-0.01, okReps=sets.every(function(v){return v!=null&&v>=min;});
   var state=(okLoad&&okReps)?'ok':(sets.some(function(v){return v!=null;})?(okReps?'mod':'miss'):'mod');
   var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:x.li,lift:L.name,tpl:L.prog.tpl,week:f.w+1,day:f.day,
     role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,load:load,sets:sets,rir:rir,
-    bw:+($('tbw').value)||S.bw,note:noteEl.value.trim(),setNotes:setNotes,state:state};
+    bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
   save(); closePanel(); refreshPlans();
 }
@@ -1193,7 +1492,7 @@ function renderToday(){
   var weeks=PLAN.filter(function(wk){return wk.w===wIdx;}).map(function(wk){
     return {w:wk.w,days:wk.days.filter(function(dd){return dd.label===sel;})};
   }).filter(function(wk){return wk.days.length;});
-  renderPlan($('todayout'),weeks,'t');
+  renderPlan($('todayout'),weeks,'t','day');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
 }
@@ -1234,7 +1533,10 @@ $('todayout').addEventListener('input',function(e){
 });
 $('tday').addEventListener('change',renderToday);
 $('start').addEventListener('change',function(){S.start=this.value;save();generate();renderToday();});
-$('tbw').addEventListener('input',function(){});
+$('tbw').addEventListener('input',function(){
+  var v=num(this.value,null);
+  S.tbw=(v===null||v<=0)?null:Math.round(v*100)/100; save();
+});
 
 /* ================= Données ================= */
 function fitLift(li){
@@ -1324,7 +1626,7 @@ function renderData(){
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/');
       return '<div class="logrow"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+((e.li||0)%4)+'">'+(e.lift||'')+'</b> '+F(e.load)+' '+S.sep+' '+reps+
-        (e.rir!=null?' · '+e.rir+' en réserve':' · réserve inconnue')+
+        (e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue')+
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+F(e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
         (e.note?'<br><i>'+e.note+'</i>':'')+'</span>'+
@@ -1347,11 +1649,11 @@ $('applyfit').addEventListener('click',function(){
 });
 $('addlog').addEventListener('click',function(){
   var li=+$('llift').value, L=S.lifts[li], rirv=$('lrir').value;
-  var reps=Math.max(1,+$('lreps').value||0), load=+$('lload').value||0;
+  var reps=Math.max(1,num($('lreps').value,0)), load=num($('lload').value,0);
   if(!load&&!reps)return;
   S.log.push({v:SCHEMA,id:'pr'+Date.now(),key:'pr'+Date.now(),date:$('ldate').value||todayISO(),
     li:li,lift:L.name,tpl:null,week:null,day:null,role:'pr',presLoad:null,presReps:null,presSets:null,
-    load:load,sets:[reps],rir:rirv===''?null:+rirv,bw:+$('lbw').value||S.bw,note:$('lnote').value.trim(),state:null});
+    load:load,sets:[reps],rir:rirv===''?null:+rirv,bw:num($('lbw').value,S.bw),note:$('lnote').value.trim(),state:null});
   save(); renderData();
   $('lload').value='';$('lreps').value='';$('lnote').value='';
 });
@@ -1387,16 +1689,21 @@ $('importfile').addEventListener('change',function(){
 });
 
 /* ================= démarrage ================= */
-$('bw').addEventListener('input',function(){S.bw=+this.value||0;save();renderHead();renderCharges();renderLifts();renderAssign();generate();});
+$('bw').addEventListener('input',function(){
+  var v=num(this.value,null);
+  if(v===null||v<=0)return;                    /* saisie en cours : on ne touche a rien */
+  S.bw=Math.round(v*100)/100; save();
+  renderHead();renderCharges();renderLifts();renderAssign();generate();renderCatPick();
+});
 $('lift').addEventListener('change',function(){S.active=+this.value;save();renderHead();renderCharges();});
 
 function renderAll(){
   applyTheme();
-  $('bw').value=S.bw; $('nwk').value=S.nwk; $('sep').value=S.sep; $('jours').value=S.jours;
-  $('start').value=S.start||''; if(!$('tbw').value)$('tbw').value=S.bw;
+  $('bw').value=F(S.bw); $('nwk').value=S.nwk; $('sep').value=S.sep; $('jours').value=S.jours;
+  $('start').value=S.start||''; if(!$('tbw').value)$('tbw').value=F(S.tbw!=null?S.tbw:S.bw);
   if(!$('ldate').value)$('ldate').value=todayISO();
-  if(!$('lbw').value)$('lbw').value=S.bw;
-  fillSelects(); renderHead(); renderLifts(); renderCharges(); renderAssign();
+  if(!$('lbw').value)$('lbw').value=F(S.bw);
+  fillSelects(); renderHead(); renderLifts(); renderCharges(); renderCatPick(); renderCatList(); renderAssign();
   generate(); renderToday(); renderData();
 }
 load(); renderAll();
@@ -1406,6 +1713,9 @@ $('foot').innerHTML='Modèle de charge : RPE Calculator (streetlifting) — 1RM 
   'Vérifié sur neuf captures de l\'app, au quart de kilo près. '+
   'Programmes marqués « PDF Zlat » : structures et pourcentages du PDF. V2 et V3 : modifications faites avec vous. '+
   'Gabarits Helms : transposition en reps et reps en réserve, les réserves affichées sont une interprétation des RPE du livre. '+
+  'Charge cumulée : INOL = Σ reps / (100 − %1RM), Hristov via Jovanović — seuils établis sur charge externe de barre, '+
+  'à recalibrer sur vos blocs puisque la charge système comprime les pourcentages. '+
+  'Catalogue de mouvements : matrice de rapports de 1RM de Jovanović (fig. 3.28, d\'après Dan Baker 2015). '+
   'Données enregistrées dans ce navigateur uniquement — exportez régulièrement. Schéma v'+SCHEMA+'.';
 
 if('serviceWorker' in navigator){
