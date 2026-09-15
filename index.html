@@ -356,8 +356,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div class="btnrow">
       <button class="act ghost" id="exportj">Exporter en JSON</button>
       <button class="act ghost" id="exportc">Exporter en CSV</button>
-      <button class="act ghost" id="importbtn">Importer</button>
+      <button class="act ghost" id="importbtn">Importer une sauvegarde</button>
+      <button class="act ghost" id="mergebtn">Ajouter un historique</button>
       <input type="file" id="importfile" accept="application/json" style="display:none">
+      <input type="file" id="mergefile" accept="application/json" style="display:none">
     </div>
   </div>
 </section>
@@ -2528,9 +2530,46 @@ $('importbtn').addEventListener('click',function(){$('importfile').click();});
 $('importfile').addEventListener('change',function(){
   var f=this.files[0]; if(!f)return; var r=new FileReader();
   r.onload=function(){
-    try{var d=JSON.parse(r.result); if(!d.lifts||!d.lifts.length)throw 0;
+    try{
+      var d=JSON.parse(r.result); if(!d.lifts||!d.lifts.length)throw 0;
+      /* l'import complet ECRASE tout : on compte ce qui part et ce qui arrive,
+         et on sauvegarde l'etat courant avant, sinon un mauvais fichier efface tout. */
+      var cur=(S.log||[]).length, inc=(d.log||[]).length;
+      if(!confirm('Remplacer TOUT le contenu actuel ?\n\n'+
+        'Actuellement : '+cur+' s\u00e9rie'+(cur>1?'s':'')+' et '+(S.lifts||[]).length+' mouvements.\n'+
+        'Dans le fichier : '+inc+' s\u00e9rie'+(inc>1?'s':'')+' et '+d.lifts.length+' mouvements.\n\n'+
+        'Une copie de l\'\u00e9tat actuel est gard\u00e9e et peut \u00eatre restaur\u00e9e par le m\u00eame bouton '+
+        'tant que vous ne rechargez pas.'))return;
+      try{localStorage.setItem('cp-state-backup',JSON.stringify(S));}catch(e2){}
       localStorage.setItem('cp-state',JSON.stringify(d)); load(); renderAll();
     }catch(e){alert("Ce fichier n'est pas une sauvegarde de cet outil.");}
+  };
+  r.readAsText(f);
+});
+/* Fusion : ajoute des series au journal sans toucher aux reglages, aux mouvements
+   ni au bloc en cours. Sert a verser un historique ancien pour que l'ajustement de
+   courbe ait de quoi travailler. */
+$('mergebtn').addEventListener('click',function(){$('mergefile').click();});
+$('mergefile').addEventListener('change',function(){
+  var f=this.files[0]; if(!f)return; var r=new FileReader();
+  r.onload=function(){
+    try{
+      var d=JSON.parse(r.result);
+      var arr=Array.isArray(d)?d:(d&&Array.isArray(d.log)?d.log:null);
+      if(!arr||!arr.length)throw 0;
+      var have={}; (S.log||[]).forEach(function(e){have[e.id||e.key]=1;});
+      var add=0, skip=0, bad=0;
+      arr.forEach(function(e){
+        if(!e||e.li==null||!e.date||!e.sets||!e.sets.length){bad++;return;}
+        if(e.li>=S.lifts.length){bad++;return;}
+        if(have[e.id||e.key]){skip++;return;}
+        S.log.push(e); have[e.id||e.key]=1; add++;
+      });
+      save(); renderAll();
+      alert(add+' s\u00e9rie'+(add>1?'s':'')+' ajout\u00e9e'+(add>1?'s':'')+
+        (skip?', '+skip+' d\u00e9j\u00e0 pr\u00e9sente'+(skip>1?'s':''):'')+
+        (bad?', '+bad+' ignor\u00e9e'+(bad>1?'s':'')+' (format ou mouvement inconnu)':'')+'.');
+    }catch(e){alert("Ce fichier ne contient pas une liste de s\u00e9ries exploitable.");}
   };
   r.readAsText(f);
 });
