@@ -69,6 +69,7 @@ button.act{font:600 13px/1 var(--txt);padding:9px 12px;border:1px solid var(--in
 button.act.ghost{background:transparent;color:var(--ink)}
 button.act.mini{padding:5px 8px;font-size:12px}
 .btnrow{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+button:disabled{opacity:.35;pointer-events:none}
 .iconbtn.sq{flex:0 0 auto;width:34px;height:32px;padding:0;font-size:15px;line-height:1;
   display:inline-flex;align-items:center;justify-content:center}
 .iconbtn{font:600 12px/1 var(--txt);padding:7px 9px;border:1px solid var(--rule);background:var(--surface);
@@ -188,7 +189,12 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 </nav>
 
 <!-- ======================= SÉANCE DU JOUR ======================= -->
-<section class="page on" id="p-today">
+<section class="page" id="p-today">
+  <div class="card" id="cardform">
+    <h2>Forme du jour <em>quatre repères, 5 = au mieux</em></h2>
+    <div id="formrows"></div>
+    <p class="note" id="formnote"></p>
+  </div>
   <div class="card">
     <h2>Aujourd'hui <em id="todaydate"></em></h2>
     <div class="row">
@@ -196,7 +202,12 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="field sm"><label for="tbw">PdC du jour</label><input id="tbw" class="numin" type="text" inputmode="decimal"></div>
       <div class="field md"><label for="tday">Séance</label><select id="tday"></select></div>
     </div>
-    <div class="btnrow"><button class="act ghost" id="tdone">Marquer la séance comme faite</button></div>
+    <div class="btnrow">
+      <button class="iconbtn sq" id="tprev" title="Séance précédente" aria-label="Séance précédente">‹</button>
+      <button class="iconbtn sq" id="tnext" title="Séance suivante" aria-label="Séance suivante">›</button>
+      <button class="act ghost" id="tdone">Marquer la séance comme faite</button>
+      <button class="act" id="tback" style="display:none">Revenir à la séance en cours</button>
+    </div>
     <p class="note" id="tstate"></p>
     <p class="note">Le poids de corps saisi ici s'applique à toutes les séries enregistrées aujourd'hui.
     Touchez une ligne pour la valider ou la corriger. Marquer une séance comme faite ne verrouille rien :
@@ -232,6 +243,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div id="sync"></div>
   </div>
   <div id="out"></div>
+  <div id="inolhelp"></div>
 </section>
 
 <!-- ======================= CHARGES ======================= -->
@@ -410,7 +422,7 @@ var S={
     {name:'Tractions',catId:'pullup',useBw:true,step:1.25,k:0.025,ref:{load:46.25,reps:3,rir:0},prog:newProg(1.25)},
     {name:'Dips',catId:'dip',useBw:true,step:1.25,k:0.025,ref:{load:58.75,reps:3,rir:0},prog:newProg(2.5)}
   ],
-  cat:[], catHide:{}, tbw:null, done:{}, tsel:null, blockId:1, blocks:[], verbo:'norm',
+  cat:[], catHide:{}, tbw:null, done:{}, tsel:null, blockId:1, blocks:[], verbo:'norm', form:{},
   log:[]
 };
 S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
@@ -427,7 +439,7 @@ function load(){
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
     if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null;
     if(!S.done)S.done={}; if(S.tsel===undefined)S.tsel=null; if(!S.blockId)S.blockId=1;
-    if(!S.blocks)S.blocks=[]; if(!S.verbo)S.verbo='norm';
+    if(!S.blocks)S.blocks=[]; if(!S.verbo)S.verbo='norm'; if(!S.form)S.form={};
     S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
     S.lifts.forEach(function(L){
       var p=newProg(1.25); if(!L.prog)L.prog=p;
@@ -1522,10 +1534,59 @@ function dayDate(w,lab){
   var dt=new Date(base.getTime()+delta*86400000);
   return ' <em style="font-style:normal;font-weight:400;color:var(--muted)">'+dt.getDate()+'/'+(dt.getMonth()+1)+'</em>';
 }
+/* Simule une variante du reglage et rend la charge cumulee hebdomadaire maximale
+   qui en resulterait, puis remet l'etat exactement comme il etait. */
+function simInol(i,field,value){
+  var P=S.lifts[i].prog, isN=(field==='nwk'), old=isN?S.nwk:P[field], v=null;
+  if(isN)S.nwk=value; else P[field]=value;
+  try{ buildPlan(); v=inolMaxFor(i); }catch(e){ v=null; }
+  if(isN)S.nwk=old; else P[field]=old;
+  buildPlan();
+  return v;
+}
+function inolHelp(){
+  buildPlan();
+  var body=S.lifts.map(function(L,i){
+    var P=L.prog, now=inolMaxFor(i);
+    if(!now)return '';
+    var alts=[];
+    if(P.startMode==='rir')alts.push(['partir avec '+F((+P.rir||0)+1)+' reps en r\u00e9serve au lieu de '+F(+P.rir||0),simInol(i,'rir',(+P.rir||0)+1)]);
+    var lo=INCS.filter(function(v){return v<+P.inc;}).pop();
+    if(lo)alts.push(['incr\u00e9ment '+F(lo)+' kg au lieu de '+F(P.inc),simInol(i,'inc',lo)]);
+    if(+S.nwk>3)alts.push([(S.nwk-1)+' semaines au lieu de '+S.nwk,simInol(i,'nwk',+S.nwk-1)]);
+    var tg=inolTag(now,'week');
+    return '<p class="note" style="margin-top:10px"><b class="n'+(i%4)+'">'+esc(L.name)+'</b> \u2014 semaine la plus chargée du bloc : <b>'+
+      F(Math.round(now*10)/10)+'</b>, soit '+tg.t+'.</p>'+
+      (alts.length?'<div class="scroll"><table><thead><tr><th>si vous changez</th><th>la semaine la plus chargée passe à</th></tr></thead><tbody>'+
+        alts.map(function(a){
+          if(a[1]==null)return '<tr><td>'+a[0]+'</td><td>\u2014</td></tr>';
+          var d=a[1]-now;
+          return '<tr><td>'+a[0]+'</td><td>'+F(Math.round(a[1]*10)/10)+' <span class="src">('+(d>=0?'+':'\u2212')+F(Math.abs(Math.round(d*10)/10))+')</span></td></tr>';
+        }).join('')+'</tbody></table></div>':'');
+  }).join('');
+  if(!body)return '';
+  return '<details class="flag tip" style="margin-top:14px"><summary>Comment lire la charge cumul\u00e9e, et quoi en faire</summary>'+
+    '<p class="note">C\'est une dose, pas une note de difficult\u00e9. Pour chaque s\u00e9rie on additionne <b>reps \u00f7 (100 \u2212 %1RM)</b> : '+
+    'une s\u00e9rie \u00e0 95 % p\u00e8se donc quatre fois plus qu\'une s\u00e9rie de m\u00eame longueur \u00e0 80 %. Le total se lit par mouvement, '+
+    'sur une semaine.</p>'+
+    '<p class="note">Rep\u00e8res par semaine et par mouvement : sous 2 facile \u00b7 2 \u00e0 3 dur mais tenable \u00b7 3 \u00e0 4 brutal, r\u00e9serv\u00e9 '+
+    '\u00e0 un microcycle de choc \u00b7 au-del\u00e0 de 4 d\u00e9raisonnable. En s\u00e9ance : sous 0,4 stimulus insuffisant \u00b7 0,4 \u00e0 1 confortable \u00b7 '+
+    '1 \u00e0 2 dur mais bon en phase de charge \u00b7 au-del\u00e0 de 2 brutal.</p>'+
+    '<p class="note"><b>Ne visez pas un chiffre.</b> Ces seuils ont \u00e9t\u00e9 \u00e9tablis sur charge externe de barre. En charge syst\u00e8me, '+
+    'les pourcentages sont comprim\u00e9s vers le haut, donc vos valeurs sortent plus grosses \u00e0 effort r\u00e9el \u00e9gal, et « dur mais tenable » '+
+    'n\'est pas un probl\u00e8me \u00e0 corriger. Ce qui est utile, c\'est de comparer vos propres blocs entre eux, et de regarder si un bloc '+
+    'o\u00f9 vous avez cal\u00e9 sortait plus haut que celui d\'avant.</p>'+
+    '<p class="note">Les trois leviers ci-dessous sont recalcul\u00e9s sur votre configuration actuelle. Le quatri\u00e8me, qui n\'est pas '+
+    'simul\u00e9 ici, est le nombre de s\u00e9ries de back-off : il est fix\u00e9 par le gabarit.</p>'+
+    body+
+    '<p class="note"><b class="src">Source : INOL, Hristov, repris par Jovanovi\u0107.</b></p></details>';
+}
+
 function generate(){
   buildPlan();
   LASTTXT=renderPlan($('out'),PLAN);
   renderSync();
+  $('inolhelp').innerHTML=inolHelp();
 }
 function renderSync(){
   var ends=[];
@@ -1715,6 +1776,60 @@ function sessions(){
   var out=[]; PLAN.forEach(function(wk){wk.days.forEach(function(dd){out.push(wk.w+'|'+dd.label);});});
   return out;
 }
+/* ================= forme du jour =================
+   Quatre reperes notes de 1 a 5, tous dans le meme sens pour eviter les erreurs de saisie.
+   Ils ne modifient aucune charge : ils servent a relire les ecarts apres coup. Le jeu
+   sommeil / fatigue / stress / courbatures est celui du questionnaire de Hooper, cite de
+   memoire et non verifie ici ; les echelles d'origine vont de 1 a 7 et en sens inverse. */
+var FORMQ=[{k:'som',n:'Sommeil',h:'5 = reposé'},{k:'ene',n:'Énergie',h:'5 = en forme'},
+           {k:'cou',n:'Courbatures',h:'5 = aucune'},{k:'str',n:'Stress',h:'5 = calme'}];
+function formOf(k){return (S.form&&S.form[k])||{};}
+function formSum(f){
+  var v=FORMQ.map(function(q){return f[q.k];}).filter(function(x){return x;});
+  return v.length===FORMQ.length?v.reduce(function(a,b){return a+b;},0):null;
+}
+function renderForm(){
+  var k=S.tsel;
+  if(!k){$('formrows').innerHTML='';$('formnote').textContent='';return;}
+  var f=formOf(k);
+  $('formrows').innerHTML=FORMQ.map(function(q){
+    return '<p class="note" style="margin:8px 0 0"><b>'+q.n+'</b> <span class="src">'+q.h+'</span></p><div class="pillrow">'+
+      [1,2,3,4,5].map(function(v){
+        return '<button class="pill" data-fq="'+q.k+'" data-fv="'+v+'" aria-pressed="'+(f[q.k]===v)+'">'+v+'</button>';
+      }).join('')+'</div>';
+  }).join('');
+  var t=formSum(f);
+  $('formnote').innerHTML=t!=null
+    ? 'Total <b>'+t+'/20</b> pour cette s\u00e9ance'+(f.d?', not\u00e9 le '+frDate(f.d):'')+
+      '. Touchez une note d\u00e9j\u00e0 choisie pour l\'annuler.'
+    : 'Aucune charge n\'en d\u00e9pend. L\'int\u00e9r\u00eat est ailleurs : une s\u00e9rie rat\u00e9e un jour \u00e0 8/20 ne dit pas la m\u00eame chose qu\'une s\u00e9rie rat\u00e9e un jour \u00e0 18/20, et sans cette note la diff\u00e9rence est invisible trois semaines plus tard.';
+}
+$('formrows').addEventListener('click',function(ev){
+  var b=ev.target.closest?ev.target.closest('[data-fq]'):null; if(!b)return;
+  var k=S.tsel; if(!k)return;
+  if(!S.form[k])S.form[k]={};
+  var q=b.dataset.fq, v=+b.dataset.fv;
+  if(S.form[k][q]===v)delete S.form[k][q]; else S.form[k][q]=v;
+  S.form[k].d=todayISO();
+  save(); renderForm();
+});
+
+function nextSession(){
+  var sess=sessions(); if(!sess.length)return null;
+  for(var i=0;i<sess.length;i++)if(!S.done[sess[i]])return sess[i];
+  return sess[sess.length-1];
+}
+function goSession(k){ if(!k)return; S.tsel=k; save(); renderToday(); }
+$('tback').addEventListener('click',function(){goSession(nextSession());});
+$('tprev').addEventListener('click',function(){
+  buildPlan(); var sess=sessions(), i=sess.indexOf(S.tsel);
+  if(i>0)goSession(sess[i-1]);
+});
+$('tnext').addEventListener('click',function(){
+  buildPlan(); var sess=sessions(), i=sess.indexOf(S.tsel);
+  if(i>=0&&i<sess.length-1)goSession(sess[i+1]);
+});
+
 function renderToday(){
   buildPlan();
   var d=new Date(), names=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -1740,8 +1855,15 @@ function renderToday(){
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
+  var nk=nextSession(), off=(nk&&k!==nk);
+  $('tback').style.display=off?'':'none';
+  if(off)$('tback').textContent='Revenir \u00e0 S'+(+nk.split('|')[0]+1)+' \u2014 '+nk.split('|')[1];
+  $('tprev').disabled=(sessions().indexOf(k)<=0);
+  $('tnext').disabled=(sessions().indexOf(k)>=sess.length-1);
+  renderForm();
   $('tdone').textContent=S.done[k]?'Rouvrir cette s\u00e9ance':'Marquer la s\u00e9ance comme faite';
-  $('tstate').innerHTML=(S.done[k]?'Marqu\u00e9e faite le <b>'+frDate(S.done[k])+'</b>. ':'')+
+  $('tstate').innerHTML=(off?'<b>Vous consultez une autre s\u00e9ance que celle en cours.</b> ':'')+
+    (S.done[k]?'Marqu\u00e9e faite le <b>'+frDate(S.done[k])+'</b>. ':'')+
     '<b>'+nd+'</b> s\u00e9ance'+(nd>1?'s':'')+' sur '+sess.length+' marqu\u00e9e'+(nd>1?'s':'')+' faite'+(nd>1?'s':'')+' sur ce bloc.'+
     (S.start?'':' <b>Aucune date de d\u00e9but de bloc</b> : les dates affich\u00e9es dans le programme resteront vides tant que le champ ci-dessus est vide.');
   applyFolds();
@@ -1792,7 +1914,6 @@ $('todayout').addEventListener('input',function(e){
   if(n==='block'){S.blockNote=t.value;save();}
   else if(n==='day'){S.dayNotes[t.dataset.k]=t.value;save();}
 });
-$('tday').addEventListener('change',renderToday);
 $('start').addEventListener('change',function(){S.start=this.value;save();generate();renderToday();});
 $('tbw').addEventListener('input',function(){
   var v=num(this.value,null);
@@ -1896,17 +2017,29 @@ function statsHTML(st){
       '.</p>';
   }).join('');
 }
+function formStats(){
+  var v=[]; for(var k in (S.form||{})){ var t=formSum(S.form[k]); if(t!=null)v.push(t); }
+  if(!v.length)return null;
+  return {n:v.length,avg:v.reduce(function(a,b){return a+b;},0)/v.length,
+          lo:Math.min.apply(null,v),hi:Math.max.apply(null,v)};
+}
+function formLine(st){
+  var f=(st===undefined)?formStats():st;
+  if(!f)return '';
+  return ' \u00b7 forme moyenne ' + F(Math.round(f.avg*10)/10) + '/20 sur ' + f.n +
+    ' s\u00e9ance' + (f.n>1?'s':'') + ' not\u00e9e' + (f.n>1?'s':'') + ' (de ' + f.lo + ' \u00e0 ' + f.hi + ')';
+}
 function renderBilan(){
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   var h='<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
-    (S.start?'depuis le '+frDate(S.start):'aucune date de d\u00e9but')+' \u00b7 '+nd+'/'+sess.length+' s\u00e9ances marqu\u00e9es faites.</p>'+
+    (S.start?'depuis le '+frDate(S.start):'aucune date de d\u00e9but')+' \u00b7 '+nd+'/'+sess.length+' s\u00e9ances marqu\u00e9es faites'+formLine()+'.</p>'+
     statsHTML(blockStats(S.start||null,null));
   if(S.blocks.length){
     h+=S.blocks.slice().reverse().map(function(b){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
-        ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
+        ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
         statsHTML(b.stats)+'</div>';
     }).join('');
   }
@@ -1921,11 +2054,11 @@ $('newblock').addEventListener('click',function(){
     'faites, notes de s\u00e9ance, note de bloc et charges r\u00e9p\u00e9t\u00e9es apr\u00e8s \u00e9chec sont remises \u00e0 z\u00e9ro.'))return;
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
-  S.blocks.push({id:S.blockId,from:S.start||null,to:todayISO(),sess:sess.length,doneN:nd,
+  S.blocks.push({id:S.blockId,from:S.start||null,to:todayISO(),sess:sess.length,doneN:nd,form:formStats(),
     tpl:S.lifts.map(function(L){var t=tplOf(L.prog.tpl); return L.name+' : '+(t?t.name:L.prog.tpl)+', +'+F(L.prog.inc)+' kg';}),
     stats:blockStats(S.start||null,todayISO())});
   S.blockId=(+S.blockId||1)+1;
-  S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote='';
+  S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.form={};
   S.lifts.forEach(function(L){L.prog.adj=[];});
   S.start=todayISO();
   save(); renderAll();
