@@ -7,7 +7,11 @@
 <title>Charges &amp; programmes</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Chargement non bloquant : hors ligne ou en mauvais reseau, la page s'affiche
+     immediatement avec les polices systeme au lieu d'attendre l'expiration du delai. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"></noscript>
 <style>
 :root{
   --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#5F6874;
@@ -15,7 +19,7 @@
   --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00;
   --ok:#2E6B3F; --warn:#9C6200; --bad:#A3242E;
   --r:3px;
-  --num:'Barlow Condensed',Arial Narrow,system-ui,sans-serif;
+  --num:'Barlow Condensed','Arial Narrow','Helvetica Neue Condensed',system-ui,sans-serif;
   --txt:Archivo,system-ui,-apple-system,sans-serif;
 }
 [data-theme="dark"]{
@@ -192,7 +196,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 </nav>
 
 <!-- ======================= SÉANCE DU JOUR ======================= -->
-<section class="page" id="p-today">
+<section class="page on" id="p-today">
   <div class="card" id="cardform">
     <h2>Forme du jour <em>quatre repères, 5 = au mieux</em></h2>
     <div id="formrows"></div>
@@ -445,13 +449,36 @@ var S={
 };
 S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
 
-function save(){REFSTAMP++;REFC={};try{localStorage.setItem('cp-state',JSON.stringify(S));}catch(e){}}
+var SAVEFAIL=false;
+function save(){
+  REFSTAMP++; REFC={};
+  try{ localStorage.setItem('cp-state',JSON.stringify(S)); SAVEFAIL=false; }
+  catch(e){
+    /* quota depasse ou stockage refuse : sans cet avertissement, tout continue de
+       fonctionner a l'ecran et rien n'est conserve au rechargement. */
+    if(!SAVEFAIL){
+      SAVEFAIL=true;
+      alert("L'enregistrement a \u00e9chou\u00e9 : le stockage du navigateur est plein ou d\u00e9sactiv\u00e9.\n\n"+
+            "Ce qui est \u00e0 l'\u00e9cran n'est PAS conserv\u00e9. Exportez en JSON tout de suite, "+
+            "puis lib\u00e9rez de la place ou autorisez le stockage pour ce site.");
+    }
+  }
+}
 function load(){
   try{
     var raw=localStorage.getItem('cp-state'); if(!raw)return;
     var d=JSON.parse(raw);
     if(!d||!d.lifts||!d.lifts.length)return;
-    S=d; S.v=SCHEMA;
+    /* migrations : jusqu'ici la version etait ecrasee sans etre lue, donc le numero
+       ne servait a rien. On la lit avant de l'ecrire. */
+    var from=+d.v||1;
+    S=d;
+    if(from<3){
+      (S.lifts||[]).forEach(function(L){
+        if(L&&L.ref&&L.ref.bw==null&&d.bw)L.ref.bw=d.bw;   /* referencer au poids d'alors */
+      });
+    }
+    S.v=SCHEMA; S.vFrom=from;
     if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
@@ -961,8 +988,14 @@ function renderLifts(){
           }).join('')+'</select></div>'+
         '<div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" data-i="'+i+'" data-f="reftake">Reprendre ma dernière série</button></div>'+
       '</div>'+
-      '<p class="note">1RM estimé <b>'+F(rnd(rmOf(L)-eff(L),0.25))+' kg</b> de lest · une rep coûte '+F(L.k*100)+' %'+
-        (L.ref.est?' · <b>référence estimée</b>, à remplacer par une vraie série':'')+'</p>'+
+      (function(){
+        var r=refOf(L), diff=(r.load!==L.ref.load||r.reps!==L.ref.reps||r.rir!==L.ref.rir);
+        return '<p class="note">1RM estimé <b>'+F(rnd(rmOf(L)-eff(L),0.25))+' kg</b> de lest · une rep coûte '+F(L.k*100)+' %'+
+          (L.ref.est?' · <b>référence estimée</b>, à remplacer par une vraie série':'')+'</p>'+
+          (diff?'<p class="note"><b>Les trois champs ci-dessus ne servent pas dans ce mode.</b> Le calcul utilise '+
+            F(r.load)+' kg × '+F(r.reps)+(r.rir?' à '+F(r.rir)+' en réserve':' à l\'échec')+
+            (r.date?', du '+frDate(r.date):'')+' — '+r.src+'.</p>':'');
+      })()+
       (S.lifts.length>1?'<div class="btnrow"><button class="act ghost mini" data-del="'+i+'">Supprimer</button></div>':'')+
     '</div>';
   }).join('');
@@ -982,6 +1015,28 @@ $('liftlist').addEventListener('input',function(e){
   else if(f==='catId')L.catId=v||null;
   save(); fillSelects(); renderHead(); renderCharges(); renderAssign(); renderCatPick();
 });
+/* Les entrees du journal et les cles de programme designent un mouvement par son INDEX.
+   Supprimer un mouvement decale donc tout ce qui suit : sans ce remaniement, l'historique
+   des mouvements suivants se retrouve silencieusement attribue au mauvais. */
+function deleteLift(d){
+  var mine=S.log.filter(function(e){return e.li===d;}).length;
+  var L=S.lifts[d];
+  if(!confirm('Supprimer \u00ab '+L.name+' \u00bb ?'+
+    (mine?'\n\n'+mine+' s\u00e9rie'+(mine>1?'s':'')+' de ce mouvement '+(mine>1?'seront supprim\u00e9es':'sera supprim\u00e9e')+
+     ' du journal : elles ne pourraient plus \u00eatre rattach\u00e9es \u00e0 rien.':'\n\nAucune s\u00e9rie enregistr\u00e9e pour ce mouvement.')+
+    '\n\nExportez d\'abord si vous voulez en garder une copie.'))return;
+  S.log=S.log.filter(function(e){return e.li!==d;});
+  S.log.forEach(function(e){
+    if(e.li>d)e.li--;
+    if(typeof e.key==='string'){                     /* cle de plan : type|lift|semaine|jour|ligne */
+      var q=e.key.split('|');
+      if(q.length>=5&&/^\d+$/.test(q[1])&&+q[1]>d){ q[1]=String(+q[1]-1); e.key=q.join('|'); }
+    }
+  });
+  S.lifts.splice(d,1);
+  if(S.active>=S.lifts.length)S.active=Math.max(0,S.lifts.length-1);
+  REFC={}; save(); renderAll();
+}
 $('liftlist').addEventListener('click',function(e){
   var rt=e.target.closest('[data-f=reftake]');
   if(rt){
@@ -992,8 +1047,12 @@ $('liftlist').addEventListener('click',function(e){
     save(); renderAll(); return;
   }
   var b=e.target.closest('[data-del]'); if(!b)return;
-  S.lifts.splice(+b.dataset.del,1); if(S.active>=S.lifts.length)S.active=0; save(); renderAll();
+  deleteLift(+b.dataset.del);
 });
+/* 2,5 % vient de RPE Calculator, cale sur des tractions lestees en charge systeme, ou les
+   pourcentages sont comprimes. Sur un mouvement a la barre, une rep coute plus cher : on
+   part d'Epley, 3,33 %, quitte a l'ajuster ensuite sur les series reelles. */
+function kDefault(useBw){return useBw?0.025:0.0333;}
 function catOptions(sel){
   var out='<option value="">aucun</option>';
   ['pull','push','leg','mine'].forEach(function(g){
@@ -1028,7 +1087,7 @@ function catNote(sel,from){
   var A=(from!==''&&from!=null&&S.lifts[+from])?S.lifts[+from]:null;
   var lk=A?catLink(A.catId,sel):null;
   if(!lk)return 'Pas d\'estimation possible ici : la r\u00e9f\u00e9rence sera \u00e0 saisir \u00e0 la main.';
-  var rm=rmOf(A)*lk.f, effN=e.bw?S.bw*RC:0, lo=rm/(1+0.025*4)-effN;
+  var rm=rmOf(A)*lk.f, effN=e.bw?S.bw*RC:0, lo=rm/(1+kDefault(!!e.bw)*4)-effN;
   var t='Rapport appliqu\u00e9 <b>'+F(Math.round(lk.f*1000)/10)+' %</b> de '+esc(A.name)+
     ' \u2192 1RM syst\u00e8me estim\u00e9 <b>'+F(rnd(rm,0.25))+' kg</b>, r\u00e9f\u00e9rence de d\u00e9part <b>'+
     (lo<0?'0 kg, sous le poids de corps':F(rnd(lo,0.25))+' kg')+'</b> pour 5 reps \u00e0 l\'\u00e9chec.';
@@ -1078,7 +1137,7 @@ $('addlift').addEventListener('click',function(){
   var sel=$('catsel').value, from=$('catfrom').value, L;
   if(!sel){
     var nm=($('catname').value||'').trim()||'Nouveau mouvement', bw=$('catbw').value==='1';
-    L={name:nm,catId:null,useBw:bw,step:bw?1.25:2.5,k:0.025,
+    L={name:nm,catId:null,useBw:bw,step:bw?1.25:2.5,k:kDefault(bw),
        ref:{load:bw?10:40,reps:5,rir:0,est:true},prog:newProg(bw?1.25:2.5)};
     if($('catkeep').value==='1'){
       var id='u'+Date.now();
@@ -1088,7 +1147,7 @@ $('addlift').addEventListener('click',function(){
     $('catname').value='';
   }else{
     var e=catOf(sel);
-    L={name:e.n,catId:e.id,useBw:!!e.bw,step:e.bw?1.25:2.5,k:0.025,
+    L={name:e.n,catId:e.id,useBw:!!e.bw,step:e.bw?1.25:2.5,k:kDefault(!!e.bw),
        ref:{load:e.bw?10:40,reps:5,rir:0,est:true},prog:newProg(e.bw?1.25:2.5)};
     var A=(from!==''&&S.lifts[+from])?S.lifts[+from]:null, lk=A?catLink(A.catId,sel):null;
     if(lk)L.ref.load=Math.max(0,Math.round((rmOf(A)*lk.f/(1+L.k*4)-(L.useBw?S.bw*RC:0))*4)/4);
@@ -1821,7 +1880,15 @@ function findCfg(){
     'programme : le plafond lui-même vient d\'une table qui n\'a pas été établie pour des tractions lestées, et une seule '+
     'métrique ne décide pas d\'un bloc. Prenez-la comme un filtre, pas comme un verdict.</p>';
 }
-$('findcfg').addEventListener('click',findCfg);
+$('findcfg').addEventListener('click',function(){
+  var b=this, old=b.textContent;
+  b.textContent='calcul\u2026'; b.disabled=true;
+  $('cfgout').innerHTML='<p class="note">Environ '+(S.lifts.filter(function(L){return L.prog.tpl!=='off';}).length*100)+
+    ' programmes \u00e0 construire et \u00e0 mesurer. Quelques secondes.</p>';
+  setTimeout(function(){                       /* laisse le navigateur peindre avant de bloquer */
+    try{ findCfg(); } finally { b.textContent=old; b.disabled=false; }
+  },40);
+});
 
 function inolHelp(){
   buildPlan();
@@ -2585,6 +2652,8 @@ $('lift').addEventListener('change',function(){S.active=+this.value;save();rende
 
 function renderAll(){
   applyTheme();
+  /* filet : si aucune page n'est marquee active, on ouvre la premiere */
+  if(!document.querySelector('section.page.on'))$('p-today').classList.add('on');
   $('bw').value=F(S.bw); $('nwk').value=S.nwk; $('sep').value=S.sep; $('jours').value=S.jours;
   $('start').value=S.start||''; if(!$('tbw').value)$('tbw').value=F(S.tbw!=null?S.tbw:S.bw);
   if(!$('ldate').value)$('ldate').value=todayISO();
