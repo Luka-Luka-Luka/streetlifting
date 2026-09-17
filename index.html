@@ -16,7 +16,7 @@
 :root{
   --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#5F6874;
   --rule:#CFD4DB; --soft:#F3F5F7; --softer:#F8F9FA; --hl:#FBF3D6;
-  --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00;
+  --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00; --a5:#6B3FA0; --a6:#0F7C80; --a7:#B0337A; --a8:#5A5F66;
   --ok:#2E6B3F; --warn:#9C6200; --bad:#A3242E;
   --r:3px;
   --num:'Barlow Condensed','Arial Narrow','Helvetica Neue Condensed',system-ui,sans-serif;
@@ -25,7 +25,7 @@
 [data-theme="dark"]{
   --bg:#14171C; --surface:#1C2026; --ink:#E7EAEE; --muted:#939CA8;
   --rule:#2E343C; --soft:#22272E; --softer:#1F242A; --hl:#33301F;
-  --a1:#F0728A; --a2:#74AEEA; --a3:#7DC28F; --a4:#D8A845;
+  --a1:#F0728A; --a2:#74AEEA; --a3:#7DC28F; --a4:#D8A845; --a5:#B89AE8; --a6:#6CC9CC; --a7:#E58BC0; --a8:#A9AFB7;
   --ok:#7DC28F; --warn:#D8A845; --bad:#F0728A;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -110,8 +110,10 @@ details .note{margin-top:5px}
 .liftcard{border-left:3px solid var(--rule)}
 .c0{border-left-color:var(--a1)} .c1{border-left-color:var(--a2)}
 .c2{border-left-color:var(--a3)} .c3{border-left-color:var(--a4)}
+.c4{border-left-color:var(--a5)} .c5{border-left-color:var(--a6)} .c6{border-left-color:var(--a7)} .c7{border-left-color:var(--a8)}
 .tagname{font:600 15px/1 var(--num);letter-spacing:.03em}
 .n0{color:var(--a1)} .n1{color:var(--a2)} .n2{color:var(--a3)} .n3{color:var(--a4)}
+.n4{color:var(--a5)} .n5{color:var(--a6)} .n6{color:var(--a7)} .n7{color:var(--a8)}
 
 .wk{border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);margin-bottom:9px}
 .wkh{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:7px 11px;background:var(--soft);border-bottom:1px solid var(--rule)}
@@ -130,7 +132,15 @@ h2[data-fold],.tagname[data-fold]{cursor:pointer;-webkit-user-select:none;user-s
 .day.folded .line{display:none}
 .day.folded .dayn{margin-bottom:0}
 [data-fold]{cursor:pointer;-webkit-user-select:none;user-select:none}
-.fchev{display:inline-block;width:12px;font-size:9px;color:var(--muted);transform:translateY(-1px)}
+.fchev{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-right:4px;border-radius:50%;background:var(--soft);font-size:12px;color:var(--ink);flex:0 0 auto}
+#assign .tagname[data-fold]{display:flex;align-items:center;min-height:44px;margin:-4px 0 4px!important;padding:4px 0}
+.wkh[data-fold],.dayn[data-fold]{min-height:34px;display:flex;align-items:center}
+h2[data-fold]{min-height:40px;display:flex;align-items:center}
+[data-fold]:active{opacity:.7}
+.daypick{display:flex;gap:6px;flex-wrap:wrap}
+.dchip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid var(--rule);border-radius:999px;font:600 13px/1 var(--txt);cursor:pointer;-webkit-user-select:none;user-select:none}
+.dchip input{position:absolute;opacity:0;pointer-events:none}
+.dchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 
 .line{display:flex;gap:8px;align-items:baseline;padding:4px 0;cursor:pointer;
   border-left:3px solid transparent;padding-left:6px;margin-left:-6px}
@@ -423,7 +433,7 @@ var VAR=['standard','hautes','bloquées','stato-dynamiques','pausées','tempo','
 function newProg(inc){return {tpl:'novice',inc:inc,startMode:'rir',rir:3,top:null,pair:'',
   prWeek:5,prDay:'J1',prLoad:null,varMod:'standard',varTxt:'',intro:null,jump:2.5,jumps:[5,2.5,2.5],
   adj:[],warm:'BW*5, 30%*3, 60%*2, 85%*1',gap:1.25,cad:'sess',
-  accDay:'J1',accSets:3,accLo:8,accHi:10,accLoad:60,accMode:'double',accEvery:3};}
+  accDay:'J1',accDays:['J1'],accSets:3,accLo:8,accHi:10,accLoad:60,accMode:'double',accEvery:3};}
 var S={
   v:SCHEMA, theme:'auto', bw:86, active:0, nwk:6, sep:'*', jours:'dim,mar,jeu', start:'',
   blockNote:'', dayNotes:{}, fold:{},
@@ -478,6 +488,7 @@ function load(){
     /* ne pas faire disparaitre un repere deja renseigne */
     FORMALL.forEach(function(q){ for(var kk in S.form){ if(S.form[kk][q.k]!=null){S.formOn[q.k]=1;S.formMode='multi';break;} } });
     S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
+    S.lifts.forEach(function(L){ if(L.prog&&!L.prog.accDays)L.prog.accDays=[L.prog.accDay||'J1']; });
     /* main lift : tractions et dips coches d'office, le reste non ; un choix deja fait n'est pas touche */
     S.lifts.forEach(function(L){ if(L.main===undefined)L.main=isMainDefault(L.catId); });
     /* references anterieures : on fige le poids de corps courant, sinon la relecture change les valeurs */
@@ -552,6 +563,25 @@ function rmOf(L){
 function rirOf(L,lo,reps){ /* réserve implicite d'une charge à un nombre de reps donné */
   var r=(rmOf(L)/(eff(L)+lo)-1)/L.k+1; return r-reps;
 }
+/* ================= couleurs =================
+   Huit couleurs. Une couleur choisie dans la fiche du mouvement est prioritaire ; les autres
+   mouvements prennent, dans l'ordre de la liste, la premiere couleur libre, en servant d'abord
+   ceux qui sont programmes : deux mouvements d'un meme programme n'ont la meme couleur que
+   s'ils sont plus de huit. */
+var COLNAMES=['rouge','bleu','vert','ocre','violet','sarcelle','framboise','gris'];
+function colMap(){
+  var n=COLNAMES.length, used={}, out={};
+  S.lifts.forEach(function(L,i){ if(L.color!=null&&L.color!==''){out[i]=+L.color%n; if(L.prog&&L.prog.tpl!=='off')used[out[i]]=1;} });
+  var order=S.lifts.map(function(L,i){return i;}).filter(function(i){return out[i]==null;});
+  order.sort(function(a,b){var oa=S.lifts[a].prog&&S.lifts[a].prog.tpl!=='off'?0:1, ob=S.lifts[b].prog&&S.lifts[b].prog.tpl!=='off'?0:1; return oa-ob||a-b;});
+  var c=0;
+  order.forEach(function(i){
+    var tries=0; while(used[c%n]&&tries<n){c++;tries++;}
+    out[i]=c%n; if(S.lifts[i].prog&&S.lifts[i].prog.tpl!=='off')used[c%n]=1; c++;
+  });
+  return out;
+}
+function col(i){var m=colMap(); return m[i]==null?0:m[i];}
 function cur(){return S.lifts[S.active]||S.lifts[0];}
 /* Suffixe de bloc : sans lui, un second bloc batirait les memes cles que le premier
    et reprendrait ses series validees. Vide sur le bloc 1 pour ne rien casser. */
@@ -739,21 +769,30 @@ var ACC={name:'Accessoire — entretien et progression lente',src:'Helms, adapt�
    "Calendrier : la charge monte d'un incrément toutes les N semaines, quoi qu'il arrive. À réserver aux mouvements où vous savez déjà que vous avez de la marge.",
    "Échec : en double progression, une séance ratée laisse la prescription inchangée ; deux d'affilée retirent 10 %. C'est la règle du livre.",
    "Les semaines non encore enregistrées sont projetées en supposant la cible atteinte. Dès que vous saisissez une séance, la suite se recalcule."]};
+function accDaysOf(P){
+  var d=(P.accDays&&P.accDays.length)?P.accDays.slice():[P.accDay||'J1'];
+  return d.sort(function(a,b){return DORDER.indexOf(a)-DORDER.indexOf(b);});
+}
+/* Une entree par seance, dans l'ordre (semaine, puis jour). La double progression avance
+   d'une seance a la suivante, meme quand l'accessoire tombe plusieurs fois dans la semaine ;
+   le calendrier, lui, compte en semaines. */
 function accPlan(L,i){
-  var P=L.prog, lo=+P.accLo||8, hi=+P.accHi||10, inc=+P.inc||2.5;
+  var P=L.prog, lo=+P.accLo||8, hi=+P.accHi||10, inc=+P.inc||2.5, days=accDaysOf(P);
   var load=+P.accLoad||0, reps=lo, miss=0, out=[];
   for(var w=0;w<S.nwk;w++){
-    out.push({load:load,reps:reps});
-    var e=S.log.filter(function(x){return x.key==='c|'+i+'|'+w+'|'+P.accDay+'|0'+BK();})[0];
-    var ok=true;
-    if(e){var sv=e.sets||[];
-      ok=sv.length>0&&sv.every(function(v){return v!=null&&v>=reps;})&&(e.load==null||e.load>=load-0.01);}
-    if(P.accMode==='maintien')continue;
-    if(P.accMode==='calendrier'){if((w+1)%(+P.accEvery||3)===0)load+=inc;continue;}
-    if(ok){miss=0;
-      var got=reps; if(e&&e.sets&&e.sets.length)got=Math.max(reps,Math.min.apply(null,e.sets));
-      if(got>=hi){reps=lo;load+=inc;} else reps=got+1;}
-    else {miss++; if(miss>=2){load=rnd(load*0.9,L.step);reps=lo;miss=0;}}
+    days.forEach(function(lab){
+      out.push({w:w,lab:lab,load:load,reps:reps});
+      if(P.accMode==='maintien'||P.accMode==='calendrier')return;
+      var e=S.log.filter(function(x){return x.key==='c|'+i+'|'+w+'|'+lab+'|0'+BK();})[0];
+      var ok=true;
+      if(e){var sv=e.sets||[];
+        ok=sv.length>0&&sv.every(function(v){return v!=null&&v>=reps;})&&(e.load==null||e.load>=load-0.01);}
+      if(ok){miss=0;
+        var got=reps; if(e&&e.sets&&e.sets.length)got=Math.max(reps,Math.min.apply(null,e.sets));
+        if(got>=hi){reps=lo;load+=inc;} else reps=got+1;}
+      else {miss++; if(miss>=2){load=rnd(load*0.9,L.step);reps=lo;miss=0;}}
+    });
+    if(P.accMode==='calendrier'&&(w+1)%(+P.accEvery||3)===0)load+=inc;
   }
   return out;
 }
@@ -954,8 +993,8 @@ function renderHead(){
 var ADVOPEN={};
 function renderLifts(){
   $('liftlist').innerHTML=S.lifts.map(function(L,i){
-    return '<div class="card liftcard c'+(i%4)+'">'+
-      '<h2><span class="tagname n'+(i%4)+'">'+esc(L.name)+'</span><em>'+(L.useBw?'poids de corps inclus':'charge seule')+'</em></h2>'+
+    return '<div class="card liftcard c'+col(i)+'">'+
+      '<h2><span class="tagname n'+col(i)+'">'+esc(L.name)+'</span><em>'+(L.useBw?'poids de corps inclus':'charge seule')+'</em></h2>'+
       '<div class="row">'+
         '<div class="field"><label>Nom</label><input type="text" data-i="'+i+'" data-f="name" value="'+esc(L.name)+'"></div>'+
         '<div class="field md"><label>Suivi</label><select data-i="'+i+'" data-f="main">'+
@@ -986,6 +1025,9 @@ function renderLifts(){
           '<option value="1"'+(L.useBw?' selected':'')+'>compte</option><option value="0"'+(!L.useBw?' selected':'')+'>ne compte pas</option></select></div>'+
       '</div>'+
       '<div class="row" style="margin-top:8px">'+
+        '<div class="field sm"><label>Couleur</label><select data-i="'+i+'" data-f="color">'+
+          '<option value=""'+(L.color==null||L.color===''?' selected':'')+'>auto</option>'+
+          COLNAMES.map(function(nm,k){return '<option value="'+k+'"'+(L.color!=null&&L.color!==''&&+L.color===k?' selected':'')+'>'+nm+'</option>';}).join('')+'</select></div>'+
         '<div class="field md"><label>Équivalent catalogue</label><select data-i="'+i+'" data-f="catId">'+catOptions(L.catId)+'</select></div>'+
       '</div>'+
       '<div class="row" style="margin-top:8px">'+
@@ -1012,6 +1054,7 @@ $('liftlist').addEventListener('input',function(e){
   else if(f==='refMode')L.refMode=v;
   else if(f==='useBw')L.useBw=(v==='1');
   else if(f==='main')L.main=(v==='1');
+  else if(f==='color'){L.color=(v===''?null:+v); save(); renderAll(); return;}
   else if(f==='catId')L.catId=v||null;
   save(); fillSelects(); renderHead(); renderCharges(); renderAssign(); renderCatPick();
 });
@@ -1240,6 +1283,20 @@ function unitIndex(t,w,day,P){
    TIPS     : un conseil tire d'une source. Il n'apparait que si sa condition est vraie
               ET si sa portee correspond a ce qui est reellement programme. Un conseil
               sans condition calculable n'a rien a faire ici : il reste dans le livre. */
+/* Premiere seance ou le top set prescrit, fait a la borne haute de sa fourchette, ne laisse
+   plus de reserve selon la reference (zero), puis premiere ou il en demande plus qu'elle ne
+   predit (over). Le programme est fait pour aller jusqu'au mur : l'information utile est quand. */
+function wallOf(i,L){
+  var o={zero:null,over:null};
+  PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){
+    if(x.li!==i||x.role!=='top')return;
+    var reps=repMax(x.reps); if(!reps)return;
+    var r=rirOf(L,x.load,reps), lab='S'+(wk.w+1)+' '+d.label, txt=reps+' × '+F(x.load)+' kg, réserve '+F(Math.round(r*10)/10);
+    if(!o.zero&&r<=0.5)o.zero={lab:lab,txt:txt};
+    if(!o.over&&r<-0.5)o.over={lab:lab,txt:txt};
+  });});});
+  return o;
+}
 function hardFlag(short,long){
   if(S.verbo==='min')return '<div class="flag"><b>'+short+'.</b></div>';
   return '<details class="flag"'+(S.verbo==='full'?' open':'')+'><summary><b>'+short+'</b></summary><p class="note">'+long+'</p></details>';
@@ -1283,18 +1340,19 @@ function renderAssign(){
   $('assign').innerHTML=S.lifts.map(function(L,i){
     var P=L.prog, t=tplOf(P.tpl);
     if(P.tpl==='off'||!t){
-      return '<div class="liftcard c'+(i%4)+'" style="padding-left:9px;margin-bottom:13px">'+
-        '<div class="tagname n'+(i%4)+'" style="margin-bottom:6px">'+L.name+'</div>'+
+      return '<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
+        '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+'</div>'+
         '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div></div>';
     }
     if(t.acc){
       var pl=accPlan(L,i), last=pl[pl.length-1];
-      return '<div class="liftcard c'+(i%4)+'" style="padding-left:9px;margin-bottom:13px">'+
-        '<div class="tagname n'+(i%4)+'" style="margin-bottom:6px">'+esc(L.name)+'</div>'+
+      return '<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
+        '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+esc(L.name)+'</div>'+
         '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>'+
         '<div class="row" style="margin-top:8px">'+
-          '<div class="field sm"><label>Jour</label><select data-i="'+i+'" data-f="accDay">'+
-            ['J1','J2','J3','J4'].map(function(d){return '<option value="'+d+'"'+(P.accDay===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div>'+
+          '<div class="field w" style="flex:1 1 100%"><label>Jours</label><div class="daypick">'+
+            ['J1','J2','J3','J4'].map(function(d){var on=accDaysOf(P).indexOf(d)>=0;
+              return '<label class="dchip'+(on?' on':'')+'"><input type="checkbox" data-i="'+i+'" data-f="accDayT" data-d="'+d+'"'+(on?' checked':'')+'>'+d+'</label>';}).join('')+'</div></div>'+
           '<div class="field sm"><label>Séries</label><input data-i="'+i+'" data-f="accSets" type="number" min="1" step="1" value="'+(+P.accSets||3)+'"></div>'+
           '<div class="field sm"><label>Reps de</label><input data-i="'+i+'" data-f="accLo" type="number" min="1" step="1" value="'+(+P.accLo||8)+'"></div>'+
           '<div class="field sm"><label>à</label><input data-i="'+i+'" data-f="accHi" type="number" min="1" step="1" value="'+(+P.accHi||10)+'"></div>'+
@@ -1308,7 +1366,7 @@ function renderAssign(){
           incField(i,P)+
           (P.accMode==='calendrier'?'<div class="field sm"><label>Toutes les</label><input data-i="'+i+'" data-f="accEvery" type="number" min="1" step="1" value="'+(+P.accEvery||3)+'"></div>':'')+
         '</div>'+
-        '<p class="note">Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
+        '<p class="note">'+accDaysOf(P).length+' séance'+(accDaysOf(P).length>1?'s':'')+' par semaine, la progression avance à chaque séance. Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
           ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
         tipsFor(L,i,P,t)+
         (S.verbo==='min'?'':'<details'+(S.verbo==='full'?' open':'')+'><summary class="note">Comment lire ce programme</summary>'+
@@ -1316,8 +1374,8 @@ function renderAssign(){
           t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details>')+'</div>';
     }
     var z=isZlat(P.tpl), ap=P.tpl==='advpeak';
-    var h='<div class="liftcard c'+(i%4)+'" style="padding-left:9px;margin-bottom:13px">'+
-      '<div class="tagname n'+(i%4)+'" style="margin-bottom:6px">'+L.name+'</div>'+
+    var h='<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
+      '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+'</div>'+
       '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>';
 
     /* variantes des séances secondaires */
@@ -1373,14 +1431,15 @@ function renderAssign(){
       var lastU=unitIndex(t,S.nwk-1,t.days[t.days.length-1].label,P);
       var nAdj=(P.adj||[]).length, sEnd=s0+P.inc*adjUnit(P,lastU);
       var rir0=rirOf(L,s0,target), rirEnd=rirOf(L,sEnd,target);
+      var wall=wallOf(i,L);
       h+='<p class="note">Départ <b>'+F(s0)+' kg</b> pour '+target+' reps, réserve implicite '+F(Math.round(rir0*10)/10)+
-        ' · arrivée <b>'+F(sEnd)+' kg</b> en S'+S.nwk+', réserve '+F(Math.round(rirEnd*10)/10)+'</p>';
+        ' · arrivée <b>'+F(sEnd)+' kg</b> en S'+S.nwk+', réserve '+F(Math.round(rirEnd*10)/10)+
+        (wall.zero?' · <b>réserve nulle prévue en '+wall.zero.lab+'</b> ('+wall.zero.txt+')':' · la réserve ne tombe pas à zéro dans ce bloc')+'</p>';
       if(nAdj)h+=hardFlag(nAdj+' charge'+(nAdj>1?'s':'')+' répétée'+(nAdj>1?'s':'')+' après échec',
         'Tout ce qui suit a reculé d\'un cran : l\'arrivée en S'+S.nwk+' tombe à '+F(sEnd)+' kg au lieu de '+F(sEnd+P.inc*nAdj)+' kg. '+
         'Ajoutez '+nAdj+' semaine'+(nAdj>1?'s':'')+' si vous voulez retrouver la cible de départ.');
-      if(rirEnd<0)h+=hardFlag('Le bloc dépasse votre 1RM estimé',
-        'La charge d\'arrivée demande '+F(Math.round(-rirEnd*10)/10)+' rep de plus que ce que votre référence prédit. '+
-        'Baissez l\'incrément, raccourcissez le bloc, ou assumez que la référence est périmée.');
+      if(wall.over)h+='<p class="note">Au-delà de votre référence à partir de <b>'+wall.over.lab+'</b> ('+wall.over.txt+
+        ') : c\'est là que le mur est attendu. Chaque top set suivant qui passe est un record.</p>';
 
     }
     if(ap){
@@ -1430,7 +1489,9 @@ $('assign').addEventListener('input',function(e){
   else if(f==='warm'){P.warm=v;save();generate();renderToday();return;}
   else if(f==='gap')P.gap=+v;
   else if(f==='cad')P.cad=v;
-  else if(f==='accDay')P.accDay=v;
+  else if(f==='accDayT'){var ds=accDaysOf(P), d=t.dataset.d, k=ds.indexOf(d);
+    if(t.checked&&k<0)ds.push(d); else if(!t.checked&&k>=0&&ds.length>1)ds.splice(k,1);
+    P.accDays=ds; P.accDay=ds[0]; save(); renderAssign(); generate(); renderToday(); return;}
   else if(f==='accSets')P.accSets=Math.max(1,+v||1);
   else if(f==='accLo')P.accLo=Math.max(1,+v||1);
   else if(f==='accHi')P.accHi=Math.max(1,+v||1);
@@ -1467,7 +1528,7 @@ function buildPlan(){
     active.forEach(function(o){
       var t=tplOf(o.L.prog.tpl);
       if(t.special){ apDays(w).forEach(function(d){if(labels.indexOf(d)<0)labels.push(d);}); return;}
-      if(t.acc){ var ad=o.L.prog.accDay||'J1'; if(labels.indexOf(ad)<0)labels.push(ad); return;}
+      if(t.acc){ accDaysOf(o.L.prog).forEach(function(ad){if(labels.indexOf(ad)<0)labels.push(ad);}); return;}
       t.days.forEach(function(d){if(labels.indexOf(d.label)<0)labels.push(d.label);});
     });
     labels.sort(function(a,b){
@@ -1480,8 +1541,8 @@ function buildPlan(){
         var L=o.L, P=L.prog, t=tplOf(P.tpl);
         if(t.special){apLines(L,o.i,w,lab,day);return;}
         if(t.acc){
-          if(lab!==(P.accDay||'J1')||w>=S.nwk)return;
-          var st=accPlan(L,o.i)[w]; if(!st)return;
+          if(accDaysOf(P).indexOf(lab)<0||w>=S.nwk)return;
+          var st=accPlan(L,o.i).filter(function(q){return q.w===w&&q.lab===lab;})[0]; if(!st)return;
           day.lines.push({li:o.i,name:L.name,role:'acc',sets:+P.accSets||3,reps:String(st.reps),
             load:rnd(st.load,L.step),info:accInfo(P),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
           return;
@@ -1598,7 +1659,7 @@ function renderPlan(into,weeks,pfx,scope){
       day.lines.forEach(function(x){
         var st=lineState(x.key);
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
-          '<span class="nm n'+(x.li%4)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':'')+'</span>'+
+          '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':'')+'</span>'+
           '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
           '<span class="in">'+x.info+'</span></div>';
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
@@ -1668,7 +1729,7 @@ function trackHTML(){
   if(!mains.length)return '<p class="note">Aucun main lift n\'est programmé dans ce bloc.</p>';
   return mains.map(function(i){
     var o=trackLift(i); if(!o)return '';
-    var L=o.L, h='<p class="note" style="margin-top:12px"><b class="n'+(i%4)+'">'+esc(L.name)+'</b></p>';
+    var L=o.L, h='<p class="note" style="margin-top:12px"><b class="n'+col(i)+'">'+esc(L.name)+'</b></p>';
     var kg=function(v){return F(rnd(v,0.25))+' kg';};
     /* 1. record */
     if(!o.best){
@@ -1764,7 +1825,9 @@ function panelHTML(key){
   }
   var nxt='';
   if(x.role==='acc'){
-    var pl=accPlan(L,x.li), n=pl[f.w+1];
+    var pl=accPlan(L,x.li), ix=-1;
+    pl.forEach(function(q,k){if(q.w===f.w&&q.lab===f.day)ix=k;});
+    var n=ix>=0?pl[ix+1]:null;
     nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
@@ -1778,7 +1841,7 @@ function panelHTML(key){
     '<button class="pill half" data-rir="h" aria-pressed="'+rirHalf+'">\u00bd</button>'+
     '<button class="pill" data-rir="x" aria-pressed="'+(!!(e&&e.rir===null))+'">?</button>';
   return '<div class="panel" data-panel="'+key+'">'+
-    '<h4 class="n'+(x.li%4)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
+    '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" type="number" step="0.25" value="'+(e&&e.load!=null?e.load:x.load)+'"></div>'+
       (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Séries — touchez pour valider, retouchez pour corriger</label><div class="pillrow">'+sets.join('')+'</div></div>'
@@ -2104,7 +2167,7 @@ function warmCard(weeks){
     return '<div class="day'+(fold(kf)?' folded':'')+'"><div class="dayn" data-fold="'+kf+'">'+chev(kf)+
       esc(L.name)+' — jusqu\'à '+loadKg(L,x.load)+'</div>'+
       st.map(function(w,q){
-        return '<div class="line"><span class="nm n'+(x.li%4)+'">Montée '+(q+1)+'</span>'+
+        return '<div class="line"><span class="nm n'+col(x.li)+'">Montée '+(q+1)+'</span>'+
           '<span class="pr">'+(w.load==null?'à vide':F(w.load)+' kg')+' '+S.sep+' '+w.reps+'</span>'+
           '<span class="in">'+w.lab+'</span></div>';
       }).join('')+'</div>';
@@ -2216,9 +2279,9 @@ function blockStats(from,to){
 }
 function statsHTML(st){
   return st.lifts.map(function(b){
-    if(!b.n&&!b.nEx)return '<p class="note"><b class="n'+(b.i%4)+'">'+esc(b.name)+'</b> \u2014 rien d\'enregistr\u00e9.</p>';
+    if(!b.n&&!b.nEx)return '<p class="note"><b class="n'+col(b.i)+'">'+esc(b.name)+'</b> \u2014 rien d\'enregistr\u00e9.</p>';
     var d=(b.best!=null&&b.first!=null)?(b.best-b.first):null;
-    return '<p class="note"><b class="n'+(b.i%4)+'">'+esc(b.name)+'</b> \u2014 '+
+    return '<p class="note"><b class="n'+col(b.i)+'">'+esc(b.name)+'</b> \u2014 '+
       b.n+' s\u00e9rie'+(b.n>1?'s':'')+' valid\u00e9e'+(b.n>1?'s':'')+
       (b.n?', '+Math.round(b.ok/b.n*100)+' % conformes':'')+
       (b.nEx?' \u00b7 '+b.nEx+' exploitable'+(b.nEx>1?'s':'')+' pour la courbe \u00b7 1RM pr\u00e9dit <b>'+
@@ -2295,7 +2358,7 @@ function renderData(){
     ? '<p class="note">Rien d\'enregistré sur ce bloc. Validez vos séries depuis l\'onglet Séance du jour : le taux de conformité est ce qui départage « le programme ne marche pas » de « je ne l\'ai pas suivi ».</p>'
     : byLift.filter(function(b){return b.n;}).map(function(b){
         return '<div class="stat" style="margin-bottom:10px">'+
-          '<div><b class="n'+(b.i%4)+'">'+Math.round(b.ok/b.n*100)+' %</b><span>'+b.L.name+' — séries conformes</span></div>'+
+          '<div><b class="n'+col(b.i)+'">'+Math.round(b.ok/b.n*100)+' %</b><span>'+b.L.name+' — séries conformes</span></div>'+
           '<div><b>'+b.n+'</b><span>séries enregistrées</span></div>'+
           '<div><b>'+(b.n-b.ok)+'</b><span>écarts</span></div></div>';
       }).join('');
@@ -2303,7 +2366,7 @@ function renderData(){
   /* courbe */
   $('fit').innerHTML=S.lifts.map(function(L,i){
     var f=fitLift(i);
-    var head='<p class="note" style="margin-top:0"><b class="n'+(i%4)+'">'+L.name+'</b> — coefficient actuel '+F(L.k*100)+' %, 1RM de référence '+F(rnd(rmOf(L)-eff(L),0.25))+' kg.</p>';
+    var head='<p class="note" style="margin-top:0"><b class="n'+col(i)+'">'+L.name+'</b> — coefficient actuel '+F(L.k*100)+' %, 1RM de référence '+F(rnd(rmOf(L)-eff(L),0.25))+' kg.</p>';
     if(!f.k)return head+'<p class="note">'+f.n+' série(s) exploitable(s) sur '+f.d+' nombre(s) de reps équivalentes différent(s). Il en faut trois de chaque pour ajuster quoi que ce soit. Seuls les top sets, séries maximales et performances hors programme à réserve connue comptent : une série de back-off est faussée par la fatigue de la précédente.</p>'+plotFit(L,f);
     var ab=(f.k<0.015||f.k>0.045);
     return head+'<p class="note">Ajusté sur '+f.n+' séries : coefficient <b>'+F(Math.round(f.k*10000)/100)+' %</b>, 1RM <b>'+
@@ -2320,7 +2383,7 @@ function renderData(){
     $('loglist').innerHTML=S.log.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(e){
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/');
       return '<div class="logrow"><span class="d">'+(e.date||'')+'</span>'+
-        '<span class="t"><b class="n'+((e.li||0)%4)+'">'+(e.lift||'')+'</b> '+F(e.load)+' '+S.sep+' '+reps+
+        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> '+F(e.load)+' '+S.sep+' '+reps+
         (e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue')+
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+F(e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
