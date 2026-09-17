@@ -199,6 +199,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <button data-p="prog" aria-selected="false">Programme</button>
   <button data-p="charges" aria-selected="false">Charges</button>
   <button data-p="data" aria-selected="false">Données</button>
+  <button data-p="velo" aria-selected="false">Vitesse</button>
   <button data-p="lifts" aria-selected="false">Mouvements</button>
 </nav>
 
@@ -269,7 +270,9 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <h2>Table des charges <em>lest à mettre à la ceinture</em></h2>
     <div class="row" style="margin-bottom:8px">
       <div class="field w"><label for="lift">Mouvement</label><select id="lift"></select></div>
+      <div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" id="cbest">Meilleure perf</button></div>
     </div>
+    <p class="note" id="cbestnote" style="margin-top:0"></p>
     <p class="note" id="rmhead" style="margin-top:0"></p>
     <div class="row">
       <div class="field sm"><label for="cload">Lest</label><input id="cload" type="number" step="0.25" value="46.25"></div>
@@ -366,6 +369,20 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   </div>
 </section>
 
+<!-- ======================= VITESSE ======================= -->
+<section class="page" id="p-velo">
+  <div class="card">
+    <h2>Analyses vidéo <em>vitesse et hauteur de chaque rep</em></h2>
+    <div class="btnrow">
+      <button class="act" id="veloadd">Importer une analyse</button>
+      <input type="file" id="velofile" accept=".json,application/json" multiple style="display:none">
+    </div>
+    <p class="note" id="velomsg">Fichiers <b>.serie.json</b> produits par le script d'analyse. Réimporter
+    la même analyse la remplace. Elles sont conservées dans la sauvegarde de l'outil.</p>
+  </div>
+  <div id="velolist"></div>
+</section>
+
 <!-- ======================= MOUVEMENTS ======================= -->
 <section class="page" id="p-lifts">
   <div id="liftlist"></div>
@@ -441,7 +458,7 @@ var S={
     {name:'Tractions',catId:'pullup',main:true,useBw:true,step:1.25,k:0.025,refMode:'fixe',ref:{load:46.25,reps:3,rir:0,bw:86,date:null},prog:newProg(1.25)},
     {name:'Dips',catId:'dip',main:true,useBw:true,step:1.25,k:0.025,refMode:'fixe',ref:{load:58.75,reps:3,rir:0,bw:86,date:null},prog:newProg(2.5)}
   ],
-  cat:[], catHide:{}, tbw:null, done:{}, tsel:null, blockId:1, blocks:[], verbo:'norm', form:{},
+  cat:[], catHide:{}, tbw:null, done:{}, tsel:null, blockId:1, blocks:[], verbo:'norm', form:{}, velo:[],
   formOn:{som:1,ene:1,cou:1,art:1,tra:1}, formMode:'simple',
   log:[]
 };
@@ -485,6 +502,7 @@ function load(){
     if(!S.blocks)S.blocks=[]; if(!S.verbo)S.verbo='norm'; if(!S.form)S.form={};
     if(!S.formOn)S.formOn={som:1,ene:1,cou:1,art:1,tra:1};
     if(!S.formMode)S.formMode='simple';
+    if(!S.velo)S.velo=[];
     /* ne pas faire disparaitre un repere deja renseigne */
     FORMALL.forEach(function(q){ for(var kk in S.form){ if(S.form[kk][q.k]!=null){S.formOn[q.k]=1;S.formMode='multi';break;} } });
     S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
@@ -947,9 +965,10 @@ $('foldall').addEventListener('click',function(){
 $('nav').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b)return;
   Array.prototype.forEach.call(this.children,function(x){x.setAttribute('aria-selected',x===b);});
-  ['today','prog','charges','data','lifts'].forEach(function(p){$('p-'+p).classList.toggle('on',p===b.dataset.p);});
+  ['today','prog','charges','data','velo','lifts'].forEach(function(p){$('p-'+p).classList.toggle('on',p===b.dataset.p);});
   if(b.dataset.p==='today')renderToday();
   if(b.dataset.p==='data')renderData();
+  if(b.dataset.p==='velo')renderVelo();
   window.scrollTo(0,0);
 });
 
@@ -1237,6 +1256,41 @@ $('pbaset').addEventListener('click',function(){
   var L=cur(); $('pbase').value=F(rnd(num($('cload').value,0)+bwZ(L),0.25)); PLAST='ppct'; renderPct();
 });
 
+/* ================= meilleure perf enregistree =================
+   « Meilleure » au sens du modele de charge de l'outil, donc en relatif : 46,25 x 3
+   (1RM estime plus haut) passe devant 50 x 1. Les series dont la reserve est inconnue
+   sont ecartees : sans reserve, l'equivalence n'est pas calculable. Faute de serie
+   exploitable, on retombe sur la reference saisie a la main dans la fiche du mouvement. */
+function bestPerf(L){
+  var e=lastExploitable(L,true);
+  if(e)return {load:+e.load||0,reps:+e.sets[e.sets.length-1],rir:+e.rir||0,
+               bw:(+e.bw||S.bw),date:e.date,src:'journal',rm:e1rm(L,+e.load||0,+e.sets[e.sets.length-1],+e.rir||0,(+e.bw||S.bw))};
+  var q=L.ref||{};
+  return {load:+q.load||0,reps:+q.reps||1,rir:+q.rir||0,bw:(q.bw!=null?+q.bw:S.bw),
+          date:q.date||null,src:'reference saisie',rm:e1rm(L,+q.load||0,+q.reps||1,+q.rir||0,(q.bw!=null?+q.bw:S.bw))};
+}
+/* Remplit les trois champs avec cette meilleure perf. Appele au changement de mouvement
+   et par le bouton ; une saisie manuelle reste possible et n'est jamais ecrasee ensuite. */
+var CTOUCH=false;   /* une saisie manuelle a eu lieu : ne pas la remplacer sous les doigts */
+function fillCharges(){
+  var L=cur(), b=bestPerf(L);
+  CTOUCH=false;
+  $('cload').value=F(b.load).replace(',','.');
+  $('creps').value=b.reps;
+  $('crir').value=b.rir;
+  renderCharges();
+}
+function bestNote(){
+  var L=cur(), b=bestPerf(L), n=(S.log||[]).filter(function(e){
+    return e.li===S.lifts.indexOf(L)&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null;
+  }).length;
+  $('cbestnote').innerHTML=b.src==='journal'
+    ? 'Champs remplis avec la meilleure perf enregistrée : <b>'+F(b.load)+' kg × '+F(b.reps)+
+      (b.rir?' à '+F(b.rir)+' en réserve':" à l'échec")+'</b>'+(b.date?' du '+frDate(b.date):'')+
+      ' — la meilleure des '+n+' série'+(n>1?'s':'')+' exploitables du journal, au sens du modèle de charge.'
+    : 'Aucune série exploitable au journal pour ce mouvement : champs remplis avec la référence '+
+      'saisie dans la fiche (<b>'+F(b.load)+' kg × '+F(b.reps)+'</b>).';
+}
 function renderCharges(){
   var L=cur(), lo=num($('cload').value,0), reps=Math.max(1,num($('creps').value,1)), rir=num($('crir').value,0);
   var rm=e1rm(L,lo,reps,rir);
@@ -1251,7 +1305,10 @@ function renderCharges(){
   }
   $('ladder').innerHTML=rows;
 }
-['cload','creps','crir'].forEach(function(id){$(id).addEventListener('input',renderCharges);});
+['cload','creps','crir'].forEach(function(id){
+  $(id).addEventListener('input',function(){CTOUCH=true;renderCharges();});
+});
+$('cbest').addEventListener('click',function(){fillCharges();bestNote();});
 
 /* ================= assignation ================= */
 function startLoad(L,t){
@@ -2416,6 +2473,139 @@ $('addlog').addEventListener('click',function(){
   $('lload').value='';$('lreps').value='';$('lnote').value='';
 });
 
+/* ================= analyses video (onglet Vitesse) =================
+   Les fichiers .serie.json sont produits hors de l'outil par le script d'analyse.
+   On n'en garde que ce qui sert : les mesures par rep, le resume, la calibration et
+   les profils vitesse/hauteur de la premiere et de la derniere rep — les seules dont
+   la comparaison ait un interet. Le reste du fichier est ecarte a l'import. */
+var VSCHEMA='velocite-serie/v1';
+var VREPK=['rep','course_cm','hauteur_sommet_cm','montee_s','vitesse_moy_ms','vitesse_pic_ms',
+           'vitesse_point_dur_ms','hauteur_point_dur_cm','temps_sous_02_s','descente_s',
+           'vitesse_pic_descente_ms','puissance_moy_w','pause_apres_s'];
+function veloLi(nom){
+  var n=String(nom||'').toLowerCase(), hit=-1;
+  S.lifts.forEach(function(L,i){
+    var q=String(L.name).toLowerCase();
+    if(hit<0&&(q===n||q.indexOf(n)>=0||n.indexOf(q)>=0))hit=i;
+  });
+  return hit;
+}
+function veloTrim(d){
+  var reps=(d.reps||[]).map(function(r,i,arr){
+    var o={}; VREPK.forEach(function(k){ if(r[k]!=null)o[k]=r[k]; });
+    if(i===0||i===arr.length-1){ o.profil_vitesse_ms=r.profil_vitesse_ms; o.profil_hauteur_cm=r.profil_hauteur_cm; }
+    return o;
+  });
+  var m=d.mesure||{};
+  return {id:d.id,date:d.date,mouvement:d.mouvement,li:veloLi(d.mouvement),
+    lest_kg:d.lest_kg,poids_corps_kg:d.poids_corps_kg,charge_systeme_kg:d.charge_systeme_kg,
+    semaine:d.semaine,seance:d.seance,type_serie:d.type_serie,reps_annoncees:d.reps_annoncees,
+    px_cm:m.px_par_cm,echelle_epinglee:!!m.echelle_epinglee,repere:m.repere,
+    qualite:m.qualite_suivi_med,alertes:d.alertes||[],resume:d.resume||{},reps:reps,
+    notes:(d.observations_manuelles||{}).notes||''};
+}
+function veloImport(d){
+  if(!d||d.schema!==VSCHEMA)return 'schéma inattendu';
+  if(!d.reps||!d.reps.length)return 'aucune rep dans le fichier';
+  if(!d.date)return 'date absente du fichier';
+  var t=veloTrim(d);
+  S.velo=(S.velo||[]).filter(function(x){return x.id!==t.id;});
+  S.velo.push(t);
+  S.velo.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+  return null;
+}
+/* Serie precedente comparable : meme mouvement, charge systeme a 1,25 kg pres.
+   A defaut de charge systeme (PdC absent), on compare a lest egal. */
+function veloRef(v){
+  var l=(S.velo||[]).filter(function(x){
+    if(x.id===v.id||x.mouvement!==v.mouvement||String(x.date)>=String(v.date))return false;
+    return (x.charge_systeme_kg!=null&&v.charge_systeme_kg!=null)
+      ? Math.abs(x.charge_systeme_kg-v.charge_systeme_kg)<=1.25 : x.lest_kg===v.lest_kg;
+  });
+  return l.length?l[l.length-1]:null;
+}
+function veloSvg(v){
+  var sel=[v.reps[0],v.reps[v.reps.length-1]].filter(function(r){return r&&r.profil_vitesse_ms;});
+  if(sel.length<1)return '';
+  var W=340,H=170,p=30,cols=['var(--ok)','var(--bad)'];
+  var xm=1,ym=1.2;
+  sel.forEach(function(r){r.profil_hauteur_cm.forEach(function(x){if(x>xm)xm=x;});
+                          r.profil_vitesse_ms.forEach(function(y){if(y>ym)ym=y;});});
+  var X=function(x){return p+(x/xm)*(W-p-8);}, Y=function(y){return H-p-(y/ym)*(H-p-10);};
+  var o='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:420px;display:block">'+
+    '<line x1="'+p+'" y1="'+(H-p)+'" x2="'+(W-8)+'" y2="'+(H-p)+'" stroke="currentColor" opacity=".35"/>'+
+    '<line x1="'+p+'" y1="8" x2="'+p+'" y2="'+(H-p)+'" stroke="currentColor" opacity=".35"/>'+
+    '<text x="'+(W-8)+'" y="'+(H-8)+'" text-anchor="end" font-size="10" fill="currentColor" opacity=".7">hauteur (cm)</text>'+
+    '<text x="2" y="14" font-size="10" fill="currentColor" opacity=".7">m/s</text>';
+  sel.forEach(function(r,i){
+    var pts=r.profil_hauteur_cm.map(function(x,k){return X(x).toFixed(1)+','+Y(r.profil_vitesse_ms[k]).toFixed(1);}).join(' ');
+    o+='<polyline points="'+pts+'" fill="none" stroke="'+cols[i%2]+'" stroke-width="2"/>'+
+       '<text x="'+(W-10)+'" y="'+(20+i*13)+'" text-anchor="end" font-size="11" fill="'+cols[i%2]+'">rep '+r.rep+'</text>';
+  });
+  return o+'</svg>';
+}
+function veloCard(v,k){
+  var q=v.resume||{}, ref=veloRef(v), L=S.lifts[v.li], rows='';
+  v.reps.forEach(function(r){
+    rows+='<tr><td>'+r.rep+'</td><td>'+F(r.course_cm)+'</td><td>'+F(r.montee_s)+'</td><td>'+
+      F(r.vitesse_moy_ms)+'</td><td>'+F(r.vitesse_point_dur_ms)+'</td><td>'+F(r.hauteur_sommet_cm)+'</td><td>'+
+      (r.puissance_moy_w?r.puissance_moy_w+' W':'—')+'</td></tr>';
+  });
+  var cmp='';
+  if(ref){
+    var d1=ref.resume.v_moy_rep1, d2=q.v_moy_rep1;
+    var pc=d1?Math.round(1000*(d2-d1)/d1)/10:null;
+    cmp='<p class="note">Contre le '+frDate(ref.date)+' à charge comparable : rep 1 '+
+      (pc>0?'+':'')+F(pc)+' % ('+F(d1)+' → '+F(d2)+' m/s)'+
+      ((ref.echelle_epinglee&&v.echelle_epinglee&&ref.px_cm!==v.px_cm)?
+        ' — échelles différentes ('+F(ref.px_cm)+' contre '+F(v.px_cm)+' px/cm), écart absolu à prendre avec précaution':'')+'.</p>';
+  }
+  var al=(v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'';
+  return '<div class="card">'+
+    '<h2>'+frDate(v.date)+' — '+esc(v.mouvement)+' '+F(v.lest_kg)+' kg × '+v.reps.length+
+      (v.semaine?' <em>S'+v.semaine+'J'+v.seance+(v.type_serie?', '+esc(v.type_serie):'')+'</em>':'')+'</h2>'+
+    '<p class="note">'+(v.charge_systeme_kg?'Charge système '+F(v.charge_systeme_kg)+' kg. ':'')+
+      'Rep 1 → dernière : <b>'+F(q.v_moy_rep1)+' → '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
+      'Vitesse mini de la dernière rep '+F(q.v_mini_derniere)+' m/s, point dur vers '+F(q.hauteur_point_dur_cm)+' cm. '+
+      'Sommet : −'+F(q.perte_hauteur_sommet_cm)+' cm sur la série.'+
+      (L?'':' <b>Mouvement non reconnu</b> : non rattaché à un mouvement de l\'outil.')+'</p>'+
+    cmp+al+veloSvg(v)+
+    '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Rep</th><th>Course cm</th>'+
+      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Puissance</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div>'+
+    (v.notes?'<p class="note">'+esc(v.notes)+'</p>':'')+
+    '<p class="note">Échelle '+F(v.px_cm)+' px/cm'+(v.echelle_epinglee?' (épinglée)':' (estimée)')+
+      ', suivi '+F(v.qualite)+'. Hauteurs mesurées à la ceinture, pas au menton.</p>'+
+    '<div class="btnrow"><button class="act ghost mini" data-velodel="'+k+'">Supprimer cette analyse</button></div>'+
+    '</div>';
+}
+function renderVelo(){
+  var l=(S.velo||[]).slice().reverse();
+  $('velolist').innerHTML=l.length?l.map(function(v){return veloCard(v,v.id);}).join('')
+    :'<div class="card"><p class="note">Aucune analyse importée.</p></div>';
+}
+$('veloadd').addEventListener('click',function(){$('velofile').click();});
+$('velofile').addEventListener('change',function(){
+  var fs=Array.prototype.slice.call(this.files), msgs=[], done=0, self=this;
+  if(!fs.length)return;
+  fs.forEach(function(f){
+    var r=new FileReader();
+    r.onload=function(){
+      var err;
+      try{ err=veloImport(JSON.parse(r.result)); }catch(e){ err='JSON illisible'; }
+      msgs.push(f.name+(err?' : '+err:' : importé'));
+      if(++done===fs.length){ save(); renderVelo(); $('velomsg').textContent=msgs.join(' · '); self.value=''; }
+    };
+    r.readAsText(f);
+  });
+});
+$('velolist').addEventListener('click',function(e){
+  var b=e.target.closest('[data-velodel]'); if(!b)return;
+  if(!confirm('Supprimer cette analyse ?'))return;
+  S.velo=(S.velo||[]).filter(function(x){return x.id!==b.dataset.velodel;});
+  save(); renderVelo();
+});
+
 /* ================= import / export ================= */
 function dl(name,txt,mime){
   var b=new Blob([txt],{type:mime}), a=document.createElement('a');
@@ -2490,7 +2680,9 @@ $('bw').addEventListener('input',function(){
   S.bw=Math.round(v*100)/100; save();
   renderHead();renderCharges();renderLifts();renderAssign();generate();renderCatPick();
 });
-$('lift').addEventListener('change',function(){S.active=+this.value;save();renderHead();renderCharges();});
+$('lift').addEventListener('change',function(){
+  S.active=+this.value; save(); renderHead(); fillCharges(); bestNote();
+});
 
 function renderAll(){
   applyTheme();
@@ -2501,8 +2693,10 @@ function renderAll(){
   if(!$('ldate').value)$('ldate').value=todayISO();
   if(!$('lbw').value)$('lbw').value=F(S.bw);
   $('verbo').value=S.verbo;
-  fillSelects(); renderHead(); renderLifts(); renderCharges(); renderPct(); renderCatPick(); renderCatList(); renderAssign();
-  generate(); renderToday(); renderData(); renderBilan(); applyFolds();
+  fillSelects(); renderHead(); renderLifts();
+  if(CTOUCH)renderCharges(); else fillCharges();
+  bestNote(); renderPct(); renderCatPick(); renderCatList(); renderAssign();
+  generate(); renderToday(); renderData(); renderBilan(); renderVelo(); applyFolds();
 }
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
