@@ -90,6 +90,7 @@ tbody tr:nth-child(even){background:var(--softer)}
 
 .note{font:400 12.5px/1.55 var(--txt);color:var(--muted);margin-top:9px}
 .note b{color:var(--ink);font-weight:600}
+tr.best td{font-weight:650}
 .flag{border-left:3px solid var(--warn);padding:7px 0 7px 9px;margin-top:9px;
   font:400 12.5px/1.5 var(--txt);color:var(--muted)}
 .flag b{color:var(--ink)}
@@ -2500,7 +2501,8 @@ function veloTrim(d){
   return {id:d.id,date:d.date,mouvement:d.mouvement,li:veloLi(d.mouvement),
     lest_kg:d.lest_kg,poids_corps_kg:d.poids_corps_kg,charge_systeme_kg:d.charge_systeme_kg,
     semaine:d.semaine,seance:d.seance,type_serie:d.type_serie,reps_annoncees:d.reps_annoncees,
-    px_cm:m.px_par_cm,echelle_epinglee:!!m.echelle_epinglee,repere:m.repere,
+    px_cm:m.px_par_cm,echelle_epinglee:!!m.echelle_epinglee,
+    echelle_verifiee:(m.echelle_verifiee!==false),repere:m.repere,
     qualite:m.qualite_suivi_med,alertes:d.alertes||[],resume:d.resume||{},reps:reps,
     notes:(d.observations_manuelles||{}).notes||''};
 }
@@ -2574,15 +2576,76 @@ function veloCard(v,k){
       '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Puissance</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table></div>'+
     (v.notes?'<p class="note">'+esc(v.notes)+'</p>':'')+
+    (v.echelle_verifiee===false?'<p class="note">Échelle non vérifiée pour ce cadrage : cm et m/s indicatifs.</p>':'')+
     '<p class="note">Échelle '+F(v.px_cm)+' px/cm'+(v.echelle_epinglee?' (épinglée)':' (estimée)')+
       ', suivi '+F(v.qualite)+'. Hauteurs mesurées à la ceinture, pas au menton.</p>'+
     '<div class="btnrow"><button class="act ghost mini" data-velodel="'+k+'">Supprimer cette analyse</button></div>'+
     '</div>';
 }
+/* ---------- comparaison a charge egale ----------
+   Les series ne sont comparables qu'a charge systeme equivalente. Le classement
+   s'appuie d'abord sur des grandeurs sans echelle (nombre de reps, perte de vitesse
+   en %, duree du concentrique en s), parce que les centimetres et les m/s dependent
+   de l'etalonnage px/cm, qui n'est pas verifie pour tous les cadrages. */
+function veloGroupes(){
+  var g={};
+  (S.velo||[]).forEach(function(v){
+    var k=v.mouvement+'|'+(v.charge_systeme_kg!=null
+      ? 'sys'+(Math.round(v.charge_systeme_kg/1.25)*1.25) : 'lest'+v.lest_kg);
+    (g[k]=g[k]||[]).push(v);
+  });
+  return g;
+}
+function veloClasse(l){
+  return l.slice().sort(function(a,b){
+    if(a.reps.length!==b.reps.length)return b.reps.length-a.reps.length;
+    var pa=a.resume.perte_v_moy_pct||0, pb=b.resume.perte_v_moy_pct||0;
+    if(Math.abs(pa-pb)>3)return pb-pa;
+    var ma=a.resume.v_mini_derniere||0, mb=b.resume.v_mini_derniere||0;
+    if(Math.abs(ma-mb)>0.05)return mb-ma;
+    return (b.resume.v_moy_rep1||0)-(a.resume.v_moy_rep1||0);
+  });
+}
+function veloMotif(a,b){
+  if(!b)return 'seule série à cette charge.';
+  if(a.reps.length!==b.reps.length)
+    return a.reps.length+' reps contre '+b.reps.length+' à la même charge.';
+  var pa=a.resume.perte_v_moy_pct||0, pb=b.resume.perte_v_moy_pct||0;
+  if(Math.abs(pa-pb)>3)return 'même nombre de reps, mais '+F(Math.abs(pa))+' % de perte de vitesse contre '+F(Math.abs(pb))+' %.';
+  var ma=a.resume.v_mini_derniere||0, mb=b.resume.v_mini_derniere||0;
+  if(Math.abs(ma-mb)>0.05)return 'à égalité de reps et de perte, dernière rep moins proche de l\u2019arrêt ('+F(ma)+' contre '+F(mb)+' m/s au point dur).';
+  return 'séries très proches ; départ un peu plus rapide ('+F(a.resume.v_moy_rep1)+' contre '+F(b.resume.v_moy_rep1)+' m/s).';
+}
+function veloCompare(){
+  var g=veloGroupes(), out='';
+  Object.keys(g).forEach(function(k){
+    var l=veloClasse(g[k]); if(l.length<2)return;
+    var v0=l[0], douteux=l.some(function(v){return v.echelle_verifiee===false;});
+    var rows=l.map(function(v,i){
+      var q=v.resume, d1=v.reps[0]||{};
+      return '<tr'+(i===0?' class="best"':'')+'><td>'+(i+1)+'</td><td>'+frDate(v.date)+'</td><td>'+
+        v.reps.length+'</td><td>'+F(q.v_moy_rep1)+'</td><td>'+F(q.perte_v_moy_pct)+' %</td><td>'+
+        F(q.v_mini_derniere)+'</td><td>'+F(d1.montee_s)+' s</td><td>'+F(d1.course_cm)+'</td><td>'+
+        F(q.perte_hauteur_sommet_cm)+'</td></tr>';
+    }).join('');
+    out+='<div class="card"><h2>Comparaison à charge égale <em>'+esc(l[0].mouvement)+' '+
+      F(l[0].lest_kg)+' kg'+(l[0].charge_systeme_kg?', système '+F(l[0].charge_systeme_kg)+' kg':'')+'</em></h2>'+
+      '<div class="scroll"><table><thead><tr><th>#</th><th>Date</th><th>Reps</th><th>V rep 1</th>'+
+      '<th>Perte V</th><th>V mini fin</th><th>Montée rep 1</th><th>Course rep 1 cm</th>'+
+      '<th>Perte sommet cm</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<p class="note"><b>Meilleure série : '+frDate(v0.date)+'</b> — '+veloMotif(v0,l[1])+'</p>'+
+      '<p class="note">Classement : nombre de reps à charge égale, puis perte de vitesse, puis '+
+      'proximité de l\u2019arrêt sur la dernière rep, puis vitesse de départ. Les reps, les % et '+
+      'les secondes ne dépendent pas de l\u2019étalonnage ; les centimètres et les m/s, oui.</p>'+
+      (douteux?'<div class="flag">Une série au moins a une échelle px/cm non vérifiée pour son cadrage : '+
+        'les colonnes en cm et en m/s sont indicatives, le reste tient.</div>':'')+'</div>';
+  });
+  return out;
+}
 function renderVelo(){
   var l=(S.velo||[]).slice().reverse();
-  $('velolist').innerHTML=l.length?l.map(function(v){return veloCard(v,v.id);}).join('')
-    :'<div class="card"><p class="note">Aucune analyse importée.</p></div>';
+  $('velolist').innerHTML=(l.length?veloCompare()+l.map(function(v){return veloCard(v,v.id);}).join('')
+    :'<div class="card"><p class="note">Aucune analyse importée.</p></div>');
 }
 $('veloadd').addEventListener('click',function(){$('velofile').click();});
 $('velofile').addEventListener('change',function(){
