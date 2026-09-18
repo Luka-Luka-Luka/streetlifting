@@ -180,6 +180,29 @@ h2[data-fold]{min-height:40px;display:flex;align-items:center}
 .stat b{display:block;font:700 22px/1 var(--num)}
 .stat span{font:400 11px/1.3 var(--txt);color:var(--muted)}
 svg.plot{width:100%;height:190px;display:block;margin-top:8px}
+.mk{font:400 12px/1 var(--txt);margin-left:4px;white-space:nowrap}
+.rirset{display:flex;gap:6px;align-items:center;margin-top:5px}
+.rirset>span{font:600 12px/1 var(--num);color:var(--muted);flex:0 0 22px}
+.rirset .pill{min-width:30px;padding:7px 4px}
+.chk{display:flex;align-items:center;gap:7px;font:400 12.5px/1.3 var(--txt);color:var(--muted);margin:0;cursor:pointer}
+.chk input{width:18px;height:18px;flex:0 0 auto}
+.brush{font-size:15px;min-width:auto;padding:7px 6px;font-family:var(--txt)}
+.brush small{font:400 11px/1 var(--txt);margin-left:3px;color:inherit}
+.vrow{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:5px}
+.vrow>button.vset{font:600 12px/1 var(--num);min-width:34px;padding:8px 4px;border:1px dashed var(--rule);
+  background:transparent;color:var(--muted);border-radius:var(--r);cursor:pointer}
+.vchip{width:34px;height:34px;border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);
+  font:600 11px/1 var(--num);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.vchip.on{font-size:17px;border-color:var(--ink)}
+.vidsum{border-left:3px solid var(--a6);padding:6px 0 6px 9px;margin-top:9px;font:400 12.5px/1.5 var(--txt);color:var(--muted)}
+.vidsum b{color:var(--ink)}
+.linkbtn{background:none;border:0;padding:0;color:var(--a2);font:600 12.5px/1.4 var(--txt);cursor:pointer;text-decoration:underline}
+.logrow.hl{background:var(--hl)}
+svg.vplot{width:100%;max-width:460px;display:block;margin-top:8px;overflow:visible}
+svg.vplot text{font-family:var(--num);font-size:11px;fill:currentColor}
+svg.vplot .g{stroke:currentColor;opacity:.13}
+svg.vplot .ax{stroke:currentColor;opacity:.45}
+svg.vplot .lb{opacity:.65}
 footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:400 11.5px/1.55 var(--txt);color:var(--muted)}
 @media print{nav,.btnrow,.iconbtn,footer{display:none}body{background:#fff}.line{cursor:auto}}
 </style>
@@ -259,6 +282,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     </div>
     <div id="sync"></div>
   </div>
+  <div class="daypick" style="margin:0 0 9px"><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Afficher les mouvements secondaires</label></div>
   <div id="out"></div>
   <div class="card" id="cardind">
     <h2>Suivi des main lifts <em>sur le bloc généré</em></h2>
@@ -461,9 +485,11 @@ var S={
     {name:'Dips',catId:'dip',main:true,useBw:true,step:1.25,k:0.025,refMode:'fixe',ref:{load:58.75,reps:3,rir:0,bw:86,date:null},prog:newProg(2.5)}
   ],
   cat:[], catHide:{}, tbw:null, done:{}, tsel:null, blockId:1, blocks:[], verbo:'norm', form:{}, velo:[],
+  veloJuge:{}, extra:{}, showAcc:true, rirEach:false, extraSeed:1,
   formOn:{som:1,ene:1,cou:1,art:1,tra:1}, formMode:'simple',
   log:[]
 };
+S.fold['c:cardextra']=1;
 S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
 
 var SAVEFAIL=false;
@@ -507,6 +533,10 @@ function load(){
     if(!S.velo)S.velo=[];
     if(!S.rappels)S.rappels=[];
     if(!S.veloJuge)S.veloJuge={};
+    if(!S.extra)S.extra={};
+    if(S.showAcc===undefined)S.showAcc=true;
+    if(S.rirEach===undefined)S.rirEach=false;
+    if(!S.extraSeed){ S.fold['c:cardextra']=1; S.extraSeed=1; }   /* la carte d'ajout part repliee */
     /* Rappel ponctuel, attache a une seance precise : il s'affiche dans Seance du jour
        quand cette seance est selectionnee, et disparait des qu'on l'efface. Il ne touche
        ni aux notes ni aux autres seances. Le drapeau evite qu'il revienne apres effacement. */
@@ -984,6 +1014,48 @@ $('nav').addEventListener('click',function(e){
   window.scrollTo(0,0);
 });
 
+/* ================= liens entre onglets =================
+   Une serie enregistree, sa ligne dans le programme et son analyse video sont la meme
+   chose vue de trois endroits : chacun renvoie aux deux autres. */
+function goTab(p){var b=document.querySelector('#nav button[data-p='+p+']'); if(b)b.click();}
+function openSession(key){
+  buildPlan(); var f=findLine(key);
+  if(!f){ goLog(key); return; }
+  S.tsel=f.w+'|'+f.day;
+  if(S.fold){ delete S.fold['tw'+f.w]; delete S.fold['td'+f.w+'-'+f.day]; }
+  save(); goTab('today');
+  var el=document.querySelector('#todayout .line[data-key="'+key+'"]');
+  if(el){ openPanel(el,key); el.scrollIntoView({block:'start'}); }
+}
+function unfoldTo(el){
+  var n=el, ch=false;
+  while(n&&n!==document.body){
+    if(n.classList&&n.classList.contains('folded')){
+      var h=n.querySelector('[data-fold]'); if(h&&S.fold){ delete S.fold[h.getAttribute('data-fold')]; ch=true; }
+    }
+    n=n.parentNode;
+  }
+  if(ch){ save(); applyFolds(); }
+}
+function goLog(key){
+  goTab('data');
+  var el=null;
+  Array.prototype.forEach.call(document.querySelectorAll('#loglist [data-lk]'),function(r){
+    r.classList.remove('hl'); if(r.dataset.lk===key)el=r;
+  });
+  if(el){ unfoldTo(el); el.classList.add('hl'); el.scrollIntoView({block:'center'}); }
+}
+function goVelo(id){
+  if(S.fold)delete S.fold['c:vc-'+id];
+  save(); goTab('velo'); applyFolds();
+  var el=$('vc-'+id); if(el){ unfoldTo(el); el.scrollIntoView({block:'start'}); }
+}
+document.addEventListener('click',function(ev){
+  var t=ev.target; if(!t||!t.closest)return;
+  var a=t.closest('[data-vgo]'); if(a){ goVelo(a.dataset.vgo); return; }
+  var o=t.closest('[data-open]'); if(o){ openSession(o.dataset.open); return; }
+});
+
 /* ================= thème ================= */
 function applyTheme(){
   var t=S.theme;
@@ -1105,6 +1177,20 @@ function deleteLift(d){
     if(typeof e.key==='string'){                     /* cle de plan : type|lift|semaine|jour|ligne */
       var q=e.key.split('|');
       if(q.length>=5&&/^\d+$/.test(q[1])&&+q[1]>d){ q[1]=String(+q[1]-1); e.key=q.join('|'); }
+    }
+  });
+  Object.keys(S.extra||{}).forEach(function(k){
+    S.extra[k]=S.extra[k].filter(function(x){return x.li!==d;});
+    S.extra[k].forEach(function(x){if(x.li>d)x.li--;});
+    if(!S.extra[k].length)delete S.extra[k];
+  });
+  (S.velo||[]).forEach(function(v){
+    if(v.li===d)v.li=-1; else if(v.li>d)v.li--;
+    if(v.lien&&v.lien.key){
+      var q=v.lien.key.split('|');
+      if(q.length>=5&&/^\d+$/.test(q[1])){
+        if(+q[1]===d)delete v.lien; else if(+q[1]>d){ q[1]=String(+q[1]-1); v.lien.key=q.join('|'); }
+      }
     }
   });
   S.lifts.splice(d,1);
@@ -1649,7 +1735,15 @@ function buildPlan(){
           });
         }
       });
-      if(day.lines.length)week.days.push(day);
+      if(day.lines.length){
+        /* ajouts ponctuels : rattaches a une seance precise du bloc, rien d'autre ne bouge */
+        (S.extra[w+'|'+lab+BK()]||[]).forEach(function(xa){
+          var XL=S.lifts[xa.li]; if(!XL)return;
+          day.lines.push({li:xa.li,name:XL.name,role:'extra',sets:+xa.sets||1,reps:String(xa.reps),
+            load:+xa.load||0,info:'ajout ponctuel',key:'x|'+xa.li+'|'+w+'|'+lab+'|'+xa.id+BK()});
+        });
+        week.days.push(day);
+      }
     });
     if(week.days.length)PLAN.push(week);
   }
@@ -1725,14 +1819,18 @@ function renderPlan(into,weeks,pfx,scope){
       html+='<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
         day.label+dayDate(week.w,day.label)+(S.done&&S.done[week.w+'|'+day.label]?' ✓':'')+'</div>';
       txt+=day.label+'\n';
+      var hid=0;
       day.lines.forEach(function(x){
+        if(pfx==='p'&&!S.showAcc&&S.lifts[x.li]&&!S.lifts[x.li].main){ hid++;
+          txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n'; return; }
         var st=lineState(x.key);
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
-          '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':'')+'</span>'+
+          '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':'')+lineMarks(x.key)+'</span>'+
           '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
           '<span class="in">'+x.info+'</span></div>';
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
+      if(hid)html+='<div class="note" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
       html+='</div>';
     });
     html+='</div></div>';
@@ -1777,7 +1875,7 @@ function trackLift(i){
   PLAN.forEach(function(wk){
     var n=0;
     wk.days.forEach(function(d){d.lines.forEach(function(x){
-      if(x.li!==i)return;
+      if(x.li!==i||x.role==='extra')return;
       n+=(+x.sets||1);
       if(x.role==='var'||x.role==='acc')return;
       if(x.role==='amrap'||!/^\d/.test(String(x.reps))){ if(amrap===null)amrap={w:wk.w,d:d.label}; return; }
@@ -1876,6 +1974,101 @@ $('copy').addEventListener('click',function(){
 
 /* ================= saisie d'une ligne ================= */
 var OPENKEY=null;
+/* Validite des reps : jugement a l'oeil, rep par rep, pose en seance. C'est la meme donnee
+   que celle de l'onglet Vitesse, qui la lit ici des qu'une analyse est rattachee a la serie :
+   une seule source, deux endroits pour la saisir. Codes internes identiques a ceux
+   deja utilises par l'etalonnage (ko / ok / franc), plus « douteuse », qui n'entre pas
+   dans le calcul du seuil : une rep dont vous n'etes pas sur ne doit pas le deplacer. */
+var VJ={ko:{e:'\ud83d\ude11',n:'ratée'},dt:{e:'\ud83e\udd14',n:'douteuse'},
+        ok:{e:'\ud83d\ude00',n:'valide'},franc:{e:'\ud83d\ude0e',n:'franche'}};
+var VJO=['ko','dt','ok','franc'];
+var JCOL={ko:'var(--bad)',dt:'var(--warn)',ok:'var(--a2)',franc:'var(--ok)'};
+var PV=[], PBRUSH='ok';
+function veloOfKey(key){return (S.velo||[]).filter(function(v){return v.lien&&v.lien.key===key;});}
+function lienEntry(v){return (v&&v.lien&&v.lien.key)?entryOf(v.lien.key):null;}
+function lineMarks(key){
+  var e=entryOf(key), ko=0, dt=0, h='';
+  if(e&&e.valid)e.valid.forEach(function(a){(a||[]).forEach(function(c){if(c==='ko')ko++; if(c==='dt')dt++;});});
+  if(veloOfKey(key).length)h+=' \ud83c\udfa5';
+  if(dt)h+=' '+VJ.dt.e+dt; if(ko)h+=' '+VJ.ko.e+ko;
+  return h?'<span class="mk">'+h+'</span>':'';
+}
+/* jugements deja poses dans l'onglet Vitesse sur une analyse rattachee a cette ligne */
+function panelValid(key,e){
+  var a=(e&&e.valid)?e.valid.map(function(r){return (r||[]).slice();}):[];
+  veloOfKey(key).forEach(function(v){
+    var st=v.lien.set; if(st==null)return;
+    v.reps.forEach(function(r){
+      var j=S.veloJuge[v.id+'|'+r.rep]; if(!j)return;
+      if(!a[st])a[st]=[]; if(!a[st][r.rep-1])a[st][r.rep-1]=j;
+    });
+  });
+  return a;
+}
+function panelReps(p){
+  var r=p.querySelector('[data-fld=reps]');
+  if(r)return [r.value===''?null:Math.max(0,Math.round(+r.value||0))];
+  return Array.prototype.map.call(p.querySelectorAll('[data-set]'),function(b){
+    var t=b.textContent.replace(' reps',''); return /^\d+$/.test(t)?+t:null;
+  });
+}
+function vCount(key,reps,st){
+  var n=reps[st]!=null?reps[st]:(PV[st]||[]).length;
+  veloOfKey(key).forEach(function(v){if(v.lien.set===st)n=Math.max(n,v.reps.length);});
+  return n;
+}
+function validRows(key,reps){
+  return reps.map(function(nr,st){
+    var n=vCount(key,reps,st), lab='S'+(st+1);
+    if(!n)return '<div class="vrow"><button class="vset" disabled>'+lab+'</button><span class="note" style="margin:0 0 0 4px">reps pas encore saisies</span></div>';
+    var h='<div class="vrow"><button class="vset" data-vfill="'+st+'" title="Toute la série" aria-label="Toute la série '+(st+1)+'">'+lab+'</button>';
+    for(var r=0;r<n;r++){
+      var c=(PV[st]||[])[r];
+      h+='<button class="vchip'+(c?' on':'')+'" data-vr="'+st+'|'+r+'" aria-label="Série '+(st+1)+', rep '+(r+1)+(c?', '+VJ[c].n:', non jugée')+'">'+(c?VJ[c].e:(r+1))+'</button>';
+    }
+    return h+'</div>';
+  }).join('');
+}
+function refreshV(p){var w=p.querySelector('[data-vrows]'); if(w)w.innerHTML=validRows(p.dataset.panel,panelReps(p));}
+function rirPills(v){
+  var base=(v==null)?null:Math.floor(v), half=v!=null&&(v-Math.floor(v))>0.01;
+  return [0,1,2,3,4,5].map(function(q){
+    return '<button class="pill" data-rir="'+q+'" aria-pressed="'+(base===q)+'">'+q+'</button>';
+  }).join('')+
+  '<button class="pill half" data-rir="h" aria-pressed="'+half+'">\u00bd</button>'+
+  '<button class="pill" data-rir="x" aria-pressed="'+(v===null)+'">?</button>';
+}
+function readRir(row){
+  if(!row)return undefined;
+  if(row.querySelector('[data-rir=x][aria-pressed=true]'))return null;
+  var half=!!row.querySelector('[data-rir=h][aria-pressed=true]'), base=null;
+  Array.prototype.forEach.call(row.querySelectorAll('[data-rir][aria-pressed=true]'),function(x){
+    if(x.dataset.rir!=='x'&&x.dataset.rir!=='h')base=+x.dataset.rir;
+  });
+  return base!=null?base+(half?0.5:0):(half?0.5:undefined);
+}
+function copyRir(from,to,force){
+  if(!from||!to)return;
+  if(!from.querySelector('[aria-pressed=true]'))return;
+  if(!force&&to.querySelector('[aria-pressed=true]'))return;
+  var a=from.querySelectorAll('[data-rir]'), b=to.querySelectorAll('[data-rir]');
+  for(var i=0;i<a.length&&i<b.length;i++)b[i].setAttribute('aria-pressed',a[i].getAttribute('aria-pressed'));
+}
+/* conserve les jugements d'une analyse video quand la serie a laquelle elle est rattachee disparait */
+function keepJuge(key){
+  var e=entryOf(key); if(!e||!e.valid)return;
+  veloOfKey(key).forEach(function(v){
+    (e.valid[v.lien.set]||[]).forEach(function(c,r){ if(c)S.veloJuge[v.id+'|'+(r+1)]=c; });
+  });
+}
+function vidSummary(key){
+  return veloOfKey(key).map(function(v){
+    var q=v.resume||{};
+    return '<div class="vidsum">\ud83c\udfa5 <b>Série '+(v.lien.set+1)+'</b> filmée le '+frDate(v.date)+' : rep 1 \u2192 dernière <b>'+
+      F(q.v_moy_rep1)+' \u2192 '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
+      '<button class="linkbtn" data-vgo="'+esc(v.id)+'">Voir l\'analyse</button></div>';
+  }).join('');
+}
 function findLine(key){
   for(var i=0;i<PLAN.length;i++)for(var j=0;j<PLAN[i].days.length;j++){
     var d=PLAN[i].days[j];
@@ -1902,13 +2095,26 @@ function panelHTML(key){
   }
   var uKey=keyUnit(key);
   var fail=(uKey!=null&&(x.role==='top'||x.role==='amrap'))?((L.prog.adj||[]).indexOf(uKey)>=0):null;
-  var rirNow=e&&e.rir!=null?e.rir:null;
-  var rirBase=rirNow==null?null:Math.floor(rirNow), rirHalf=rirNow!=null&&(rirNow-Math.floor(rirNow))>0.01;
-  var rirs=[0,1,2,3,4,5].map(function(q){
-    return '<button class="pill" data-rir="'+q+'" aria-pressed="'+(rirBase===q)+'">'+q+'</button>';
-  }).join('')+
-    '<button class="pill half" data-rir="h" aria-pressed="'+rirHalf+'">\u00bd</button>'+
-    '<button class="pill" data-rir="x" aria-pressed="'+(!!(e&&e.rir===null))+'">?</button>';
+  var rirNow=e?(e.rir===null?null:e.rir):undefined;
+  var each=x.sets>1&&(e&&e.rirs?true:(e?false:!!S.rirEach));
+  var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return e&&e.sets&&e.sets[q]!=null?e.sets[q]:null;})
+                      :[e&&e.sets&&e.sets[0]!=null?e.sets[0]:repMin(x.reps)];
+  var rirBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
+    (x.sets>1?'<label class="chk"><input type="checkbox" data-rireach'+(each?' checked':'')+'>Réserve notée à chaque série</label>':'')+
+    '<div data-rirlast'+(each?' style="display:none"':'')+'><label style="margin-top:6px">Reps en réserve sur la dernière série</label>'+
+      '<div class="pillrow" data-rirrow="last">'+rirPills(rirNow)+'</div></div>'+
+    (x.sets>1?'<div data-rireachwrap'+(each?'':' style="display:none"')+'><label style="margin-top:6px">Reps en réserve, série par série</label>'+
+      Array.apply(null,{length:x.sets}).map(function(_,q){
+        var v=(e&&e.rirs)?(e.rirs[q]===undefined?undefined:e.rirs[q]):undefined;
+        return '<div class="rirset" data-rirrow="'+q+'"><span>S'+(q+1)+'</span>'+rirPills(v)+'</div>';
+      }).join('')+'</div>':'')+
+    '</div></div>';
+  var validBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
+    '<label>Validité des reps — choisissez un jugement, puis touchez les reps (« S1 » remplit la série)</label>'+
+    '<div class="pillrow" data-brushes>'+VJO.map(function(c){
+      return '<button class="pill brush" data-brush="'+c+'" aria-pressed="'+(PBRUSH===c)+'">'+VJ[c].e+'<small>'+VJ[c].n+'</small></button>';
+    }).join('')+'</div>'+
+    '<div data-vrows>'+validRows(key,repsNow)+'</div></div></div>';
   return '<div class="panel" data-panel="'+key+'">'+
     '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
     '<div class="row">'+
@@ -1918,8 +2124,7 @@ function panelHTML(key){
     '</div>'+
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
-    '<div class="row" style="margin-top:8px"><div class="field w"><label>Reps en réserve sur la dernière série</label>'+
-      '<div class="pillrow">'+rirs+'</div></div></div>'+
+    vidSummary(key)+rirBlock+validBlock+
     '<div class="row" style="margin-top:8px"><div class="field w"><label>Note</label>'+
       '<input data-fld="note" type="text" value="'+(e&&e.note?e.note.replace(/"/g,'&quot;'):'')+'" placeholder="vitesse, exécution, vidéo"></div></div>'+
     (x.sets>1?'<details style="margin-top:8px"><summary class="note">Une note par série</summary>'+
@@ -1936,11 +2141,13 @@ function panelHTML(key){
       '</div></div>':'')+
     '<div class="btnrow"><button class="act mini" data-save="'+key+'">Enregistrer</button>'+
       '<button class="act ghost mini" data-close="1">Fermer</button>'+
-      (e?'<button class="act ghost mini" data-clear="'+key+'">Effacer</button>':'')+'</div>'+
+      (e?'<button class="act ghost mini" data-clear="'+key+'">Effacer</button>':'')+
+      (x.role==='extra'?'<button class="act ghost mini" data-xdel="'+key+'">Retirer de la séance</button>':'')+'</div>'+
   '</div>';
 }
 function openPanel(el,key){
   closePanel();
+  PV=panelValid(key,entryOf(key));
   var div=document.createElement('div'); div.innerHTML=panelHTML(key);
   el.parentNode.insertBefore(div.firstChild,el.nextSibling); OPENKEY=key;
 }
@@ -1978,7 +2185,7 @@ function panelClick(e){
       var f=findLine(p.dataset.panel), min=repMin(f.line.reps);
       if(b.classList.contains('done')||b.classList.contains('short'))showPick(p,b,f.line);
       else { b.textContent=min+' reps'; b.className='pill set done'; hidePick(p); }
-      e.stopPropagation(); return;
+      refreshV(p); e.stopPropagation(); return;
     }
     if(b.dataset.pick!=null){
       var sel=p.querySelector('[data-set][data-sel]');
@@ -1987,16 +2194,35 @@ function panelClick(e){
         if(pv===''){ sel.textContent='S'+(+sel.dataset.set+1); sel.className='pill set'; }
         else { sel.textContent=(+pv)+' reps'; sel.className='pill set '+((+pv)>=mn?'done':'short'); }
       }
-      hidePick(p); e.stopPropagation(); return;
+      hidePick(p); refreshV(p); e.stopPropagation(); return;
     }
+    if(b.dataset.brush){
+      PBRUSH=b.dataset.brush;
+      Array.prototype.forEach.call(p.querySelectorAll('[data-brush]'),function(x){x.setAttribute('aria-pressed',x===b);});
+      e.stopPropagation(); return;
+    }
+    if(b.dataset.vr){
+      var vq=b.dataset.vr.split('|'), vs=+vq[0], vr=+vq[1];
+      if(!PV[vs])PV[vs]=[];
+      PV[vs][vr]=(PV[vs][vr]===PBRUSH)?null:PBRUSH;
+      refreshV(p); e.stopPropagation(); return;
+    }
+    if(b.dataset.vfill!=null){
+      var fs=+b.dataset.vfill, fn=p.querySelectorAll('[data-vr^="'+fs+'|"]').length;
+      if(!PV[fs])PV[fs]=[];
+      var all=true; for(var z=0;z<fn;z++)if(PV[fs][z]!==PBRUSH)all=false;
+      for(z=0;z<fn;z++)PV[fs][z]=all?null:PBRUSH;
+      refreshV(p); e.stopPropagation(); return;
+    }
+    if(b.dataset.xdel){delExtra(b.dataset.xdel);e.stopPropagation();return;}
     if(b.dataset.rir!=null){
-      var dr=b.dataset.rir;
+      var dr=b.dataset.rir, rrow=b.closest('[data-rirrow]')||p;
       if(dr==='h'){                                  /* modificateur : s'ajoute au chiffre choisi */
         var on=b.getAttribute('aria-pressed')==='true';
         b.setAttribute('aria-pressed',on?'false':'true');
-        var xb=p.querySelector('[data-rir=x]'); if(xb)xb.setAttribute('aria-pressed','false');
+        var xb=rrow.querySelector('[data-rir=x]'); if(xb)xb.setAttribute('aria-pressed','false');
       }else{
-        Array.prototype.forEach.call(p.querySelectorAll('[data-rir]'),function(x){
+        Array.prototype.forEach.call(rrow.querySelectorAll('[data-rir]'),function(x){
           if(x.dataset.rir==='h'){ if(dr==='x')x.setAttribute('aria-pressed','false'); return; }
           x.setAttribute('aria-pressed',x===b);
         });
@@ -2005,7 +2231,7 @@ function panelClick(e){
     }
     if(b.dataset.fail){toggleFail(b.dataset.fail);e.stopPropagation();return;}
     if(b.dataset.close){closePanel();e.stopPropagation();return;}
-    if(b.dataset.clear){S.log=S.log.filter(function(x){return x.key!==b.dataset.clear;});save();closePanel();refreshPlans();e.stopPropagation();return;}
+    if(b.dataset.clear){keepJuge(b.dataset.clear);S.log=S.log.filter(function(x){return x.key!==b.dataset.clear;});save();closePanel();refreshPlans();e.stopPropagation();return;}
     if(b.dataset.save){saveLine(p,b.dataset.save);e.stopPropagation();return;}
     return;
   }
@@ -2032,13 +2258,19 @@ function saveLine(p,key){
   else Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(b){
     var t=b.textContent.replace(' reps',''); sets.push(/^\d+$/.test(t)?+t:null);
   });
-  var unkB=p.querySelector('[data-rir=x][aria-pressed=true]');
-  var halfB=p.querySelector('[data-rir=h][aria-pressed=true]');
-  var baseB=null;
-  Array.prototype.forEach.call(p.querySelectorAll('[data-rir][aria-pressed=true]'),function(x){
-    if(x.dataset.rir!=='x'&&x.dataset.rir!=='h')baseB=x;
+  var chk=p.querySelector('[data-rireach]'), each=!!(chk&&chk.checked), rir, rirs=null;
+  if(each){
+    rirs=Array.prototype.map.call(p.querySelectorAll('[data-rireachwrap] [data-rirrow]'),function(r){
+      var v=readRir(r); return v===undefined?null:v;
+    });
+    rir=rirs[rirs.length-1];
+  }else{ rir=readRir(p.querySelector('[data-rirrow=last]')); if(rir===undefined)rir=null; }
+  /* validite : tronquee au nombre de reps de chaque serie, rien si rien n'est juge */
+  var valid=sets.map(function(_,st){
+    var n=vCount(key,sets,st), a=(PV[st]||[]).slice(0,n).map(function(c){return c||null;});
+    return a.some(Boolean)?a:null;
   });
-  var rir = unkB ? null : (baseB ? +baseB.dataset.rir+(halfB?0.5:0) : (halfB?0.5:null));
+  if(!valid.some(Boolean))valid=null;
   var setNotes=[];
   Array.prototype.forEach.call(p.querySelectorAll('[data-setnote]'),function(el){setNotes[+el.dataset.setnote]=el.value.trim();});
   var min=repMin(x.reps), load=num(loadEl.value,x.load);
@@ -2047,12 +2279,33 @@ function saveLine(p,key){
   var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:x.li,lift:L.name,tpl:L.prog.tpl,week:f.w+1,day:f.day,
     role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,load:load,sets:sets,rir:rir,
     bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
+  if(rirs)e.rirs=rirs;
+  if(valid)e.valid=valid;
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
+  /* la ligne devient la reference des jugements de ses analyses video */
+  veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
   save(); closePanel(); refreshPlans();
 }
 function refreshPlans(){generate();renderToday();renderData();}
 $('out').addEventListener('click',panelClick);
 $('todayout').addEventListener('click',panelClick);
+function panelChange(ev){
+  var t=ev.target; if(!t||!t.closest)return;
+  var p=t.closest('[data-panel]'); if(!p)return;
+  if(t.dataset&&t.dataset.rireach!=null){
+    var last=p.querySelector('[data-rirrow=last]'), rows=p.querySelectorAll('[data-rireachwrap] [data-rirrow]');
+    var lastEach=rows[rows.length-1];
+    if(t.checked)copyRir(last,lastEach,false); else copyRir(lastEach,last,true);
+    p.querySelector('[data-rirlast]').style.display=t.checked?'none':'';
+    p.querySelector('[data-rireachwrap]').style.display=t.checked?'':'none';
+    S.rirEach=t.checked; save();
+  }
+  if(t.dataset&&t.dataset.fld==='reps')refreshV(p);
+}
+['out','todayout'].forEach(function(id){
+  $(id).addEventListener('change',panelChange);
+  $(id).addEventListener('input',function(ev){ if(ev.target.dataset&&ev.target.dataset.fld==='reps')panelChange(ev); });
+});
 
 /* ================= séance du jour ================= */
 function todayISO(){var d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);}
@@ -2176,6 +2429,7 @@ $('tnext').addEventListener('click',function(){
 });
 
 function renderToday(){
+  veloAutoAll();
   buildPlan();
   var d=new Date(), names=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   $('todaydate').textContent=names[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1);
@@ -2199,7 +2453,9 @@ function renderToday(){
   renderPlan($('todayout'),weeks,'t','day');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('afterbegin',rappelCard(k));
+  $('todayout').insertAdjacentHTML('beforeend',extraCard(k));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
+  xFill(null);
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   var nk=nextSession(), off=(nk&&k!==nk);
   $('tback').style.display=off?'':'none';
@@ -2247,6 +2503,85 @@ function warmCard(weeks){
     '<b>Échauffement</b><span>modifiable par mouvement, onglet Programme</span></div>'+
     '<div class="wkb">'+body+'</div></div>';
 }
+/* ================= ajout ponctuel =================
+   Un mouvement fait en plus, pour une seance seulement. Il est range sous la cle de la
+   seance (semaine|jour|bloc) et reconstruit dans le plan comme une ligne ordinaire : il
+   s'enregistre, se juge et se rattache a une video comme les autres. Il n'entre ni dans
+   la conformite (rien n'etait prescrit) ni dans le volume prevu du suivi des main lifts. */
+function extraCard(k){
+  var ln=S.lifts.map(function(L,i){return '<option value="'+i+'">'+esc(L.name)+'</option>';}).join('');
+  return '<div class="card" id="cardextra"><h2>Ajouter un mouvement <em>à cette séance seulement</em></h2>'+
+    '<div class="row"><div class="field w"><label>Mouvement</label><select data-xli>'+ln+'</select></div></div>'+
+    '<div class="row" style="margin-top:8px">'+
+      '<div class="field sm"><label>Lest</label><input data-xf="load" class="numin" type="text" inputmode="decimal"></div>'+
+      '<div class="field sm"><label>Reps</label><input data-xf="reps" class="numin" type="text" inputmode="numeric"></div>'+
+      '<div class="field sm"><label>Séries</label><input data-xf="sets" class="numin" type="text" inputmode="numeric"></div></div>'+
+    '<p class="note" data-xsrc></p>'+
+    '<div class="btnrow"><button class="act" data-xadd="'+esc(k)+'">Ajouter à la séance</button></div>'+
+    '<p class="note">La ligne s\'ajoute à cette séance, dans Séance du jour et dans Programme, marquée « ajout ponctuel ». '+
+    'Elle s\'enregistre comme les autres mais ne compte ni dans la conformité, ni dans le volume prévu du bloc.</p></div>';
+}
+/* pre-remplissage : ce que le programme prevoit pour ce mouvement la meme semaine,
+   sinon la semaine la plus proche, sinon la derniere serie enregistree */
+function xGuess(li){
+  var k=S.tsel||'0|', w=+k.split('|')[0], best=null;
+  PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){
+    if(x.li!==li||x.role==='extra')return;
+    var dist=Math.abs(wk.w-w);
+    if(!best||dist<best.dist)best={dist:dist,x:x,src:'S'+(wk.w+1)+' '+d.label};
+  });});});
+  if(best)return {load:best.x.load,reps:String(best.x.reps),sets:best.x.sets,
+    src:'Repris du programme, '+best.src+' : '+F(best.x.load)+' '+S.sep+' '+best.x.reps+(best.x.sets>1?' '+S.sep+' '+best.x.sets:'')+'.'};
+  var es=S.log.filter(function(e){return e.li===li&&e.sets&&e.sets.length;})
+    .sort(function(a,b){return a.date<b.date?1:-1;});
+  if(es.length){var e=es[0];
+    return {load:+e.load||0,reps:String(e.sets[0]!=null?e.sets[0]:''),sets:e.sets.length,
+      src:'Reprise de la dernière série enregistrée ('+frDate(e.date)+').'};}
+  return {load:0,reps:'8',sets:3,src:'Aucune donnée pour ce mouvement : valeurs par défaut, à corriger.'};
+}
+function xFill(li){
+  var c=$('cardextra'); if(!c)return;
+  var sel=c.querySelector('[data-xli]'); if(!sel)return;
+  if(li==null){
+    var today={}; (PLAN.filter(function(wk){return wk.w===+String(S.tsel).split('|')[0];})[0]||{days:[]}).days
+      .forEach(function(d){ if(d.label===String(S.tsel).split('|')[1])d.lines.forEach(function(x){today[x.li]=1;}); });
+    li=0; for(var i=0;i<S.lifts.length;i++){ if(!today[i]){li=i;break;} }
+    sel.value=String(li);
+  }
+  var g=xGuess(+li);
+  c.querySelector('[data-xf=load]').value=F(g.load);
+  c.querySelector('[data-xf=reps]').value=g.reps;
+  c.querySelector('[data-xf=sets]').value=g.sets;
+  c.querySelector('[data-xsrc]').textContent=g.src;
+}
+function delExtra(key){
+  var q=String(key).split('|'), sk=q[2]+'|'+q[3]+(q[5]?'|'+q[5]:''), id=q[4];
+  var e=entryOf(key);
+  if(e&&!confirm('Retirer cet ajout de la séance ?\n\nLa série enregistrée sur cette ligne sera supprimée du journal.'))return;
+  keepJuge(key);
+  S.extra[sk]=(S.extra[sk]||[]).filter(function(x){return x.id!==id;});
+  if(!S.extra[sk].length)delete S.extra[sk];
+  S.log=S.log.filter(function(x){return x.key!==key;});
+  save(); closePanel(); refreshPlans();
+}
+$('todayout').addEventListener('change',function(e){
+  var t=e.target; if(t&&t.dataset&&t.dataset.xli!=null)xFill(+t.value);
+});
+$('todayout').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-xadd]'):null; if(!b)return;
+  var c=$('cardextra'), k=b.dataset.xadd;
+  var li=+c.querySelector('[data-xli]').value;
+  var load=num(c.querySelector('[data-xf=load]').value,0);
+  var reps=String(c.querySelector('[data-xf=reps]').value||'').trim()||'1';
+  var sets=Math.max(1,Math.round(num(c.querySelector('[data-xf=sets]').value,1)));
+  var sk=k+BK(), id='a'+Date.now().toString(36);
+  if(!S.extra[sk])S.extra[sk]=[];
+  S.extra[sk].push({id:id,li:li,load:load,reps:reps,sets:sets});
+  save(); refreshPlans();
+  var q=k.split('|'), key='x|'+li+'|'+q[0]+'|'+q[1]+'|'+id+BK();
+  var el=document.querySelector('#todayout .line[data-key="'+key+'"]');
+  if(el){ openPanel(el,key); el.scrollIntoView({block:'center'}); }
+});
 function rappelCard(k){
   var l=(S.rappels||[]).filter(function(r){return r.k===k;});
   if(!l.length)return '';
@@ -2350,7 +2685,7 @@ function blockStats(from,to){
       return e.li===i&&(!from||e.date>=from)&&(!to||e.date<=to);
     }).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
     var n=0,ok=0;
-    es.forEach(function(e){ if(e.state){n++; if(e.state==='ok')ok++;} });
+    es.forEach(function(e){ if(e.state&&e.role!=='extra'){n++; if(e.state==='ok')ok++;} });
     var us=es.filter(function(e){return ['top','amrap','pr'].indexOf(e.role)>=0&&predRM(L,e)!=null;});
     var best=null,bestD=null;
     us.forEach(function(e){var v=predRM(L,e); if(best===null||v>best){best=v;bestD=e.date;}});
@@ -2433,7 +2768,7 @@ $('newblock').addEventListener('click',function(){
 function renderData(){
   /* conformité */
   var byLift=S.lifts.map(function(L,i){
-    var es=S.log.filter(function(e){return e.li===i&&e.state;});
+    var es=S.log.filter(function(e){return e.li===i&&e.state&&e.role!=='extra';});
     var ok=es.filter(function(e){return e.state==='ok';}).length;
     return {L:L,i:i,n:es.length,ok:ok};
   });
@@ -2466,18 +2801,28 @@ function renderData(){
   else{
     $('loglist').innerHTML=S.log.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(e){
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/');
-      return '<div class="logrow"><span class="d">'+(e.date||'')+'</span>'+
+      var vl=(e.valid||[]).map(function(a,st){
+        return (a&&a.some(Boolean))?'S'+(st+1)+' '+a.map(function(c){return c?VJ[c].e:'\u00b7';}).join(''):'';
+      }).filter(Boolean).join(' \u00b7 ');
+      var lk=[];
+      if(e.key&&findLine(e.key))lk.push('<button class="linkbtn" data-open="'+esc(e.key)+'">ouvrir la séance</button>');
+      veloOfKey(e.key).forEach(function(v){lk.push('<button class="linkbtn" data-vgo="'+esc(v.id)+'">\ud83c\udfa5 vidéo S'+(v.lien.set+1)+'</button>');});
+      return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> '+F(e.load)+' '+S.sep+' '+reps+
-        (e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue')+
+        (e.rirs?' · réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue'))+
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+F(e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
-        (e.note?'<br><i>'+e.note+'</i>':'')+'</span>'+
+        (e.role==='extra'?'<br><i>ajout ponctuel</i>':'')+
+        (vl?'<br>'+vl:'')+
+        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+
+        (lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
         '<button class="act ghost mini" data-rm="'+e.id+'">×</button></div>';
     }).join('');
   }
 }
 $('loglist').addEventListener('click',function(e){
   var b=e.target.closest('[data-rm]'); if(!b)return;
+  S.log.forEach(function(x){ if(x.id===b.dataset.rm)keepJuge(x.key); });
   S.log=S.log.filter(function(x){return x.id!==b.dataset.rm;}); save(); refreshPlans();
 });
 $('applyfit').addEventListener('click',function(){
@@ -2560,13 +2905,79 @@ function veloRef(v){
    tete a 0,6 cm pres en ecart-type, avec une pointe a 1,3 cm sur la rep la plus degradee
    (mesure faite le 17/09 en suivant l'oreille) : d'ou la bande d'incertitude ci-dessous. */
 var VBANDE=1.3;
+/* Le jugement d'une rep vit dans la serie enregistree quand l'analyse y est rattachee
+   (saisi en seance ou ici, c'est le meme), sinon dans S.veloJuge en attendant. */
+function jugeOf(v,rep){
+  var e=lienEntry(v), st=v.lien?v.lien.set:null;
+  if(e&&e.valid&&st!=null){ var c=(e.valid[st]||[])[rep-1]; if(c)return c; }
+  return S.veloJuge[v.id+'|'+rep]||'';
+}
+function setJuge(v,rep,code){
+  var nv=(jugeOf(v,rep)===code)?null:code, e=lienEntry(v), st=v.lien?v.lien.set:null;
+  if(e&&st!=null){
+    if(!e.valid)e.valid=[]; if(!e.valid[st])e.valid[st]=[];
+    e.valid[st][rep-1]=nv;
+    delete S.veloJuge[v.id+'|'+rep];
+  }else{ if(nv)S.veloJuge[v.id+'|'+rep]=nv; else delete S.veloJuge[v.id+'|'+rep]; }
+}
+/* ce qui etait juge ici avant le rattachement rejoint la serie, sans ecraser ce qui y est deja */
+function mergeJuge(v){
+  var e=lienEntry(v), st=v.lien?v.lien.set:null; if(!e||st==null)return;
+  v.reps.forEach(function(r){
+    var k=v.id+'|'+r.rep, j=S.veloJuge[k]; if(!j)return;
+    if(!e.valid)e.valid=[]; if(!e.valid[st])e.valid[st]=[];
+    if(!e.valid[st][r.rep-1])e.valid[st][r.rep-1]=j;
+    delete S.veloJuge[k];
+  });
+}
+function setLien(v,lien){
+  v.reps.forEach(function(r){ var j=jugeOf(v,r.rep); if(j)S.veloJuge[v.id+'|'+r.rep]=j; });
+  v.lien=lien; mergeJuge(v);
+}
+/* Rattachement automatique : meme date, meme mouvement. Parmi les series de ce jour-la,
+   on retient celle dont le nombre de reps egale celui de la video et, a egalite, celle
+   dont le role correspond au type annonce (top set, back-off). Si deux candidats restent
+   ex aequo, on ne devine pas : le choix est laisse dans la carte. */
+function veloAuto(v){
+  if(v.lien)return false;
+  var es=S.log.filter(function(e){return e.date===v.date&&(v.li<0||e.li===v.li)&&e.sets&&e.sets.length;});
+  if(!es.length)return false;
+  var n=v.reps.length, ts=String(v.type_serie||'').toLowerCase(), c=[];
+  es.forEach(function(e){ e.sets.forEach(function(r,st){
+    var role=(/top/.test(ts)&&e.role==='top')||(/back/.test(ts)&&e.role==='back');
+    c.push({e:e,s:st,m:(r===n?2:0)+(role?1:0)});
+  });});
+  c.sort(function(a,b){return b.m-a.m;});
+  if(c.length===1||(c[0].m>0&&c[1].m<c[0].m)){ setLien(v,{key:c[0].e.key,set:c[0].s,auto:1}); return true; }
+  return false;
+}
+function veloAutoAll(){
+  var ch=false; (S.velo||[]).forEach(function(v){ if(veloAuto(v))ch=true; });
+  if(ch)save();
+}
+function roleLab(r){return r==='top'?'top set':r==='back'?'back-off':r==='amrap'?'série maximale':r==='pr'?'hors programme':r==='extra'?'ajout ponctuel':r==='acc'?'accessoire':'série';}
+function lienSelect(v){
+  var t=Date.parse(v.date)||0;
+  var es=S.log.filter(function(e){return (v.li<0||e.li===v.li)&&e.sets&&e.sets.length;})
+    .sort(function(a,b){return Math.abs((Date.parse(a.date)||0)-t)-Math.abs((Date.parse(b.date)||0)-t);}).slice(0,12);
+  var cur=v.lien&&v.lien.key?v.lien.key+'#'+v.lien.set:'';
+  var o='<option value="">non rattachée</option>';
+  es.forEach(function(e){ e.sets.forEach(function(r,st){
+    var val=e.key+'#'+st;
+    o+='<option value="'+esc(val)+'"'+(val===cur?' selected':'')+'>'+frDate(e.date)+
+      (e.week?' \u00b7 S'+e.week+' '+esc(e.day):'')+' \u00b7 '+roleLab(e.role)+' \u00b7 '+F(e.load)+' '+S.sep+' '+(r==null?'\u2014':r)+
+      (e.sets.length>1?' \u00b7 série '+(st+1):'')+'</option>';
+  });});
+  if(cur&&o.indexOf(' selected')<0)o+='<option value="'+esc(cur)+'" selected>série effacée du journal</option>';
+  return '<select data-velolien="'+esc(v.id)+'">'+o+'</select>';
+}
 function veloHauteurs(mouvement){
   var ko=[],ok=[],fr=[],mixte=false,verif=null;
   (S.velo||[]).forEach(function(v){
     if(v.mouvement!==mouvement)return;
     v.reps.forEach(function(r){
-      var j=S.veloJuge[v.id+'|'+r.rep];
-      if(!j)return;
+      var j=jugeOf(v,r.rep);
+      if(!j||j==='dt')return;
       if(verif===null)verif=v.echelle_verifiee; else if(verif!==v.echelle_verifiee)mixte=true;
       (j==='ko'?ko:j==='ok'?ok:fr).push(r.hauteur_sommet_cm);
     });
@@ -2587,8 +2998,8 @@ function veloSeuil(mouvement){
           chevauche:chevauche, mixte:h.mixte};
 }
 function veloVerdict(v,r){
-  var j=S.veloJuge[v.id+'|'+r.rep];
-  if(j)return j==='ko'?'<b>non valide</b> (jugée)':j==='ok'?'valide (jugée)':'franche (jugée)';
+  var j=jugeOf(v,r.rep);
+  if(j)return VJ[j].e+' '+(j==='ko'?'<b>'+VJ[j].n+'</b>':VJ[j].n);
   var s=veloSeuil(v.mouvement);
   if(!s)return '—';
   var d=r.hauteur_sommet_cm-s.valide;
@@ -2596,37 +3007,129 @@ function veloVerdict(v,r){
   if(d<-VBANDE)return '<b>non valide</b>';
   return 'limite';
 }
+/* graduations « rondes » : pas de 1, 2, 2,5 ou 5 fois une puissance de 10 */
+function niceTicks(lo,hi,n){
+  if(!(hi>lo)){hi=lo+1;}
+  var raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log(raw)/Math.LN10)), st=mag*10;
+  [1,2,2.5,5,10].some(function(m){ if(m*mag>=raw-1e-12){st=m*mag;return true;} return false; });
+  var a=Math.floor(lo/st+1e-9)*st, b=Math.ceil(hi/st-1e-9)*st, t=[];
+  for(var x=a;x<=b+st/2;x+=st)t.push(Math.round(x/st)*st);
+  return {lo:a,hi:b,t:t};
+}
+function tickLab(x){return F(Math.round(x*100)/100);}
+/* Profil vitesse-hauteur : la ceinture de bras tendus (gauche) au sommet (droite).
+   Seules la premiere et la derniere rep sont conservees a l'import. */
 function veloSvg(v){
-  var sel=[v.reps[0],v.reps[v.reps.length-1]].filter(function(r){return r&&r.profil_vitesse_ms;});
-  if(sel.length<1)return '';
-  var W=340,H=170,p=30,cols=['var(--ok)','var(--bad)'];
-  var xm=1,ym=1.2;
-  sel.forEach(function(r){r.profil_hauteur_cm.forEach(function(x){if(x>xm)xm=x;});
-                          r.profil_vitesse_ms.forEach(function(y){if(y>ym)ym=y;});});
-  var X=function(x){return p+(x/xm)*(W-p-8);}, Y=function(y){return H-p-(y/ym)*(H-p-10);};
-  var o='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:420px;display:block">'+
-    '<line x1="'+p+'" y1="'+(H-p)+'" x2="'+(W-8)+'" y2="'+(H-p)+'" stroke="currentColor" opacity=".35"/>'+
-    '<line x1="'+p+'" y1="8" x2="'+p+'" y2="'+(H-p)+'" stroke="currentColor" opacity=".35"/>'+
-    '<text x="'+(W-8)+'" y="'+(H-8)+'" text-anchor="end" font-size="10" fill="currentColor" opacity=".7">hauteur (cm)</text>'+
-    '<text x="2" y="14" font-size="10" fill="currentColor" opacity=".7">m/s</text>';
+  var sel=[v.reps[0],v.reps[v.reps.length-1]].filter(function(r,i,a){return r&&r.profil_vitesse_ms&&r.profil_hauteur_cm&&(i===0||r!==a[0]);});
+  if(!sel.length)return '';
+  var W=360,H=216,ml=36,mr=12,mt=22,mb=34,cols=['var(--a2)','var(--a1)'];
+  var xs=[],ys=[0];
+  sel.forEach(function(r){xs=xs.concat(r.profil_hauteur_cm); ys=ys.concat(r.profil_vitesse_ms);});
+  var tx=niceTicks(Math.min(0,Math.min.apply(null,xs)),Math.max.apply(null,xs),5),
+      ty=niceTicks(0,Math.max.apply(null,ys),4);
+  var X=function(x){return ml+(x-tx.lo)/(tx.hi-tx.lo)*(W-ml-mr);},
+      Y=function(y){return H-mb-(y-ty.lo)/(ty.hi-ty.lo)*(H-mb-mt);};
+  var o='<svg class="vplot" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Vitesse selon la hauteur, première et dernière rep">';
+  tx.t.forEach(function(t){
+    o+='<line class="g" x1="'+X(t)+'" y1="'+mt+'" x2="'+X(t)+'" y2="'+(H-mb)+'"/>'+
+       '<text x="'+X(t)+'" y="'+(H-mb+14)+'" text-anchor="middle" class="lb">'+tickLab(t)+'</text>';
+  });
+  ty.t.forEach(function(t){
+    o+='<line class="g" x1="'+ml+'" y1="'+Y(t)+'" x2="'+(W-mr)+'" y2="'+Y(t)+'"/>'+
+       '<text x="'+(ml-5)+'" y="'+(Y(t)+4)+'" text-anchor="end" class="lb">'+tickLab(t)+'</text>';
+  });
+  o+='<line class="ax" x1="'+ml+'" y1="'+(H-mb)+'" x2="'+(W-mr)+'" y2="'+(H-mb)+'"/>'+
+     '<line class="ax" x1="'+ml+'" y1="'+mt+'" x2="'+ml+'" y2="'+(H-mb)+'"/>'+
+     '<text x="'+(W-mr)+'" y="'+(H-4)+'" text-anchor="end" class="lb">hauteur de la ceinture (cm) \u2192</text>'+
+     '<text x="'+(ml-30)+'" y="'+(mt-10)+'" class="lb">vitesse (m/s)</text>';
   sel.forEach(function(r,i){
     var pts=r.profil_hauteur_cm.map(function(x,k){return X(x).toFixed(1)+','+Y(r.profil_vitesse_ms[k]).toFixed(1);}).join(' ');
-    o+='<polyline points="'+pts+'" fill="none" stroke="'+cols[i%2]+'" stroke-width="2"/>'+
-       '<text x="'+(W-10)+'" y="'+(20+i*13)+'" text-anchor="end" font-size="11" fill="'+cols[i%2]+'">rep '+r.rep+'</text>';
+    o+='<polyline points="'+pts+'" fill="none" stroke="'+cols[i]+'" stroke-width="2.2" stroke-linejoin="round"/>';
+    /* point dur du script, dessine seulement s'il tombe bien sur la courbe */
+    var hx=r.hauteur_point_dur_cm, vy=r.vitesse_point_dur_ms;
+    if(hx!=null&&vy!=null){
+      var kk=0,dd=1e9; r.profil_hauteur_cm.forEach(function(x,k){var d=Math.abs(x-hx); if(d<dd){dd=d;kk=k;}});
+      if(Math.abs(r.profil_vitesse_ms[kk]-vy)<0.06)
+        o+='<circle cx="'+X(hx).toFixed(1)+'" cy="'+Y(vy).toFixed(1)+'" r="4" fill="var(--surface)" stroke="'+cols[i]+'" stroke-width="2"/>';
+    }
+    var j=jugeOf(v,r.rep);
+    o+='<line x1="'+(W-mr-132)+'" y1="'+(mt+4+i*15)+'" x2="'+(W-mr-118)+'" y2="'+(mt+4+i*15)+'" stroke="'+cols[i]+'" stroke-width="2.5"/>'+
+       '<text x="'+(W-mr-114)+'" y="'+(mt+8+i*15)+'">'+(i===0?'rep 1':'rep '+r.rep+' (dernière)')+(j?' '+VJ[j].e:'')+'</text>';
   });
-  return o+'</svg>';
+  return o+'</svg><p class="note" style="margin-top:4px">Chaque courbe suit la ceinture pendant la montée : départ à gauche, '+
+    'sommet à droite. Plus la courbe est haute, plus ça monte vite ; le rond marque le point dur, là où la vitesse retombe le plus. '+
+    'L\u2019écart entre les deux courbes, c\u2019est ce que la série vous a coûté.</p>';
+}
+/* Rep par rep : vitesse moyenne en haut, hauteur au sommet en bas avec le seuil de validite.
+   Meme axe horizontal pour les deux, pour lire d'un coup d'oeil quelle rep a lache. */
+function veloRepsSvg(v){
+  var R=v.reps.filter(function(r){return r.vitesse_moy_ms!=null||r.hauteur_sommet_cm!=null;});
+  if(R.length<2)return '';
+  var W=360,ml=36,mr=12,top=26,h1=92,gap=44,h2=84,bot=36,H=top+h1+gap+h2+bot, n=R.length;
+  var bw=(W-ml-mr)/n, XC=function(i){return ml+bw*(i+.5);};
+  var vs=R.map(function(r){return r.vitesse_moy_ms||0;});
+  var ty=niceTicks(0,Math.max.apply(null,vs),3);
+  var Y1=function(y){return top+h1-(y-ty.lo)/(ty.hi-ty.lo)*h1;};
+  var sl=veloSeuil(v.mouvement), hs=R.map(function(r){return r.hauteur_sommet_cm;}).filter(function(x){return x!=null;});
+  var ext=hs.slice(); if(sl){ext.push(sl.valide-VBANDE,sl.valide+VBANDE); if(sl.franche)ext.push(sl.franche);}
+  var t2=niceTicks(Math.min.apply(null,ext),Math.max.apply(null,ext),3), y2=top+h1+gap;
+  var Y2=function(y){return y2+h2-(y-t2.lo)/(t2.hi-t2.lo)*h2;};
+  var o='<svg class="vplot" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Vitesse et hauteur de chaque rep">';
+  /* panneau haut */
+  ty.t.forEach(function(t){
+    o+='<line class="g" x1="'+ml+'" y1="'+Y1(t)+'" x2="'+(W-mr)+'" y2="'+Y1(t)+'"/>'+
+       '<text x="'+(ml-5)+'" y="'+(Y1(t)+4)+'" text-anchor="end" class="lb">'+tickLab(t)+'</text>';
+  });
+  o+='<text x="'+(ml-30)+'" y="'+(top-14)+'" class="lb">vitesse moyenne (m/s)</text>';
+  R.forEach(function(r,i){
+    var j=jugeOf(v,r.rep), c=j?JCOL[j]:'var(--a8)', y=Y1(r.vitesse_moy_ms||0);
+    o+='<rect x="'+(XC(i)-bw*.32).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw*.64).toFixed(1)+'" height="'+(top+h1-y).toFixed(1)+'" fill="'+c+'"'+(j?'':' opacity=".45"')+'/>'+
+       '<text x="'+XC(i)+'" y="'+(y-3).toFixed(1)+'" text-anchor="middle" class="lb" style="font-size:10px">'+tickLab(r.vitesse_moy_ms||0)+'</text>';
+  });
+  o+='<line class="ax" x1="'+ml+'" y1="'+(top+h1)+'" x2="'+(W-mr)+'" y2="'+(top+h1)+'"/>';
+  /* panneau bas */
+  t2.t.forEach(function(t){
+    o+='<line class="g" x1="'+ml+'" y1="'+Y2(t)+'" x2="'+(W-mr)+'" y2="'+Y2(t)+'"/>'+
+       '<text x="'+(ml-5)+'" y="'+(Y2(t)+4)+'" text-anchor="end" class="lb">'+tickLab(t)+'</text>';
+  });
+  o+='<text x="'+(ml-30)+'" y="'+(y2-14)+'" class="lb">hauteur au sommet (cm)</text>';
+  if(sl){
+    o+='<rect x="'+ml+'" y="'+Y2(sl.valide+VBANDE).toFixed(1)+'" width="'+(W-ml-mr)+'" height="'+(Y2(sl.valide-VBANDE)-Y2(sl.valide+VBANDE)).toFixed(1)+'" fill="currentColor" opacity=".08"/>'+
+       '<line x1="'+ml+'" y1="'+Y2(sl.valide).toFixed(1)+'" x2="'+(W-mr)+'" y2="'+Y2(sl.valide).toFixed(1)+'" stroke="var(--a2)" stroke-dasharray="5 4" stroke-width="1.5"/>'+
+       '<text x="'+(W-mr)+'" y="'+(Y2(sl.valide)-4).toFixed(1)+'" text-anchor="end" style="font-size:10px;fill:var(--a2)">seuil valide</text>';
+    if(sl.franche)o+='<line x1="'+ml+'" y1="'+Y2(sl.franche).toFixed(1)+'" x2="'+(W-mr)+'" y2="'+Y2(sl.franche).toFixed(1)+'" stroke="var(--ok)" stroke-dasharray="2 4" stroke-width="1.5"/>'+
+       '<text x="'+(W-mr)+'" y="'+(Y2(sl.franche)-4).toFixed(1)+'" text-anchor="end" style="font-size:10px;fill:var(--ok)">franche</text>';
+  }
+  var pts=[];
+  R.forEach(function(r,i){ if(r.hauteur_sommet_cm!=null)pts.push(XC(i).toFixed(1)+','+Y2(r.hauteur_sommet_cm).toFixed(1)); });
+  o+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="currentColor" opacity=".35" stroke-width="1.2"/>';
+  R.forEach(function(r,i){
+    if(r.hauteur_sommet_cm==null)return;
+    var j=jugeOf(v,r.rep), c=j?JCOL[j]:'var(--a8)';
+    o+='<circle cx="'+XC(i).toFixed(1)+'" cy="'+Y2(r.hauteur_sommet_cm).toFixed(1)+'" r="4.5" fill="'+c+'" stroke="var(--surface)" stroke-width="1.5"/>';
+  });
+  o+='<line class="ax" x1="'+ml+'" y1="'+(y2+h2)+'" x2="'+(W-mr)+'" y2="'+(y2+h2)+'"/>';
+  R.forEach(function(r,i){
+    var j=jugeOf(v,r.rep);
+    o+='<text x="'+XC(i)+'" y="'+(y2+h2+14)+'" text-anchor="middle">'+r.rep+'</text>'+
+       (j?'<text x="'+XC(i)+'" y="'+(y2+h2+30)+'" text-anchor="middle" style="font-family:var(--txt);font-size:13px">'+VJ[j].e+'</text>':'');
+  });
+  return o+'</svg><p class="note" style="margin-top:4px">Une colonne par rep. En haut, sa vitesse moyenne : la descente d\u2019une barre '+
+    'à l\u2019autre mesure la fatigue. En bas, la hauteur atteinte au sommet'+(sl?' ; pointillé bleu = votre seuil de validité, '+
+    'bande grise = la marge de \u00b1'+F(VBANDE)+' cm où une rep est dite limite':' ; le seuil de validité s\u2019affichera dès que vous aurez jugé '+
+    'au moins une rep ratée et une valide')+'. Couleur = votre jugement ('+VJ.ko.e+' rouge, '+VJ.dt.e+' ocre, '+VJ.ok.e+' bleu, '+VJ.franc.e+' vert), gris = pas encore jugée.</p>';
 }
 function veloCard(v,k){
   var q=v.resume||{}, ref=veloRef(v), L=S.lifts[v.li], rows='';
   v.reps.forEach(function(r){
-    var j=S.veloJuge[v.id+'|'+r.rep]||'';
-    var b=function(code,txt){
-      return '<button class="act ghost mini'+(j===code?' on':'')+'" data-juge="'+v.id+'|'+r.rep+'|'+code+
-        '" style="padding:2px 6px;margin:0 2px">'+txt+'</button>';
+    var j=jugeOf(v,r.rep);
+    var b=function(code){
+      return '<button class="act ghost mini'+(j===code?' on':'')+'" data-juge="'+esc(v.id)+'|'+r.rep+'|'+code+
+        '" title="'+VJ[code].n+'" aria-label="Rep '+r.rep+' '+VJ[code].n+'" style="padding:3px 5px;margin:0 1px;font-size:14px">'+VJ[code].e+'</button>';
     };
     rows+='<tr><td>'+r.rep+'</td><td>'+F(r.course_cm)+'</td><td>'+F(r.montee_s)+'</td><td>'+
       F(r.vitesse_moy_ms)+'</td><td>'+F(r.vitesse_point_dur_ms)+'</td><td>'+F(r.hauteur_sommet_cm)+'</td><td>'+
-      veloVerdict(v,r)+'</td><td style="white-space:nowrap">'+b('ko','✗')+b('ok','✓')+b('franc','✓✓')+'</td></tr>';
+      veloVerdict(v,r)+'</td><td style="white-space:nowrap">'+VJO.map(b).join('')+'</td></tr>';
   });
   var cmp='';
   if(ref){
@@ -2638,17 +3141,25 @@ function veloCard(v,k){
         ' — échelles différentes ('+F(ref.px_cm)+' contre '+F(v.px_cm)+' px/cm), écart absolu à prendre avec précaution':'')+'.</p>';
   }
   var al=(v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'';
-  return '<div class="card">'+
+  var le=lienEntry(v), lienTxt;
+  if(le)lienTxt='<p class="note" style="margin-top:0">Rattachée à <b>'+frDate(le.date)+(le.week?', S'+le.week+' '+esc(le.day):'')+
+    ', '+roleLab(le.role)+(le.sets.length>1?', série '+(v.lien.set+1):'')+'</b>'+(v.lien.auto?' (automatiquement)':'')+
+    ' : les jugements ci-dessous et ceux de la séance sont les mêmes. '+
+    '<button class="linkbtn" data-open="'+esc(le.key)+'">Ouvrir la séance</button></p>';
+  else lienTxt='<p class="note" style="margin-top:0"><b>Pas rattachée à une série enregistrée</b> : les jugements restent ici '+
+    'et ne remontent pas dans la séance. Choisissez la série ci-dessous.</p>';
+  return '<div class="card" id="vc-'+esc(v.id)+'">'+
     '<h2>'+frDate(v.date)+' — '+esc(v.mouvement)+' '+F(v.lest_kg)+' kg × '+v.reps.length+
       (v.semaine?' <em>S'+v.semaine+'J'+v.seance+(v.type_serie?', '+esc(v.type_serie):'')+'</em>':'')+'</h2>'+
+    lienTxt+'<div class="row" style="margin-bottom:6px"><div class="field w"><label>Série correspondante</label>'+lienSelect(v)+'</div></div>'+
     '<p class="note">'+(v.charge_systeme_kg?'Charge système '+F(v.charge_systeme_kg)+' kg. ':'')+
       'Rep 1 → dernière : <b>'+F(q.v_moy_rep1)+' → '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
       'Vitesse mini de la dernière rep '+F(q.v_mini_derniere)+' m/s, point dur vers '+F(q.hauteur_point_dur_cm)+' cm. '+
       'Sommet : −'+F(q.perte_hauteur_sommet_cm)+' cm sur la série.'+
       (L?'':' <b>Mouvement non reconnu</b> : non rattaché à un mouvement de l\'outil.')+'</p>'+
-    cmp+al+veloSvg(v)+
+    cmp+al+veloSvg(v)+veloRepsSvg(v)+
     '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Rep</th><th>Course cm</th>'+
-      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Validité</th><th>Jugement</th></tr></thead>'+
+      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Validité</th><th>Votre jugement</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table></div>'+
     (v.notes?'<p class="note">'+esc(v.notes)+'</p>':'')+
     (v.echelle_verifiee===false?'<p class="note">Échelle non vérifiée pour ce cadrage : cm et m/s indicatifs.</p>':'')+
@@ -2742,10 +3253,18 @@ function veloSeuilNote(mouvement){
     (s.mixte?' Les reps jugées viennent de vidéos d\u2019échelles différentes, le seuil est approximatif.':'')+'</p>';
 }
 function renderVelo(){
+  veloAutoAll();
   var l=(S.velo||[]).slice().reverse();
   $('velolist').innerHTML=(l.length?veloCompare()+l.map(function(v){return veloCard(v,v.id);}).join('')
     :'<div class="card"><p class="note">Aucune analyse importée.</p></div>');
 }
+$('velolist').addEventListener('change',function(e){
+  var t=e.target; if(!t||!t.dataset||t.dataset.velolien==null)return;
+  var v=(S.velo||[]).filter(function(x){return x.id===t.dataset.velolien;})[0]; if(!v)return;
+  var val=t.value, i=val.lastIndexOf('#');
+  setLien(v,val?{key:val.slice(0,i),set:+val.slice(i+1)}:{none:1});
+  save(); renderVelo(); applyFolds(); renderToday(); generate();
+});
 $('veloadd').addEventListener('click',function(){$('velofile').click();});
 $('velofile').addEventListener('change',function(){
   var fs=Array.prototype.slice.call(this.files), msgs=[], done=0, self=this;
@@ -2764,10 +3283,10 @@ $('velofile').addEventListener('change',function(){
 $('velolist').addEventListener('click',function(e){
   var j=e.target.closest('[data-juge]');
   if(j){
-    var a=j.dataset.juge.split('|'), k=a[0]+'|'+a[1];
-    S.veloJuge[k]=(S.veloJuge[k]===a[2])?undefined:a[2];
-    if(!S.veloJuge[k])delete S.veloJuge[k];
-    save(); renderVelo(); return;
+    var a=j.dataset.juge.split('|'), code=a.pop(), rp=+a.pop(), id=a.join('|');
+    var v=(S.velo||[]).filter(function(x){return x.id===id;})[0]; if(!v)return;
+    var y=window.scrollY;
+    setJuge(v,rp,code); save(); renderVelo(); applyFolds(); window.scrollTo(0,y); return;
   }
   var b=e.target.closest('[data-velodel]'); if(!b)return;
   if(!confirm('Supprimer cette analyse ?'))return;
@@ -2785,10 +3304,13 @@ $('exportj').addEventListener('click',function(){
   dl('charges-'+todayISO()+'.json',JSON.stringify(S,null,2),'application/json');
 });
 $('exportc').addEventListener('click',function(){
-  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','rir','state','note'];
+  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','rir','rirs','valid','state','note'];
+  var VL={ko:'R',dt:'D',ok:'V',franc:'F'};
   var rows=[cols.join(';')].concat(S.log.map(function(e){
     return cols.map(function(c){
-      var v=e[c]; if(Array.isArray(v))v=v.join('/');
+      var v=e[c];
+      if(c==='valid'&&v)v=v.map(function(a){return (a||[]).map(function(q){return q?VL[q]:'-';}).join('');}).join('/');
+      else if(Array.isArray(v))v=v.map(function(q){return q==null?'':q;}).join('/');
       if(v==null)v=''; return String(v).replace(/;/g,',');
     }).join(';');
   }));
@@ -2862,11 +3384,15 @@ function renderAll(){
   if(!$('ldate').value)$('ldate').value=todayISO();
   if(!$('lbw').value)$('lbw').value=F(S.bw);
   $('verbo').value=S.verbo;
+  $('showacc').checked=!!S.showAcc; $('accchip').classList.toggle('on',!!S.showAcc);
   fillSelects(); renderHead(); renderLifts();
   if(CTOUCH)renderCharges(); else fillCharges();
   bestNote(); renderPct(); renderCatPick(); renderCatList(); renderAssign();
   generate(); renderToday(); renderData(); renderBilan(); renderVelo(); applyFolds();
 }
+$('showacc').addEventListener('change',function(){
+  S.showAcc=this.checked; $('accchip').classList.toggle('on',S.showAcc); save(); generate(); applyFolds();
+});
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
 load(); renderAll();
