@@ -91,6 +91,7 @@ tbody tr:nth-child(even){background:var(--softer)}
 .note{font:400 12.5px/1.55 var(--txt);color:var(--muted);margin-top:9px}
 .note b{color:var(--ink);font-weight:600}
 tr.best td{font-weight:650}
+.act.mini.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .flag{border-left:3px solid var(--warn);padding:7px 0 7px 9px;margin-top:9px;
   font:400 12.5px/1.5 var(--txt);color:var(--muted)}
 .flag b{color:var(--ink)}
@@ -505,6 +506,7 @@ function load(){
     if(!S.formMode)S.formMode='simple';
     if(!S.velo)S.velo=[];
     if(!S.rappels)S.rappels=[];
+    if(!S.veloJuge)S.veloJuge={};
     /* Rappel ponctuel, attache a une seance precise : il s'affiche dans Seance du jour
        quand cette seance est selectionnee, et disparait des qu'on l'efface. Il ne touche
        ni aux notes ni aux autres seances. Le drapeau evite qu'il revienne apres effacement. */
@@ -2550,6 +2552,50 @@ function veloRef(v){
   });
   return l.length?l[l.length-1]:null;
 }
+/* ---------- etalon de validite des reps ----------
+   Principe : c'est Luka qui juge quelques reps (touche / pas touche / franche), et le
+   seuil en centimetres se deduit de ses jugements. Aucune connaissance a priori de la
+   hauteur du cable : elle sort des donnees. La hauteur utilisee est celle du sommet au-
+   dessus du point le plus bas de la video, mesuree a la ceinture. Cette hauteur suit la
+   tete a 0,6 cm pres en ecart-type, avec une pointe a 1,3 cm sur la rep la plus degradee
+   (mesure faite le 17/09 en suivant l'oreille) : d'ou la bande d'incertitude ci-dessous. */
+var VBANDE=1.3;
+function veloHauteurs(mouvement){
+  var ko=[],ok=[],fr=[],mixte=false,verif=null;
+  (S.velo||[]).forEach(function(v){
+    if(v.mouvement!==mouvement)return;
+    v.reps.forEach(function(r){
+      var j=S.veloJuge[v.id+'|'+r.rep];
+      if(!j)return;
+      if(verif===null)verif=v.echelle_verifiee; else if(verif!==v.echelle_verifiee)mixte=true;
+      (j==='ko'?ko:j==='ok'?ok:fr).push(r.hauteur_sommet_cm);
+    });
+  });
+  return {ko:ko,ok:ok,franc:fr,mixte:mixte};
+}
+function veloSeuil(mouvement){
+  var h=veloHauteurs(mouvement);
+  if(!h.ko.length||!h.ok.length)return null;
+  var maxKo=Math.max.apply(null,h.ko), minOk=Math.min.apply(null,h.ok);
+  var seuil=(maxKo+minOk)/2, chevauche=Math.max(0,maxKo-minOk);
+  var sf=null;
+  if(h.franc.length&&h.ok.length){
+    var maxOk=Math.max.apply(null,h.ok), minFr=Math.min.apply(null,h.franc);
+    if(minFr>Math.min.apply(null,h.ok))sf=(maxOk+minFr)/2;
+  }
+  return {valide:seuil, franche:sf, n:h.ko.length+h.ok.length+h.franc.length,
+          chevauche:chevauche, mixte:h.mixte};
+}
+function veloVerdict(v,r){
+  var j=S.veloJuge[v.id+'|'+r.rep];
+  if(j)return j==='ko'?'<b>non valide</b> (jugée)':j==='ok'?'valide (jugée)':'franche (jugée)';
+  var s=veloSeuil(v.mouvement);
+  if(!s)return '—';
+  var d=r.hauteur_sommet_cm-s.valide;
+  if(d>VBANDE)return (s.franche&&r.hauteur_sommet_cm>=s.franche)?'franche':'valide';
+  if(d<-VBANDE)return '<b>non valide</b>';
+  return 'limite';
+}
 function veloSvg(v){
   var sel=[v.reps[0],v.reps[v.reps.length-1]].filter(function(r){return r&&r.profil_vitesse_ms;});
   if(sel.length<1)return '';
@@ -2573,9 +2619,14 @@ function veloSvg(v){
 function veloCard(v,k){
   var q=v.resume||{}, ref=veloRef(v), L=S.lifts[v.li], rows='';
   v.reps.forEach(function(r){
+    var j=S.veloJuge[v.id+'|'+r.rep]||'';
+    var b=function(code,txt){
+      return '<button class="act ghost mini'+(j===code?' on':'')+'" data-juge="'+v.id+'|'+r.rep+'|'+code+
+        '" style="padding:2px 6px;margin:0 2px">'+txt+'</button>';
+    };
     rows+='<tr><td>'+r.rep+'</td><td>'+F(r.course_cm)+'</td><td>'+F(r.montee_s)+'</td><td>'+
       F(r.vitesse_moy_ms)+'</td><td>'+F(r.vitesse_point_dur_ms)+'</td><td>'+F(r.hauteur_sommet_cm)+'</td><td>'+
-      (r.puissance_moy_w?r.puissance_moy_w+' W':'—')+'</td></tr>';
+      veloVerdict(v,r)+'</td><td style="white-space:nowrap">'+b('ko','✗')+b('ok','✓')+b('franc','✓✓')+'</td></tr>';
   });
   var cmp='';
   if(ref){
@@ -2597,10 +2648,11 @@ function veloCard(v,k){
       (L?'':' <b>Mouvement non reconnu</b> : non rattaché à un mouvement de l\'outil.')+'</p>'+
     cmp+al+veloSvg(v)+
     '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Rep</th><th>Course cm</th>'+
-      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Puissance</th></tr></thead>'+
+      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Validité</th><th>Jugement</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table></div>'+
     (v.notes?'<p class="note">'+esc(v.notes)+'</p>':'')+
     (v.echelle_verifiee===false?'<p class="note">Échelle non vérifiée pour ce cadrage : cm et m/s indicatifs.</p>':'')+
+    veloSeuilNote(v.mouvement)+
     '<p class="note">Échelle '+F(v.px_cm)+' px/cm'+(v.echelle_epinglee?' (épinglée)':' (estimée)')+
       ', suivi '+F(v.qualite)+'. Hauteurs mesurées à la ceinture, pas au menton.</p>'+
     '<div class="btnrow"><button class="act ghost mini" data-velodel="'+k+'">Supprimer cette analyse</button></div>'+
@@ -2673,6 +2725,22 @@ function veloCompare(){
   });
   return out;
 }
+function veloSeuilNote(mouvement){
+  var s=veloSeuil(mouvement), h=veloHauteurs(mouvement);
+  if(!s){
+    var n=h.ko.length+h.ok.length+h.franc.length;
+    return '<p class="note">Seuil de validité pas encore calculable : il faut au moins une rep jugée '+
+      'non valide et une jugée valide. '+(n?n+' rep(s) jugée(s) pour l\u2019instant.':'Aucune rep jugée.')+'</p>';
+  }
+  return '<p class="note">Seuil de validité estimé à <b>'+F(s.valide)+' cm</b> de hauteur au sommet, '+
+    'd\u2019après '+s.n+' rep(s) que vous avez jugées'+
+    (s.franche?', et seuil de rep franche à <b>'+F(s.franche)+' cm</b>':'')+'. '+
+    'Une rep est déclarée limite à moins de '+F(VBANDE)+' cm du seuil : c\u2019est la dispersion mesurée '+
+    'entre hauteur de hanche et hauteur de tête.'+
+    (s.chevauche>0?' <b>Attention</b> : vos jugements se chevauchent sur '+F(s.chevauche)+' cm — '+
+      'une rep jugée non valide est plus haute qu\u2019une rep jugée valide.':'')+
+    (s.mixte?' Les reps jugées viennent de vidéos d\u2019échelles différentes, le seuil est approximatif.':'')+'</p>';
+}
 function renderVelo(){
   var l=(S.velo||[]).slice().reverse();
   $('velolist').innerHTML=(l.length?veloCompare()+l.map(function(v){return veloCard(v,v.id);}).join('')
@@ -2694,6 +2762,13 @@ $('velofile').addEventListener('change',function(){
   });
 });
 $('velolist').addEventListener('click',function(e){
+  var j=e.target.closest('[data-juge]');
+  if(j){
+    var a=j.dataset.juge.split('|'), k=a[0]+'|'+a[1];
+    S.veloJuge[k]=(S.veloJuge[k]===a[2])?undefined:a[2];
+    if(!S.veloJuge[k])delete S.veloJuge[k];
+    save(); renderVelo(); return;
+  }
   var b=e.target.closest('[data-velodel]'); if(!b)return;
   if(!confirm('Supprimer cette analyse ?'))return;
   S.velo=(S.velo||[]).filter(function(x){return x.id!==b.dataset.velodel;});
