@@ -504,6 +504,15 @@ function load(){
     if(!S.formOn)S.formOn={som:1,ene:1,cou:1,art:1,tra:1};
     if(!S.formMode)S.formMode='simple';
     if(!S.velo)S.velo=[];
+    if(!S.rappels)S.rappels=[];
+    /* Rappel ponctuel, attache a une seance precise : il s'affiche dans Seance du jour
+       quand cette seance est selectionnee, et disparait des qu'on l'efface. Il ne touche
+       ni aux notes ni aux autres seances. Le drapeau evite qu'il revienne apres effacement. */
+    if(!S.rappelSeed){
+      S.rappels.push({id:'cable', k:'1|J1', txt:'Analyses vidéo : peindre un point rose sur chacune des deux attaches du câble. '+
+        'Ça rend le câble visible dans toutes les vidéos, donc le passage du menton mesurable rep par rep, quel que soit le cadrage.'});
+      S.rappelSeed=1;
+    }
     /* ne pas faire disparaitre un repere deja renseigne */
     FORMALL.forEach(function(q){ for(var kk in S.form){ if(S.form[kk][q.k]!=null){S.formOn[q.k]=1;S.formMode='multi';break;} } });
     S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
@@ -2187,6 +2196,7 @@ function renderToday(){
   }).filter(function(wk){return wk.days.length;});
   renderPlan($('todayout'),weeks,'t','day');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
+  $('todayout').insertAdjacentHTML('afterbegin',rappelCard(k));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   var nk=nextSession(), off=(nk&&k!==nk);
@@ -2235,6 +2245,15 @@ function warmCard(weeks){
     '<b>Échauffement</b><span>modifiable par mouvement, onglet Programme</span></div>'+
     '<div class="wkb">'+body+'</div></div>';
 }
+function rappelCard(k){
+  var l=(S.rappels||[]).filter(function(r){return r.k===k;});
+  if(!l.length)return '';
+  return '<div class="card"><h2>Rappel <em>ponctuel, propre à cette séance</em></h2>'+
+    l.map(function(r){
+      return '<div class="flag">'+esc(r.txt)+'</div>'+
+        '<div class="btnrow"><button class="act ghost mini" data-rappel="'+esc(r.id)+'">Fait, effacer</button></div>';
+    }).join('')+'</div>';
+}
 function notesCard(wIdx,sel){
   var k=wIdx+'|'+sel;
   return '<div class="card"><h2>Notes <em>contexte du bloc et de la séance</em></h2>'+
@@ -2243,6 +2262,11 @@ function notesCard(wIdx,sel){
     '<div class="row" style="margin-top:8px"><div class="field w"><label>Cette séance — S'+(wIdx+1)+' '+esc(sel)+'</label>'+
       '<textarea data-note="day" data-k="'+esc(k)+'" rows="2" placeholder="ce qui a changé aujourd\'hui">'+esc(S.dayNotes[k]||'')+'</textarea></div></div></div>';
 }
+$('todayout').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-rappel]'):null; if(!b)return;
+  S.rappels=(S.rappels||[]).filter(function(r){return r.id!==b.dataset.rappel;});
+  save(); renderToday();
+});
 $('todayout').addEventListener('input',function(e){
   var t=e.target, n=t.dataset?t.dataset.note:null;
   if(n==='block'){S.blockNote=t.value;save();}
