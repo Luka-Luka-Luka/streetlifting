@@ -2590,8 +2590,7 @@ function veloCard(v,k){
 function veloGroupes(){
   var g={};
   (S.velo||[]).forEach(function(v){
-    var k=v.mouvement+'|'+(v.charge_systeme_kg!=null
-      ? 'sys'+(Math.round(v.charge_systeme_kg/1.25)*1.25) : 'lest'+v.lest_kg);
+    var k=v.mouvement+'|lest'+v.lest_kg;
     (g[k]=g[k]||[]).push(v);
   });
   return g;
@@ -2621,22 +2620,30 @@ function veloCompare(){
   Object.keys(g).forEach(function(k){
     var l=veloClasse(g[k]); if(l.length<2)return;
     var v0=l[0], douteux=l.some(function(v){return v.echelle_verifiee===false;});
+    var sys=l.map(function(v){return v.charge_systeme_kg;}).filter(function(x){return x!=null;});
+    var ecart=sys.length>1?(Math.max.apply(null,sys)-Math.min.apply(null,sys)):0;
+    var manque=l.filter(function(v){return v.charge_systeme_kg==null;}).length;
     var rows=l.map(function(v,i){
       var q=v.resume, d1=v.reps[0]||{};
       return '<tr'+(i===0?' class="best"':'')+'><td>'+(i+1)+'</td><td>'+frDate(v.date)+'</td><td>'+
+        (v.charge_systeme_kg?F(v.charge_systeme_kg):'—')+'</td><td>'+
         v.reps.length+'</td><td>'+F(q.v_moy_rep1)+'</td><td>'+F(q.perte_v_moy_pct)+' %</td><td>'+
         F(q.v_mini_derniere)+'</td><td>'+F(d1.montee_s)+' s</td><td>'+F(d1.course_cm)+'</td><td>'+
         F(q.perte_hauteur_sommet_cm)+'</td></tr>';
     }).join('');
     out+='<div class="card"><h2>Comparaison à charge égale <em>'+esc(l[0].mouvement)+' '+
       F(l[0].lest_kg)+' kg'+(l[0].charge_systeme_kg?', système '+F(l[0].charge_systeme_kg)+' kg':'')+'</em></h2>'+
-      '<div class="scroll"><table><thead><tr><th>#</th><th>Date</th><th>Reps</th><th>V rep 1</th>'+
+      '<div class="scroll"><table><thead><tr><th>#</th><th>Date</th><th>Système kg</th><th>Reps</th><th>V rep 1</th>'+
       '<th>Perte V</th><th>V mini fin</th><th>Montée rep 1</th><th>Course rep 1 cm</th>'+
       '<th>Perte sommet cm</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
       '<p class="note"><b>Meilleure série : '+frDate(v0.date)+'</b> — '+veloMotif(v0,l[1])+'</p>'+
       '<p class="note">Classement : nombre de reps à charge égale, puis perte de vitesse, puis '+
       'proximité de l\u2019arrêt sur la dernière rep, puis vitesse de départ. Les reps, les % et '+
       'les secondes ne dépendent pas de l\u2019étalonnage ; les centimètres et les m/s, oui.</p>'+
+      (ecart>1?'<p class="note">Charge système : '+F(ecart)+' kg d\u2019écart entre ces séries, '+
+        'soit '+F(Math.round(1000*ecart/Math.max.apply(null,sys))/10)+' % — le poids de corps a bougé.</p>':'')+
+      (manque?'<p class="note">'+manque+' série'+(manque>1?'s':'')+' sans poids de corps noté : '+
+        'regroupement fait au lest, charge système inconnue pour elle'+(manque>1?'s':'')+'.</p>':'')+
       (douteux?'<div class="flag">Une série au moins a une échelle px/cm non vérifiée pour son cadrage : '+
         'les colonnes en cm et en m/s sont indicatives, le reste tient.</div>':'')+'</div>';
   });
