@@ -64,10 +64,6 @@ body.navmin nav{transform:translateY(100%)}
 body.navmin #navtog{bottom:env(safe-area-inset-bottom);padding:0 0 0}
 body.navmin #navtog span{border-radius:8px 8px 0 0;height:18px;box-shadow:0 -1px 3px rgba(20,23,28,.12)}
 body.navmin #navtog svg{transform:rotate(180deg)}
-/* fondu au changement d'onglet */
-section.page.on{animation:pgfade .2s ease-out}
-@keyframes pgfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){section.page.on{animation:none}}
 body.navmin{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 
 section.page{display:none;padding-top:13px}
@@ -247,6 +243,26 @@ svg.vplot .lb{opacity:.65}
 .card.compact>h2{border-bottom:0;margin-bottom:6px;padding-bottom:0}
 .donebtn{width:100%;min-height:52px;margin:4px 0 12px;font-size:15px}
 footer details summary{cursor:pointer;font-weight:600}
+.bkban{background:var(--surface);border-left:4px solid var(--warn);border-radius:10px;padding:12px 14px;margin-bottom:10px;
+  box-shadow:0 1px 2px rgba(20,23,28,.08);font:400 14px/1.45 var(--txt)}
+.bkban .btnrow{margin-top:8px}
+.stt td,.stt th{padding:6px 5px}
+.stt tr.tot td{font-weight:700;border-top:1px solid var(--ink)}
+.up{color:var(--ok)}.dn{color:var(--bad)}
+/* reorganisation : chaque module se reduit a une barre avec son nom et deux fleches */
+.mvbar{display:none}
+body.reorg .mvbar{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px dashed var(--muted);
+  border-radius:10px;padding:6px 6px 6px 14px;margin-bottom:8px;font:600 15px/1.2 var(--txt)}
+body.reorg .mvbar span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.reorg .mvbar button{min-width:48px;min-height:44px;font-size:20px}
+body.reorg .mvbar button:disabled{opacity:.3}
+body.reorg .mv>:not(.mvbar){display:none!important}
+body.reorg .mv{background:none!important;box-shadow:none!important;padding:0!important;border:0!important;margin:0!important}
+.reobar{display:none}
+body.reorg section.page.on .reobar{display:block;background:var(--ink);color:var(--surface);border-radius:10px;padding:12px 14px;margin-bottom:10px;font:400 14px/1.45 var(--txt)}
+.reobar .btnrow{margin-top:8px}
+.reobar .act{background:var(--surface);color:var(--ink);border-color:var(--surface)}
+.reobar .act.ghost{background:transparent;color:var(--surface)}
 footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:400 11.5px/1.55 var(--txt);color:var(--muted)}
 @media print{nav,.btnrow,.iconbtn,footer{display:none}body{background:#fff}.line{cursor:auto}}
 </style>
@@ -258,6 +274,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <div class="hrow">
     <h1>Charges &amp; programmes</h1>
     <div class="field sm" style="flex:0 0 84px"><label for="bw">Poids de corps</label><input id="bw" class="numin" type="text" inputmode="decimal" value="86"></div>
+    <button class="iconbtn sq" id="reorg" title="Réorganiser cet onglet" aria-label="Réorganiser cet onglet">⇅</button>
     <button class="iconbtn sq" id="foldall" title="Tout replier" aria-label="Tout replier">▾</button>
     <button class="iconbtn sq" id="theme" title="Thème" aria-label="Thème">☀️</button>
   </div>
@@ -275,6 +292,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 
 <!-- ======================= SÉANCE DU JOUR ======================= -->
 <section class="page on" id="p-today">
+  <div id="bkban"></div>
   <div class="sesshead">
     <button class="iconbtn sq big44" id="tprev" title="Séance précédente" aria-label="Séance précédente">‹</button>
     <div class="sessmid">
@@ -330,8 +348,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     </div>
     <div id="sync"></div>
   </div>
+  <div id="progplan">
   <div class="daypick" style="margin:0 0 9px"><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Afficher les mouvements secondaires</label></div>
   <div id="out"></div>
+  </div>
   <div class="card" id="cardind">
     <h2>Suivi des main lifts <em>sur le bloc généré</em></h2>
     <div id="indout"></div>
@@ -429,6 +449,11 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     l'onglet Séance du jour. <b>Réserve inconnue</b> exclut la série de l'ajustement de la courbe : mieux vaut ça qu'un chiffre inventé.</p>
   </div>
 
+  <div class="card" id="cardweekvol">
+    <h2>Volume par semaine <em>bloc en cours</em></h2>
+    <div id="weekvol"></div>
+  </div>
+
   <div class="card">
     <h2>Historique <em id="logcount"></em></h2>
     <div id="loglist"></div>
@@ -440,6 +465,12 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <input type="file" id="importfile" accept="application/json" style="display:none">
       <input type="file" id="mergefile" accept="application/json" style="display:none">
     </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field md"><label for="bkevery">Rappel de sauvegarde</label>
+        <select id="bkevery"><option value="3">tous les 3 jours</option><option value="7">toutes les semaines</option>
+        <option value="14">toutes les 2 semaines</option><option value="30">tous les mois</option><option value="0">jamais</option></select></div>
+    </div>
+    <p class="note" id="bklast"></p>
   </div>
 </section>
 
@@ -1075,6 +1106,103 @@ $('nav').addEventListener('click',function(e){
     if(wk)wk.scrollIntoView({block:'start'});
   }
 });
+
+/* ================= reorganisation des modules =================
+   Par onglet, les modules (cartes, liste des semaines, seance...) echangent leurs places.
+   Seuls les emplacements des modules sont permutes : ce qui n'est pas un module (en-tete de
+   seance, bouton Terminer, notes de bas de page) reste ou il est. En Seance du jour, la Forme
+   et les Reglages sont ranges avec les cartes de la seance pour pouvoir passer avant ou apres elle ;
+   les lignes de la seance, elles, restent dans l'ordre du programme. L'ordre est garde dans
+   S.order, donc dans la sauvegarde. */
+var MODNAMES={progplan:'Semaines du programme',velolist:'Analyses vidéo',liftlist:'Vos mouvements',out:'Programme'};
+var ORIG={};
+function modName(el){
+  if(MODNAMES[el.id])return MODNAMES[el.id];
+  if(el.classList.contains('tsess'))return 'Lignes de la séance';
+  var h=el.querySelector('h2,.wkh'); if(!h)return el.id||'Module';
+  var c=h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.fchev,em,span'),function(n){n.remove();});
+  return c.textContent.replace(/\s+/g,' ').trim()||'Module';
+}
+function modKey(el){
+  if(el.id)return el.id;
+  if(el.classList.contains('tsess'))return 'plan';
+  if(el.classList.contains('wk'))return 'warm';
+  return 'h:'+modName(el);
+}
+function reoContainer(tab){ return tab==='today'?$('todayout'):$('p-'+tab); }
+function modItems(tab){
+  var c=reoContainer(tab); if(!c)return [];
+  return Array.prototype.filter.call(c.children,function(el){
+    if(tab==='today')return !el.classList.contains('reobar');
+    return el.classList.contains('card')||el.id==='progplan'||el.id==='velolist'||el.id==='liftlist';
+  });
+}
+function applyOrder(tab){
+  var c=reoContainer(tab), items=modItems(tab); if(!items.length)return;
+  if(!ORIG[tab]&&tab!=='today')ORIG[tab]=items.map(modKey);
+  var saved=(S.order&&S.order[tab])||null; if(!saved)return;
+  /* modules connus dans l'ordre enregistre ; un module absent de cet ordre (le Bilan, qui
+     n'apparait qu'une fois une serie notee) se place juste apres son voisin d'origine */
+  var want=items.filter(function(el){return saved.indexOf(modKey(el))>=0;})
+    .sort(function(a,b){return saved.indexOf(modKey(a))-saved.indexOf(modKey(b));});
+  items.forEach(function(el,i){
+    if(saved.indexOf(modKey(el))>=0)return;
+    var at=0; for(var j=i-1;j>=0;j--){var q=want.indexOf(items[j]); if(q>=0){at=q+1;break;}}
+    want.splice(at,0,el);
+  });
+  var marks=items.map(function(el){var m=document.createComment('mv'); c.insertBefore(m,el); return m;});
+  marks.forEach(function(m,i){ c.insertBefore(want[i],m); m.remove(); });
+}
+function curTab(){var b=document.querySelector('#nav [aria-selected=true]');return b?b.dataset.p:'today';}
+function drawBars(){
+  document.querySelectorAll('.mvbar').forEach(function(b){b.remove();});
+  document.querySelectorAll('.mv').forEach(function(e){e.classList.remove('mv');});
+  if(!document.body.classList.contains('reorg'))return;
+  var tab=curTab(), items=modItems(tab);
+  items.forEach(function(el,i){
+    el.classList.add('mv');
+    el.insertAdjacentHTML('afterbegin','<div class="mvbar"><span>'+esc(modName(el))+'</span>'+
+      '<button class="act ghost" data-mv="-1" aria-label="Monter"'+(i===0?' disabled':'')+'>\u2191</button>'+
+      '<button class="act ghost" data-mv="1" aria-label="Descendre"'+(i===items.length-1?' disabled':'')+'>\u2193</button></div>');
+  });
+}
+function reoBanner(){
+  document.querySelectorAll('.reobar').forEach(function(b){b.remove();});
+  var sec=$('p-'+curTab());
+  sec.insertAdjacentHTML('afterbegin','<div class="reobar"><b>Réorganiser cet onglet</b> — montez ou descendez chaque module. '+
+    'L\'ordre est gardé, et inclus dans la sauvegarde.<div class="btnrow"><button class="act" data-reo="done">Terminé</button>'+
+    '<button class="act ghost" data-reo="reset">Ordre d\'origine</button></div></div>');
+}
+function setReorg(on){
+  document.body.classList.toggle('reorg',on);
+  $('reorg').setAttribute('aria-pressed',on?'true':'false');
+  if(on){ closePanel(); reoBanner(); window.scrollTo(0,0); } else document.querySelectorAll('.reobar').forEach(function(b){b.remove();});
+  drawBars();
+}
+$('reorg').addEventListener('click',function(){ setReorg(!document.body.classList.contains('reorg')); });
+document.addEventListener('click',function(e){
+  var t=e.target; if(!t||!t.closest)return;
+  var m=t.closest('[data-mv]');
+  if(m){
+    e.stopPropagation();
+    var tab=curTab(), items=modItems(tab), el=m.closest('.mv'), i=items.indexOf(el), j=i+(+m.dataset.mv);
+    if(i<0||j<0||j>=items.length)return;
+    var keys=items.map(modKey), tmp=keys[i]; keys[i]=keys[j]; keys[j]=tmp;
+    if(!S.order)S.order={}; S.order[tab]=keys; save();
+    applyOrder(tab); drawBars();
+    var nb=el.querySelector('[data-mv="'+m.dataset.mv+'"]'); if(nb&&!nb.disabled)nb.focus();
+    return;
+  }
+  var r=t.closest('[data-reo]');
+  if(r){
+    if(r.dataset.reo==='done'){ setReorg(false); return; }
+    var tab2=curTab();
+    if(S.order)delete S.order[tab2];
+    if(tab2==='today'){ save(); renderToday(); }
+    else if(ORIG[tab2]){ S.order[tab2]=ORIG[tab2].slice(); applyOrder(tab2); delete S.order[tab2]; save(); }
+    drawBars();
+  }
+},true);
 
 /* ================= liens entre onglets =================
    Une serie enregistree, sa ligne dans le programme et son analyse video sont la meme
@@ -2418,6 +2546,103 @@ function skipLine(p,key){
     if(nx){ openPanel(nx,nx.dataset.key); nx.scrollIntoView({block:'start',behavior:'smooth'}); }
   }
 }
+/* ================= statistiques de seance =================
+   Tonnage = somme des reps comptees x charge systeme (poids de corps brut + lest, la convention
+   de l'onglet Charges) ; lest seul pour un mouvement ou le poids du corps ne compte pas.
+   Les reps 😑 ne comptent pas (e.sets est deja net), les lignes sautees non plus.
+   1RM estime : le modele de l'outil (predRM), exprime en lest, seulement si la reserve est notee. */
+function entryStats(e){
+  var L=S.lifts[e.li]; if(!L||e.state==='skip'||!e.sets)return null;
+  var sys=(L.useBw?(+e.bw||S.bw):0)+(+e.load||0), reps=0, sets=0;
+  e.sets.forEach(function(r){ if(r!=null&&r>0){reps+=r; sets++;} });
+  var rm=null; try{ var p=predRM(L,e); if(p!=null)rm=p-eff(L,+e.bw||S.bw); }catch(x){}
+  return {sets:sets,reps:reps,ton:reps*sys,rm:rm};
+}
+function sessStats(w,lab){
+  var wk=PLAN.filter(function(x){return x.w===w;})[0]; if(!wk)return null;
+  var d=wk.days.filter(function(x){return x.label===lab;})[0]; if(!d)return null;
+  var by={}, order=[], n=0;
+  d.lines.forEach(function(x){
+    var e=entryOf(x.key), st=e?entryStats(e):null; if(!st)return;
+    n++;
+    if(!by[x.li]){by[x.li]={li:x.li,sets:0,reps:0,ton:0,rm:null}; order.push(x.li);}
+    var a=by[x.li]; a.sets+=st.sets; a.reps+=st.reps; a.ton+=st.ton;
+    if(st.rm!=null&&(a.rm==null||st.rm>a.rm))a.rm=st.rm;
+  });
+  if(!n)return null;
+  var tot={sets:0,reps:0,ton:0};
+  order.forEach(function(li){var a=by[li]; tot.sets+=a.sets; tot.reps+=a.reps; tot.ton+=a.ton;});
+  return {by:by,order:order,tot:tot};
+}
+function delta(a,b){
+  if(b==null||!b)return '<td class="lb">\u2014</td>';
+  var d=(a-b)/b*100, c=Math.abs(d)<0.5?'':(d>0?'up':'dn');
+  return '<td class="'+c+'">'+(d>0?'+':'')+F(Math.round(d))+' %</td>';
+}
+function statsCard(w,lab){
+  var cur=sessStats(w,lab); if(!cur)return '';
+  var prev=w>0?sessStats(w-1,lab):null;
+  var h='<div class="card" id="cardstats"><h2>Bilan de la séance <em>'+(prev?'comparé à S'+w+' '+esc(lab):'pas de semaine précédente dans ce bloc')+'</em></h2>'+
+    '<div class="scroll"><table class="stt"><thead><tr><th></th><th>séries</th><th>reps</th><th>tonnage</th>'+(prev?'<th>\u0394</th>':'')+'</tr></thead><tbody>';
+  cur.order.forEach(function(li){
+    var a=cur.by[li], b=prev&&prev.by[li];
+    h+='<tr><td><b class="n'+col(li)+'">'+esc(S.lifts[li].name)+'</b></td><td>'+a.sets+'</td><td>'+a.reps+'</td><td>'+F(Math.round(a.ton))+'</td>'+
+      (prev?delta(a.ton,b?b.ton:null):'')+'</tr>';
+  });
+  h+='<tr class="tot"><td>Total</td><td>'+cur.tot.sets+'</td><td>'+cur.tot.reps+'</td><td>'+F(Math.round(cur.tot.ton))+'</td>'+
+    (prev?delta(cur.tot.ton,prev.tot.ton):'')+'</tr></tbody></table></div>';
+  var rms=cur.order.filter(function(li){return cur.by[li].rm!=null&&S.lifts[li].main;}).map(function(li){
+    var a=cur.by[li], b=prev&&prev.by[li]&&prev.by[li].rm;
+    return esc(S.lifts[li].name)+' <b>'+F(Math.round(a.rm*4)/4)+' kg</b>'+(b!=null&&b!==false?' (S'+w+' : '+F(Math.round(b*4)/4)+')':'');
+  });
+  if(rms.length)h+='<p class="note">1RM estimé du jour, en lest : '+rms.join(' \u00b7 ')+'.</p>';
+  return h+'<details><summary class="note">Ce que mesurent ces chiffres</summary><p class="note">Tonnage = reps comptées × charge système '+
+    '(poids de corps + lest ; lest seul si le poids du corps ne compte pas pour ce mouvement). Les reps ratées et les lignes sautées '+
+    'n\'entrent pas dans le compte. La comparaison porte sur la même séance la semaine précédente, ligne par mouvement. '+
+    'Le 1RM estimé n\'apparaît que si la réserve est notée.</p></details></div>';
+}
+function renderWeekVol(){
+  var el=$('weekvol'); if(!el)return;
+  var lifts=S.lifts.map(function(L,i){return i;}).filter(function(i){return S.lifts[i].main;});
+  var rows=[];
+  PLAN.forEach(function(wk){
+    var agg={}, any=false, tot=0;
+    wk.days.forEach(function(d){ var st=sessStats(wk.w,d.label); if(!st)return; any=true; tot+=st.tot.ton;
+      st.order.forEach(function(li){ var a=st.by[li]; if(!agg[li])agg[li]={sets:0,ton:0}; agg[li].sets+=a.sets; agg[li].ton+=a.ton; }); });
+    if(any)rows.push({w:wk.w,agg:agg,tot:tot});
+  });
+  if(!rows.length){el.innerHTML='<p class="note" style="margin-top:0">Aucune série enregistrée sur ce bloc.</p>';return;}
+  var h='<div class="scroll"><table class="stt"><thead><tr><th>Sem.</th>'+lifts.map(function(i){return '<th>'+esc(S.lifts[i].name)+'<br>séries \u00b7 t</th>';}).join('')+
+    '<th>tonnage<br>total</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr><td>S'+(r.w+1)+'</td>'+lifts.map(function(i){var a=r.agg[i]; return '<td>'+(a?a.sets+' \u00b7 '+F(Math.round(a.ton/100)/10):'\u2014')+'</td>';}).join('')+
+      '<td>'+F(Math.round(r.tot/100)/10)+' t</td></tr>';
+  });
+  el.innerHTML=h+'</tbody></table></div><p class="note">Séries et tonnage (en tonnes) des séances enregistrées, main lifts en colonnes ; '+
+    'le total compte tous les mouvements. Une semaine en cours n\'est complète qu\'une fois toutes ses séances notées.</p>';
+}
+
+/* ================= rappel de sauvegarde =================
+   Les donnees ne vivent que dans ce navigateur. Une app hors ligne sans serveur ne peut pas
+   envoyer de notification : le rappel s'affiche a l'ouverture, en tete de Seance du jour. */
+function daysSince(iso){ if(!iso)return 1e9; return Math.floor((Date.parse(todayISO())-Date.parse(iso))/86400000); }
+function renderBackup(){
+  var n=+S.bkEvery||0, since=daysSince(S.lastExport||S.firstUse), ban=$('bkban');
+  if($('bkevery'))$('bkevery').value=String(n);
+  if($('bklast'))$('bklast').textContent=S.lastExport?'Dernière sauvegarde : '+frDate(S.lastExport)+' ('+(daysSince(S.lastExport)===0?'aujourd\'hui':'il y a '+daysSince(S.lastExport)+' j')+').':'Aucune sauvegarde faite depuis cet appareil.';
+  if(!ban)return;
+  var due=n>0&&since>=n&&!(S.bkSnooze&&S.bkSnooze>=todayISO());
+  ban.innerHTML=due?'<div class="bkban"><b>Sauvegarde à faire</b> — '+(S.lastExport?'la dernière date du '+frDate(S.lastExport)+' ('+since+' jours)':'aucune sauvegarde depuis '+since+' jours')+
+    '. Vos données ne sont que dans ce téléphone.<div class="btnrow"><button class="act" data-bk="now">Sauvegarder maintenant</button>'+
+    '<button class="act ghost" data-bk="later">Demain</button></div></div>':'';
+}
+$('bkban').addEventListener('click',function(e){
+  var b=e.target.closest('[data-bk]'); if(!b)return;
+  if(b.dataset.bk==='now')$('exportj').click();
+  else { var d=new Date(Date.parse(todayISO())+86400000); S.bkSnooze=d.toISOString().slice(0,10); save(); renderBackup(); }
+});
+$('bkevery').addEventListener('change',function(){ S.bkEvery=+this.value; save(); renderBackup(); });
+
 function refreshPlans(){generate();renderToday();renderData();}
 $('out').addEventListener('click',panelClick);
 $('todayout').addEventListener('click',panelClick);
@@ -2560,6 +2785,9 @@ $('tnext').addEventListener('click',function(){
 });
 
 function renderToday(){
+  /* la Forme et les Reglages sont deplaces dans #todayout apres chaque rendu : on les met a
+     l'abri avant que le contenu de #todayout soit remplace */
+  ['cardform','cardsess'].forEach(function(id){ var c=$(id); if(c&&c.parentNode===$('todayout'))$('p-today').insertBefore(c,$('tdone')); });
   veloAutoAll();
   buildPlan();
   var d=new Date(), names=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -2585,8 +2813,13 @@ function renderToday(){
   renderPlan($('todayout'),weeks,'t','day');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('afterbegin',rappelCard(k));
+  $('todayout').insertAdjacentHTML('beforeend',statsCard(wIdx,sel));
   $('todayout').insertAdjacentHTML('beforeend',extraCard(k));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
+  $('todayout').insertBefore($('cardform'),$('todayout').firstChild);
+  $('todayout').appendChild($('cardsess'));
+  applyOrder('today');
+  if(document.body.classList.contains('reorg'))drawBars();
   xFill(null);
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   /* la date prevue au programme, que l'en-tete de jour affichait avant d'etre retire de la seance */
@@ -2902,6 +3135,7 @@ $('newblock').addEventListener('click',function(){
 });
 
 function renderData(){
+  renderWeekVol(); renderBackup();
   /* conformité */
   var byLift=S.lifts.map(function(L,i){
     var es=S.log.filter(function(e){return e.li===i&&e.state&&e.state!=='skip'&&e.role!=='extra';});
@@ -3456,7 +3690,9 @@ function dl(name,txt,mime){
   setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
 }
 $('exportj').addEventListener('click',function(){
+  S.lastExport=todayISO(); delete S.bkSnooze; save();
   dl('charges-'+todayISO()+'.json',JSON.stringify(S,null,2),'application/json');
+  renderBackup();
 });
 $('exportc').addEventListener('click',function(){
   var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','note'];
@@ -3550,7 +3786,12 @@ $('showacc').addEventListener('change',function(){
 });
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
-load(); renderAll(); applyNavMin();
+load();
+if(S.bkEvery==null)S.bkEvery=7;          /* rappel de sauvegarde : chaque semaine par defaut */
+if(!S.firstUse)S.firstUse=todayISO();
+renderAll(); applyNavMin(); renderBackup();
+['prog','charges','data','velo','lifts'].forEach(applyOrder);
+$('nav').addEventListener('click',function(){ if(document.body.classList.contains('reorg')){ reoBanner(); drawBars(); } });
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
 
 $('foot').innerHTML='<details><summary>Modèle de calcul et sources</summary>'+'Modèle de charge : RPE Calculator (streetlifting) — 1RM = (PdC×30/29 + lest) × [1 + k(reps−1)] − PdC×30/29, k = 2,5 % par défaut. '+
