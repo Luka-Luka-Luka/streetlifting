@@ -57,7 +57,7 @@ nav button[aria-selected="true"]::after{content:"";width:18px;height:3px;border-
 nav{transition:transform .22s ease}
 body.navmin nav{transform:translateY(100%)}
 #navtog{position:fixed;left:50%;z-index:41;width:64px;height:44px;margin-left:-32px;border:0;background:none;cursor:pointer;
-  bottom:calc(var(--navh) + env(safe-area-inset-bottom) - 22px);transition:bottom .22s ease;display:flex;align-items:flex-end;justify-content:center;padding:0 0 22px}
+  bottom:calc(var(--navh) + env(safe-area-inset-bottom) - 10px);transition:bottom .22s ease;display:flex;align-items:flex-end;justify-content:center;padding:0 0 10px}
 #navtog span{display:flex;align-items:center;justify-content:center;width:44px;height:16px;border-radius:8px 8px 0 0;
   background:var(--surface);border:1px solid var(--rule);border-bottom:0;color:var(--muted)}
 #navtog svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s ease}
@@ -164,7 +164,11 @@ h2[data-fold]{min-height:40px;display:flex;align-items:center}
 [data-fold]:active{opacity:.7}
 .daypick{display:flex;gap:6px;flex-wrap:wrap}
 .dchip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid var(--rule);border-radius:999px;font:600 13px/1 var(--txt);cursor:pointer;-webkit-user-select:none;user-select:none}
-.dchip input{position:absolute;opacity:0;pointer-events:none}
+.dchip{position:relative}
+.dchip input{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none}
+/* garde-fou : rien ne doit elargir la page, sinon Chrome Android elargit la zone d'affichage
+   et la barre d'onglets, fixee en bas, sort de l'ecran */
+html,body{overflow-x:clip}
 .dchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 
 .line{display:flex;gap:8px;align-items:baseline;padding:4px 0;cursor:pointer;
@@ -2585,7 +2589,9 @@ function renderToday(){
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
   xFill(null);
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
-  $('tprog').textContent=(S.done[k]?'faite le '+frDate(S.done[k]):nd+' / '+sess.length+' faites');
+  /* la date prevue au programme, que l'en-tete de jour affichait avant d'etre retire de la seance */
+  var dd=String(dayDate(wIdx,sel)||'').replace(/<[^>]*>/g,'').replace(/^[\s\u2014\u00b7,-]+/,'').trim();
+  $('tprog').textContent=(dd?'prévue '+dd+' \u00b7 ':'')+(S.done[k]?'faite le '+frDate(S.done[k]):nd+' / '+sess.length+' faites');
   var nk=nextSession(), off=(nk&&k!==nk);
   $('tback').style.display=off?'':'none';
   if(off)$('tback').textContent='Revenir \u00e0 S'+(+nk.split('|')[0]+1)+' \u2014 '+nk.split('|')[1];
