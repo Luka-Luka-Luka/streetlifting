@@ -14,7 +14,7 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"></noscript>
 <style>
 :root{
-  --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#5F6874;
+  --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#48505B;
   --rule:#CFD4DB; --soft:#F3F5F7; --softer:#F8F9FA; --hl:#FBF3D6;
   --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00; --a5:#6B3FA0; --a6:#0F7C80; --a7:#B0337A; --a8:#5A5F66;
   --ok:#2E6B3F; --warn:#9C6200; --bad:#A3242E;
@@ -30,7 +30,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
-body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--txt);padding-bottom:70px}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--txt);padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 .wrap{max-width:900px;margin:0 auto;padding:0 12px}
 
 header{padding:16px 0 11px;border-bottom:2px solid var(--ink)}
@@ -41,18 +41,23 @@ h1 b{font-weight:500;color:var(--muted)}
 .big{font:700 27px/1 var(--num)}
 .big small{font:500 12px/1.3 var(--txt);color:var(--muted);margin-left:5px}
 
-nav{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--rule);
-  display:flex;flex-wrap:wrap;gap:3px;padding:6px 0}
-nav button{flex:1 1 auto;font:600 12.5px/1 var(--txt);padding:9px 7px;border:1px solid var(--rule);
-  background:var(--surface);color:var(--muted);border-radius:var(--r);cursor:pointer;white-space:nowrap}
-nav button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--rule);
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding:4px 2px calc(4px + env(safe-area-inset-bottom))}
+nav button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:54px;justify-content:center;
+  font:600 10.5px/1 var(--txt);letter-spacing:-.01em;border:0;background:none;color:var(--muted);cursor:pointer;
+  border-radius:8px;padding:6px 0;white-space:nowrap}
+nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button[aria-selected="true"]{color:var(--ink)}
+nav button[aria-selected="true"] svg{stroke-width:2.4}
+nav button[aria-selected="true"]::after{content:"";width:18px;height:3px;border-radius:2px;background:var(--a1);margin-top:1px}
+@media print{nav{display:none}}
 
 section.page{display:none;padding-top:13px}
 section.page.on{display:block}
 
-.card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:13px;margin-bottom:10px}
+.card{background:var(--surface);border:0;border-radius:10px;padding:14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(20,23,28,.08)}
 .card>h2{font:600 17px/1.1 var(--num);letter-spacing:.02em;margin-bottom:9px;
-  border-bottom:1px solid var(--ink);padding-bottom:4px;display:flex;align-items:baseline;gap:8px}
+  padding-bottom:2px;display:flex;align-items:baseline;gap:8px}
 .card>h2 em{font-style:normal;font:400 11.5px/1 var(--txt);color:var(--muted);margin-left:auto}
 
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
@@ -88,7 +93,7 @@ thead th{font:600 11.5px/1.2 var(--txt);color:var(--muted);border-bottom:1px sol
 tbody tr:nth-child(even){background:var(--softer)}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
-.note{font:400 12.5px/1.55 var(--txt);color:var(--muted);margin-top:9px}
+.note{font:400 13.5px/1.5 var(--txt);color:var(--muted);margin-top:9px}
 .note b{color:var(--ink);font-weight:600}
 tr.best td{font-weight:650}
 .act.mini.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -203,6 +208,19 @@ svg.vplot text{font-family:var(--num);font-size:11px;fill:currentColor}
 svg.vplot .g{stroke:currentColor;opacity:.13}
 svg.vplot .ax{stroke:currentColor;opacity:.45}
 svg.vplot .lb{opacity:.65}
+/* séance du jour */
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.sesshead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sessmid{flex:1 1 auto;min-width:0;text-align:center}
+.sesssel{width:100%;border:0;background:transparent;font:700 26px/1.1 var(--num);color:var(--ink);text-align:center;
+  text-align-last:center;-webkit-appearance:none;appearance:none;padding:2px 0;cursor:pointer}
+.sessmeta{font:400 13px/1.3 var(--txt);color:var(--muted)}
+.sessmeta span+span:before{content:" · "}
+.big44{min-width:48px;min-height:48px;font-size:22px}
+.card.compact{padding:10px 13px}
+.card.compact>h2{border-bottom:0;margin-bottom:6px;padding-bottom:0}
+.donebtn{width:100%;min-height:52px;margin:4px 0 12px;font-size:15px}
+footer details summary{cursor:pointer;font-weight:600}
 footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:400 11.5px/1.55 var(--txt);color:var(--muted)}
 @media print{nav,.btnrow,.iconbtn,footer{display:none}body{background:#fff}.line{cursor:auto}}
 </style>
@@ -219,47 +237,50 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   </div>
 </header>
 
-<nav id="nav">
-  <button data-p="today" aria-selected="true">Séance du jour</button>
-  <button data-p="prog" aria-selected="false">Programme</button>
-  <button data-p="charges" aria-selected="false">Charges</button>
-  <button data-p="data" aria-selected="false">Données</button>
-  <button data-p="velo" aria-selected="false">Vitesse</button>
-  <button data-p="lifts" aria-selected="false">Mouvements</button>
+<nav id="nav" aria-label="Onglets">
+  <button data-p="today" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M15 16l2.5 2.5L22 14"/></svg>Séance</button>
+  <button data-p="prog" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Programme</button>
+  <button data-p="charges" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14M3 9v6M21 9v6M6 12h12"/></svg>Charges</button>
+  <button data-p="data" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4M4 20h16"/><path d="M7 15l4-4 3 3 5-6"/></svg>Données</button>
+  <button data-p="velo" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/></svg>Vitesse</button>
+  <button data-p="lifts" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Mouvements</button>
 </nav>
 
 <!-- ======================= SÉANCE DU JOUR ======================= -->
 <section class="page on" id="p-today">
-  <div class="card" id="cardform">
-    <h2>Forme du jour <em>quatre repères, 5 = au mieux</em></h2>
+  <div class="sesshead">
+    <button class="iconbtn sq big44" id="tprev" title="Séance précédente" aria-label="Séance précédente">‹</button>
+    <div class="sessmid">
+      <label for="tday" class="vh">Séance</label>
+      <select id="tday" class="sesssel"></select>
+      <div class="sessmeta"><span id="todaydate"></span><span id="tprog"></span></div>
+    </div>
+    <button class="iconbtn sq big44" id="tnext" title="Séance suivante" aria-label="Séance suivante">›</button>
+  </div>
+  <button class="act" id="tback" style="display:none;width:100%;margin-bottom:10px">Revenir à la séance en cours</button>
+  <div class="card compact" id="cardform">
+    <h2>Forme du jour</h2>
     <div id="formrows"></div>
     <p class="note" id="formnote"></p>
   </div>
-  <div class="card">
-    <h2>Aujourd'hui <em id="todaydate"></em></h2>
+  <div id="todayout"></div>
+  <button class="act donebtn" id="tdone">Marquer la séance comme faite</button>
+  <div class="card" id="cardsess">
+    <h2>Réglages de la séance <em>date du bloc, poids du jour</em></h2>
     <div class="row">
       <div class="field md"><label for="start">Début du bloc</label><input id="start" type="date"></div>
       <div class="field sm"><label for="tbw">PdC du jour</label><input id="tbw" class="numin" type="text" inputmode="decimal"></div>
-      <div class="field md"><label for="tday">Séance</label><select id="tday"></select></div>
-    </div>
-    <div class="btnrow">
-      <button class="iconbtn sq" id="tprev" title="Séance précédente" aria-label="Séance précédente">‹</button>
-      <button class="iconbtn sq" id="tnext" title="Séance suivante" aria-label="Séance suivante">›</button>
-      <button class="act ghost" id="tdone">Marquer la séance comme faite</button>
-      <button class="act" id="tback" style="display:none">Revenir à la séance en cours</button>
     </div>
     <p class="note" id="tstate"></p>
-    <p class="note">Le poids de corps saisi ici s'applique à toutes les séries enregistrées aujourd'hui.
-    Touchez une ligne pour la valider ou la corriger. Marquer une séance comme faite ne verrouille rien :
-    la liste continue de proposer toutes les séances du bloc, et vous pouvez y revenir pour ajouter une note.</p>
+    <p class="note">Le poids de corps du jour s'applique à toutes les séries enregistrées aujourd'hui ; vide, c'est celui de l'en-tête.
+    Marquer une séance comme faite ne verrouille rien : vous pouvez y revenir pour corriger ou ajouter une note.</p>
   </div>
-  <div id="todayout"></div>
 </section>
 
 <!-- ======================= PROGRAMME ======================= -->
 <section class="page" id="p-prog">
-  <div class="card">
-    <h2>Assignation <em>un gabarit par mouvement</em></h2>
+  <div class="card" id="cardassign">
+    <h2>Réglages du bloc <em>gabarits, génération</em></h2>
     <div id="assign"></div>
     <div class="row" style="margin-top:10px">
       <div class="field sm"><label for="nwk">Semaines</label>
@@ -489,7 +510,7 @@ var S={
   formOn:{som:1,ene:1,cou:1,art:1,tra:1}, formMode:'simple',
   log:[]
 };
-S.fold['c:cardextra']=1;
+S.fold['c:cardextra']=1; S.fold['c:cardsess']=1; S.fold['warm']=1; S.fold['c:cardassign']=1; S.uiSeed2=1;
 S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
 
 var SAVEFAIL=false;
@@ -536,7 +557,8 @@ function load(){
     if(!S.extra)S.extra={};
     if(S.showAcc===undefined)S.showAcc=true;
     if(S.rirEach===undefined)S.rirEach=false;
-    if(!S.extraSeed){ S.fold['c:cardextra']=1; S.extraSeed=1; }   /* la carte d'ajout part repliee */
+    if(!S.extraSeed){ S.fold['c:cardextra']=1; S.extraSeed=1; }
+    if(!S.uiSeed2){ S.fold['c:cardsess']=1; S.fold['warm']=1; S.fold['c:cardassign']=1; S.uiSeed2=1; }   /* la carte d'ajout part repliee */
     /* Rappel ponctuel, attache a une seance precise : il s'affiche dans Seance du jour
        quand cette seance est selectionnee, et disparait des qu'on l'efface. Il ne touche
        ni aux notes ni aux autres seances. Le drapeau evite qu'il revienne apres effacement. */
@@ -1012,6 +1034,11 @@ $('nav').addEventListener('click',function(e){
   if(b.dataset.p==='data')renderData();
   if(b.dataset.p==='velo')renderVelo();
   window.scrollTo(0,0);
+  if(b.dataset.p==='prog'&&S.tsel){
+    /* on arrive sur la semaine de la seance en cours, pas sur les reglages */
+    var wk=document.querySelector('#out .wkh[data-fold="pw'+String(S.tsel).split('|')[0]+'"]');
+    if(wk)wk.scrollIntoView({block:'start'});
+  }
 });
 
 /* ================= liens entre onglets =================
@@ -1811,12 +1838,15 @@ function renderPlan(into,weeks,pfx,scope){
   var sep=S.sep, html='', txt='';
   weeks.forEach(function(week){
     var kw=pfx+'w'+week.w;
-    html+='<div class="wk'+(fold(kw)?' folded':'')+'"><div class="wkh" data-fold="'+kw+'">'+chev(kw)+
+    /* en seance, l'en-tete de page dit deja quelle semaine et quel jour : pas de repetition */
+    html+=(pfx==='t')?'<div class="wk tsess"><div class="wkb">':
+      '<div class="wk'+(fold(kw)?' folded':'')+'"><div class="wkh" data-fold="'+kw+'">'+chev(kw)+
       '<b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span></div><div class="wkb">';
     txt+='\n[Semaine '+(week.w+1)+']\n';
     week.days.forEach(function(day){
       var kd=pfx+'d'+week.w+'-'+day.label;
-      html+='<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
+      html+=(pfx==='t')?'<div class="day">':
+        '<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
         day.label+dayDate(week.w,day.label)+(S.done&&S.done[week.w+'|'+day.label]?' ✓':'')+'</div>';
       txt+=day.label+'\n';
       var hid=0;
@@ -2018,6 +2048,8 @@ function vCount(key,reps,st){
   return n;
 }
 function validRows(key,reps){
+  if(!reps.some(function(nr,st){return vCount(key,reps,st)>0;}))
+    return '<p class="note" style="margin-top:6px">Les reps à juger apparaissent dès que les séries sont saisies.</p>';
   return reps.map(function(nr,st){
     var n=vCount(key,reps,st), lab='S'+(st+1);
     if(!n)return '<div class="vrow"><button class="vset" disabled>'+lab+'</button><span class="note" style="margin:0 0 0 4px">reps pas encore saisies</span></div>';
@@ -2029,7 +2061,16 @@ function validRows(key,reps){
     return h+'</div>';
   }).join('');
 }
-function refreshV(p){var w=p.querySelector('[data-vrows]'); if(w)w.innerHTML=validRows(p.dataset.panel,panelReps(p));}
+function countLine(reps){
+  var ko=reps.map(function(t,st){return t==null?0:koCount({valid:PV},st,t);});
+  if(!ko.some(Boolean))return '';
+  return '<p class="note" style="margin-top:6px">Reps comptées : <b>'+reps.map(function(t,st){return t==null?'\u2014':Math.max(0,t-ko[st]);}).join(' / ')+
+    '</b> — les '+VJ.ko.e+' sont retirées à l\'enregistrement.</p>';
+}
+function refreshV(p){
+  var w=p.querySelector('[data-vrows]'), r=panelReps(p);
+  if(w)w.innerHTML=validRows(p.dataset.panel,r)+countLine(r);
+}
 function rirPills(v){
   var base=(v==null)?null:Math.floor(v), half=v!=null&&(v-Math.floor(v))>0.01;
   return [0,1,2,3,4,5].map(function(q){
@@ -2055,6 +2096,32 @@ function copyRir(from,to,force){
   for(var i=0;i<a.length&&i<b.length;i++)b[i].setAttribute('aria-pressed',a[i].getAttribute('aria-pressed'));
 }
 /* conserve les jugements d'une analyse video quand la serie a laquelle elle est rattachee disparait */
+/* Convention : une rep 😑 est ratee, donc ne compte pas. Le panneau saisit des reps
+   TENTEES ; e.tries les garde, e.sets contient les reps COMPTEES (tentees moins ratees).
+   Tout le reste de l'outil (conformite, courbe, 1RM predit, reference) lit e.sets et
+   travaille donc sur les reps reussies sans rien changer d'autre. */
+function koCount(e,st,n){
+  var a=(e.valid&&e.valid[st])||[], k=0;
+  for(var r=0;r<a.length&&r<n;r++)if(a[r]==='ko')k++;
+  return k;
+}
+function stateOf(e){
+  if(e.presReps==null||e.presLoad==null)return e.state||null;
+  var min=repMin(e.presReps), sets=e.sets||[];
+  var okLoad=(+e.load)>=e.presLoad-0.01, okReps=sets.every(function(v){return v!=null&&v>=min;});
+  return (okLoad&&okReps)?'ok':(sets.some(function(v){return v!=null;})?(okReps?'mod':'miss'):'mod');
+}
+function recount(e){
+  if(!e||!e.sets)return;
+  if(!e.tries){
+    var any=(e.valid||[]).some(function(a){return (a||[]).indexOf('ko')>=0;});
+    if(!any)return;
+    e.tries=e.sets.slice();                 /* avant la convention, les reps saisies etaient toutes comptees */
+  }
+  e.sets=e.tries.map(function(t,st){return t==null?null:Math.max(0,t-koCount(e,st,t));});
+  if(e.tries.every(function(t,st){return t===e.sets[st];}))delete e.tries;
+  e.state=stateOf(e);
+}
 function keepJuge(key){
   var e=entryOf(key); if(!e||!e.valid)return;
   veloOfKey(key).forEach(function(v){
@@ -2081,7 +2148,7 @@ function panelHTML(key){
   var f=findLine(key); if(!f)return '';
   var x=f.line, L=S.lifts[x.li], e=entryOf(key);
   var sets=[]; for(var i=0;i<x.sets;i++){
-    var done=e&&e.sets&&e.sets[i]!=null?e.sets[i]:null;
+    var tr=e?(e.tries||e.sets):null, done=tr&&tr[i]!=null?tr[i]:null;
     var cls=done==null?'':(done>=repMin(x.reps)?'done':'short');
     sets.push('<button class="pill set '+cls+'" data-set="'+i+'">'+(done==null?'S'+(i+1):done+' reps')+'</button>');
   }
@@ -2097,30 +2164,31 @@ function panelHTML(key){
   var fail=(uKey!=null&&(x.role==='top'||x.role==='amrap'))?((L.prog.adj||[]).indexOf(uKey)>=0):null;
   var rirNow=e?(e.rir===null?null:e.rir):undefined;
   var each=x.sets>1&&(e&&e.rirs?true:(e?false:!!S.rirEach));
-  var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return e&&e.sets&&e.sets[q]!=null?e.sets[q]:null;})
-                      :[e&&e.sets&&e.sets[0]!=null?e.sets[0]:repMin(x.reps)];
+  var trNow=e?(e.tries||e.sets):null;
+  var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return trNow&&trNow[q]!=null?trNow[q]:null;})
+                      :[trNow&&trNow[0]!=null?trNow[0]:repMin(x.reps)];
   var rirBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
     (x.sets>1?'<label class="chk"><input type="checkbox" data-rireach'+(each?' checked':'')+'>Réserve notée à chaque série</label>':'')+
-    '<div data-rirlast'+(each?' style="display:none"':'')+'><label style="margin-top:6px">Reps en réserve sur la dernière série</label>'+
+    '<div data-rirlast'+(each?' style="display:none"':'')+'><label style="margin-top:6px">Réserve sur la dernière série</label>'+
       '<div class="pillrow" data-rirrow="last">'+rirPills(rirNow)+'</div></div>'+
-    (x.sets>1?'<div data-rireachwrap'+(each?'':' style="display:none"')+'><label style="margin-top:6px">Reps en réserve, série par série</label>'+
+    (x.sets>1?'<div data-rireachwrap'+(each?'':' style="display:none"')+'><label style="margin-top:6px">Réserve, série par série</label>'+
       Array.apply(null,{length:x.sets}).map(function(_,q){
         var v=(e&&e.rirs)?(e.rirs[q]===undefined?undefined:e.rirs[q]):undefined;
         return '<div class="rirset" data-rirrow="'+q+'"><span>S'+(q+1)+'</span>'+rirPills(v)+'</div>';
       }).join('')+'</div>':'')+
     '</div></div>';
   var validBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
-    '<label>Validité des reps — choisissez un jugement, puis touchez les reps (« S1 » remplit la série)</label>'+
+    '<label>Validité — choisissez, puis touchez les reps (« S1 » = toute la série)</label>'+
     '<div class="pillrow" data-brushes>'+VJO.map(function(c){
       return '<button class="pill brush" data-brush="'+c+'" aria-pressed="'+(PBRUSH===c)+'">'+VJ[c].e+'<small>'+VJ[c].n+'</small></button>';
     }).join('')+'</div>'+
-    '<div data-vrows>'+validRows(key,repsNow)+'</div></div></div>';
+    '<div data-vrows>'+validRows(key,repsNow)+countLine(repsNow)+'</div></div></div>';
   return '<div class="panel" data-panel="'+key+'">'+
     '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" type="number" step="0.25" value="'+(e&&e.load!=null?e.load:x.load)+'"></div>'+
-      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Séries — touchez pour valider, retouchez pour corriger</label><div class="pillrow">'+sets.join('')+'</div></div>'
-        :'<div class="field sm"><label>Reps faites</label><input data-fld="reps" type="number" step="1" min="0" value="'+(e&&e.sets&&e.sets[0]!=null?e.sets[0]:repMin(x.reps))+'"></div>')+
+      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Reps tentées par série — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
+        :'<div class="field sm"><label>Reps tentées</label><input data-fld="reps" type="number" step="1" min="0" value="'+(e&&(e.tries||e.sets)&&(e.tries||e.sets)[0]!=null?(e.tries||e.sets)[0]:repMin(x.reps))+'"></div>')+
     '</div>'+
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
@@ -2136,11 +2204,11 @@ function panelHTML(key){
     (fail!=null?'<div class="row" style="margin-top:8px"><div class="field w">'+
       '<label>Ajustement du programme</label>'+
       '<button class="act ghost mini" data-fail="'+key+'">'+(fail?'Annuler la répétition de charge':'Échec — répéter cette charge la fois suivante')+'</button>'+
-      '<p class="note">Zlat ne prévoit pas la répétition : chez lui une charge ratée termine le run, deload et reset. '+
-      'Helms prévoit la même charge la semaine suivante, puis −10 % après deux échecs. Répéter est donc votre adaptation, pas une règle du programme.</p>'+
+      '<details><summary class="note">Ce que prévoient Zlat et Helms</summary><p class="note">Zlat ne prévoit pas la répétition : chez lui une charge ratée termine le run, deload et reset. '+
+      'Helms prévoit la même charge la semaine suivante, puis −10 % après deux échecs. Répéter est donc votre adaptation, pas une règle du programme.</p></details>'+
       '</div></div>':'')+
-    '<div class="btnrow"><button class="act mini" data-save="'+key+'">Enregistrer</button>'+
-      '<button class="act ghost mini" data-close="1">Fermer</button>'+
+    '<div class="btnrow"><button class="act" style="flex:1 1 auto;min-height:48px" data-save="'+key+'">Enregistrer</button>'+
+      '<button class="act ghost" style="min-height:48px" data-close="1">Fermer</button>'+
       (e?'<button class="act ghost mini" data-clear="'+key+'">Effacer</button>':'')+
       (x.role==='extra'?'<button class="act ghost mini" data-xdel="'+key+'">Retirer de la séance</button>':'')+'</div>'+
   '</div>';
@@ -2273,18 +2341,25 @@ function saveLine(p,key){
   if(!valid.some(Boolean))valid=null;
   var setNotes=[];
   Array.prototype.forEach.call(p.querySelectorAll('[data-setnote]'),function(el){setNotes[+el.dataset.setnote]=el.value.trim();});
-  var min=repMin(x.reps), load=num(loadEl.value,x.load);
-  var okLoad=load>=x.load-0.01, okReps=sets.every(function(v){return v!=null&&v>=min;});
-  var state=(okLoad&&okReps)?'ok':(sets.some(function(v){return v!=null;})?(okReps?'mod':'miss'):'mod');
+  var load=num(loadEl.value,x.load), state=null;
   var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:x.li,lift:L.name,tpl:L.prog.tpl,week:f.w+1,day:f.day,
     role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,load:load,sets:sets,rir:rir,
     bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
   if(rirs)e.rirs=rirs;
   if(valid)e.valid=valid;
+  e.tries=sets.slice(); recount(e); if(!e.state)e.state=stateOf(e);
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
   /* la ligne devient la reference des jugements de ses analyses video */
   veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
+  var inToday=!!(p.closest&&p.closest('#todayout'));
   save(); closePanel(); refreshPlans();
+  if(inToday){
+    /* la prochaine ligne non saisie de la seance s'ouvre d'elle-meme */
+    var ls=Array.prototype.slice.call(document.querySelectorAll('#todayout .line[data-key]'));
+    var i=ls.map(function(l){return l.dataset.key;}).indexOf(key), nx=null;
+    for(var j=i+1;j<ls.length&&!nx;j++)if(!entryOf(ls[j].dataset.key))nx=ls[j];
+    if(nx){ openPanel(nx,nx.dataset.key); nx.scrollIntoView({block:'start',behavior:'smooth'}); }
+  }
 }
 function refreshPlans(){generate();renderToday();renderData();}
 $('out').addEventListener('click',panelClick);
@@ -2361,10 +2436,7 @@ function renderForm(){
     h+='<div class="pillrow">'+[1,2,3,4,5].map(function(v){
       return '<button class="pill" data-fq="gen" data-fv="'+v+'" aria-pressed="'+(f.gen===v)+'">'+v+'</button>';
     }).join('')+'</div>'+
-    [5,4,3,2,1].map(function(v){
-      return '<p class="note" style="margin:3px 0 0'+(f.gen===v?';color:var(--ink)':'')+'">'+
-        (f.gen===v?'<b>'+v+' '+FORMANCH[v-1]+'</b>':'<span class="src">'+v+' '+FORMANCH[v-1]+'</span>')+'</p>';
-    }).join('');
+    (f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+f.gen+' '+FORMANCH[f.gen-1]+'</b></p>':'');
   }else{
     h+=formQ().map(function(q){
       return '<p class="note" style="margin:8px 0 0"><b>'+q.n+'</b> <span class="src">'+q.h+'</span></p><div class="pillrow">'+
@@ -2373,7 +2445,10 @@ function renderForm(){
         }).join('')+'</div>';
     }).join('');
   }
-  h+='<details style="margin-top:12px"><summary class="note">Changer de mode</summary>'+
+  h+='<details style="margin-top:6px"><summary class="note">Signification des notes, mode de saisie</summary>'+
+    (simple?[5,4,3,2,1].map(function(v){return '<p class="note" style="margin:3px 0 0">'+v+' '+FORMANCH[v-1]+'</p>';}).join(''):'')+
+    '<p class="note">Aucune charge n\'en d\u00e9pend. Une s\u00e9rie rat\u00e9e un jour \u00e0 2 ne dit pas la m\u00eame chose qu\'une s\u00e9rie rat\u00e9e '+
+    'un jour \u00e0 5, et trois semaines plus tard la diff\u00e9rence est invisible.</p>'+
     '<div class="pillrow" style="margin-top:6px">'+
       '<button class="pill sub" style="min-width:auto;padding:6px 8px" data-fmode="simple" aria-pressed="'+simple+'">note simple</button>'+
       '<button class="pill sub" style="min-width:auto;padding:6px 8px" data-fmode="multi" aria-pressed="'+(!simple)+'">rep\u00e8res d\u00e9taill\u00e9s</button>'+
@@ -2393,8 +2468,7 @@ function renderForm(){
   var t=formSum(f);
   $('formnote').innerHTML=t!=null
     ? 'Not\u00e9 <b>'+t+'/'+formMax()+'</b>'+(f.d?' le '+frDate(f.d):'')+'. Touchez la note choisie pour l\'annuler.'
-    : 'Aucune charge n\'en d\u00e9pend. Une s\u00e9rie rat\u00e9e un jour \u00e0 2 ne dit pas la m\u00eame chose qu\'une s\u00e9rie rat\u00e9e '+
-      'un jour \u00e0 5, et trois semaines plus tard la diff\u00e9rence est invisible.';
+    : '';
 }
 $('formrows').addEventListener('click',function(ev){
   var md=ev.target.closest?ev.target.closest('[data-fmode]'):null;
@@ -2433,6 +2507,7 @@ function renderToday(){
   buildPlan();
   var d=new Date(), names=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   $('todaydate').textContent=names[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1);
+  $('tprog').textContent='';
   var sess=sessions();
   if(!sess.length){ $('tday').innerHTML='<option>\u2014</option>'; $('todayout').innerHTML=''; $('tstate').textContent=''; return; }
   var k=S.tsel;
@@ -2444,7 +2519,7 @@ function renderToday(){
   }
   $('tday').innerHTML=sess.map(function(q){
     var a=q.split('|');
-    return '<option value="'+q+'"'+(q===k?' selected':'')+'>S'+(+a[0]+1)+' \u2014 '+a[1]+(S.done[q]?' \u2713':'')+'</option>';
+    return '<option value="'+q+'"'+(q===k?' selected':'')+'>Semaine '+(+a[0]+1)+' \u00b7 '+a[1]+(S.done[q]?' \u2713':'')+'</option>';
   }).join('');
   var wIdx=+k.split('|')[0], sel=k.split('|')[1];
   var weeks=PLAN.filter(function(wk){return wk.w===wIdx;}).map(function(wk){
@@ -2457,17 +2532,19 @@ function renderToday(){
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
   xFill(null);
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
+  $('tprog').textContent=(S.done[k]?'faite le '+frDate(S.done[k]):nd+' / '+sess.length+' faites');
   var nk=nextSession(), off=(nk&&k!==nk);
   $('tback').style.display=off?'':'none';
   if(off)$('tback').textContent='Revenir \u00e0 S'+(+nk.split('|')[0]+1)+' \u2014 '+nk.split('|')[1];
   $('tprev').disabled=(sessions().indexOf(k)<=0);
   $('tnext').disabled=(sessions().indexOf(k)>=sess.length-1);
   renderForm();
-  $('tdone').textContent=S.done[k]?'Rouvrir cette s\u00e9ance':'Marquer la s\u00e9ance comme faite';
+  $('tdone').textContent=S.done[k]?'Rouvrir cette s\u00e9ance':'Terminer la s\u00e9ance';
+  $('tdone').className=S.done[k]?'act ghost donebtn':'act donebtn';
   $('tstate').innerHTML=(off?'<b>Vous consultez une autre s\u00e9ance que celle en cours.</b> ':'')+
     (S.done[k]?'Marqu\u00e9e faite le <b>'+frDate(S.done[k])+'</b>. ':'')+
     '<b>'+nd+'</b> s\u00e9ance'+(nd>1?'s':'')+' sur '+sess.length+' marqu\u00e9e'+(nd>1?'s':'')+' faite'+(nd>1?'s':'')+' sur ce bloc.'+
-    (S.start?'':' <b>Aucune date de d\u00e9but de bloc</b> : les dates affich\u00e9es dans le programme resteront vides tant que le champ ci-dessus est vide.');
+    (S.start?'':' <b>Aucune date de d\u00e9but de bloc</b> : les dates du programme restent vides tant que ce champ est vide.');
   applyFolds();
 }
 $('tdone').addEventListener('click',function(){
@@ -2800,7 +2877,8 @@ function renderData(){
   if(!S.log.length){$('loglist').innerHTML='<p class="note">Vide.</p>';}
   else{
     $('loglist').innerHTML=S.log.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(e){
-      var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/');
+      var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/')+
+        (e.tries?' <i>(tentées '+e.tries.map(function(v){return v==null?'—':v;}).join('/')+')</i>':'');
       var vl=(e.valid||[]).map(function(a,st){
         return (a&&a.some(Boolean))?'S'+(st+1)+' '+a.map(function(c){return c?VJ[c].e:'\u00b7';}).join(''):'';
       }).filter(Boolean).join(' \u00b7 ');
@@ -2918,6 +2996,7 @@ function setJuge(v,rep,code){
     if(!e.valid)e.valid=[]; if(!e.valid[st])e.valid[st]=[];
     e.valid[st][rep-1]=nv;
     delete S.veloJuge[v.id+'|'+rep];
+    recount(e);
   }else{ if(nv)S.veloJuge[v.id+'|'+rep]=nv; else delete S.veloJuge[v.id+'|'+rep]; }
 }
 /* ce qui etait juge ici avant le rattachement rejoint la serie, sans ecraser ce qui y est deja */
@@ -2929,6 +3008,7 @@ function mergeJuge(v){
     if(!e.valid[st][r.rep-1])e.valid[st][r.rep-1]=j;
     delete S.veloJuge[k];
   });
+  recount(e);
 }
 function setLien(v,lien){
   v.reps.forEach(function(r){ var j=jugeOf(v,r.rep); if(j)S.veloJuge[v.id+'|'+r.rep]=j; });
@@ -2943,7 +3023,7 @@ function veloAuto(v){
   var es=S.log.filter(function(e){return e.date===v.date&&(v.li<0||e.li===v.li)&&e.sets&&e.sets.length;});
   if(!es.length)return false;
   var n=v.reps.length, ts=String(v.type_serie||'').toLowerCase(), c=[];
-  es.forEach(function(e){ e.sets.forEach(function(r,st){
+  es.forEach(function(e){ (e.tries||e.sets).forEach(function(r,st){
     var role=(/top/.test(ts)&&e.role==='top')||(/back/.test(ts)&&e.role==='back');
     c.push({e:e,s:st,m:(r===n?2:0)+(role?1:0)});
   });});
@@ -2962,7 +3042,7 @@ function lienSelect(v){
     .sort(function(a,b){return Math.abs((Date.parse(a.date)||0)-t)-Math.abs((Date.parse(b.date)||0)-t);}).slice(0,12);
   var cur=v.lien&&v.lien.key?v.lien.key+'#'+v.lien.set:'';
   var o='<option value="">non rattachée</option>';
-  es.forEach(function(e){ e.sets.forEach(function(r,st){
+  es.forEach(function(e){ (e.tries||e.sets).forEach(function(r,st){
     var val=e.key+'#'+st;
     o+='<option value="'+esc(val)+'"'+(val===cur?' selected':'')+'>'+frDate(e.date)+
       (e.week?' \u00b7 S'+e.week+' '+esc(e.day):'')+' \u00b7 '+roleLab(e.role)+' \u00b7 '+F(e.load)+' '+S.sep+' '+(r==null?'\u2014':r)+
@@ -3023,8 +3103,13 @@ function veloSvg(v){
   var sel=[v.reps[0],v.reps[v.reps.length-1]].filter(function(r,i,a){return r&&r.profil_vitesse_ms&&r.profil_hauteur_cm&&(i===0||r!==a[0]);});
   if(!sel.length)return '';
   var W=360,H=216,ml=36,mr=12,mt=22,mb=34,cols=['var(--a2)','var(--a1)'];
-  var xs=[],ys=[0];
-  sel.forEach(function(r){xs=xs.concat(r.profil_hauteur_cm); ys=ys.concat(r.profil_vitesse_ms);});
+  /* Le profil part du debut de la montee (0 a course_cm) ; le sommet se mesure au-dessus
+     du point le plus bas de la video. On decale chaque courbe de sa hauteur de depart
+     (sommet - course) pour que les deux graphiques et le seuil partagent le meme zero. */
+  var off=function(r){return (r.hauteur_sommet_cm!=null&&r.course_cm!=null)?r.hauteur_sommet_cm-r.course_cm:0;};
+  var sl=veloSeuil(v.mouvement), xs=[],ys=[0];
+  sel.forEach(function(r){xs=xs.concat(r.profil_hauteur_cm.map(function(x){return x+off(r);})); ys=ys.concat(r.profil_vitesse_ms);});
+  if(sl)xs.push(sl.valide+VBANDE);
   var tx=niceTicks(Math.min(0,Math.min.apply(null,xs)),Math.max.apply(null,xs),5),
       ty=niceTicks(0,Math.max.apply(null,ys),4);
   var X=function(x){return ml+(x-tx.lo)/(tx.hi-tx.lo)*(W-ml-mr);},
@@ -3038,27 +3123,30 @@ function veloSvg(v){
     o+='<line class="g" x1="'+ml+'" y1="'+Y(t)+'" x2="'+(W-mr)+'" y2="'+Y(t)+'"/>'+
        '<text x="'+(ml-5)+'" y="'+(Y(t)+4)+'" text-anchor="end" class="lb">'+tickLab(t)+'</text>';
   });
+  if(sl)o+='<rect x="'+X(sl.valide-VBANDE).toFixed(1)+'" y="'+mt+'" width="'+(X(sl.valide+VBANDE)-X(sl.valide-VBANDE)).toFixed(1)+'" height="'+(H-mb-mt)+'" fill="currentColor" opacity=".08"/>'+
+     '<line x1="'+X(sl.valide).toFixed(1)+'" y1="'+mt+'" x2="'+X(sl.valide).toFixed(1)+'" y2="'+(H-mb)+'" stroke="var(--a2)" stroke-dasharray="5 4" stroke-width="1.5"/>';
   o+='<line class="ax" x1="'+ml+'" y1="'+(H-mb)+'" x2="'+(W-mr)+'" y2="'+(H-mb)+'"/>'+
      '<line class="ax" x1="'+ml+'" y1="'+mt+'" x2="'+ml+'" y2="'+(H-mb)+'"/>'+
-     '<text x="'+(W-mr)+'" y="'+(H-4)+'" text-anchor="end" class="lb">hauteur de la ceinture (cm) \u2192</text>'+
+     '<text x="'+(W-mr)+'" y="'+(H-4)+'" text-anchor="end" class="lb">hauteur au-dessus du point le plus bas (cm) \u2192</text>'+
      '<text x="'+(ml-30)+'" y="'+(mt-10)+'" class="lb">vitesse (m/s)</text>';
   sel.forEach(function(r,i){
-    var pts=r.profil_hauteur_cm.map(function(x,k){return X(x).toFixed(1)+','+Y(r.profil_vitesse_ms[k]).toFixed(1);}).join(' ');
+    var pts=r.profil_hauteur_cm.map(function(x,k){return X(x+off(r)).toFixed(1)+','+Y(r.profil_vitesse_ms[k]).toFixed(1);}).join(' ');
     o+='<polyline points="'+pts+'" fill="none" stroke="'+cols[i]+'" stroke-width="2.2" stroke-linejoin="round"/>';
     /* point dur du script, dessine seulement s'il tombe bien sur la courbe */
     var hx=r.hauteur_point_dur_cm, vy=r.vitesse_point_dur_ms;
     if(hx!=null&&vy!=null){
       var kk=0,dd=1e9; r.profil_hauteur_cm.forEach(function(x,k){var d=Math.abs(x-hx); if(d<dd){dd=d;kk=k;}});
       if(Math.abs(r.profil_vitesse_ms[kk]-vy)<0.06)
-        o+='<circle cx="'+X(hx).toFixed(1)+'" cy="'+Y(vy).toFixed(1)+'" r="4" fill="var(--surface)" stroke="'+cols[i]+'" stroke-width="2"/>';
+        o+='<circle cx="'+X(hx+off(r)).toFixed(1)+'" cy="'+Y(vy).toFixed(1)+'" r="4" fill="var(--surface)" stroke="'+cols[i]+'" stroke-width="2"/>';
     }
     var j=jugeOf(v,r.rep);
     o+='<line x1="'+(W-mr-132)+'" y1="'+(mt+4+i*15)+'" x2="'+(W-mr-118)+'" y2="'+(mt+4+i*15)+'" stroke="'+cols[i]+'" stroke-width="2.5"/>'+
        '<text x="'+(W-mr-114)+'" y="'+(mt+8+i*15)+'">'+(i===0?'rep 1':'rep '+r.rep+' (dernière)')+(j?' '+VJ[j].e:'')+'</text>';
   });
-  return o+'</svg><p class="note" style="margin-top:4px">Chaque courbe suit la ceinture pendant la montée : départ à gauche, '+
+  return o+'</svg><details><summary class="note">Comment lire</summary><p class="note">Chaque courbe suit la ceinture pendant la montée : départ à gauche, '+
     'sommet à droite. Plus la courbe est haute, plus ça monte vite ; le rond marque le point dur, là où la vitesse retombe le plus. '+
-    'L\u2019écart entre les deux courbes, c\u2019est ce que la série vous a coûté.</p>';
+    'L\u2019écart entre les deux courbes, c\u2019est ce que la série vous a coûté. Les hauteurs partent du point le plus bas de la vidéo, '+
+    'comme la hauteur au sommet : là où une courbe s\u2019arrête, c\u2019est son sommet'+(sl?', et le pointillé bleu est votre seuil de validité':'')+'.</p></details>';
 }
 /* Rep par rep : vitesse moyenne en haut, hauteur au sommet en bas avec le seuil de validite.
    Meme axe horizontal pour les deux, pour lire d'un coup d'oeil quelle rep a lache. */
@@ -3114,10 +3202,10 @@ function veloRepsSvg(v){
     o+='<text x="'+XC(i)+'" y="'+(y2+h2+14)+'" text-anchor="middle">'+r.rep+'</text>'+
        (j?'<text x="'+XC(i)+'" y="'+(y2+h2+30)+'" text-anchor="middle" style="font-family:var(--txt);font-size:13px">'+VJ[j].e+'</text>':'');
   });
-  return o+'</svg><p class="note" style="margin-top:4px">Une colonne par rep. En haut, sa vitesse moyenne : la descente d\u2019une barre '+
+  return o+'</svg><details><summary class="note">Comment lire</summary><p class="note">Une colonne par rep. En haut, sa vitesse moyenne : la descente d\u2019une barre '+
     'à l\u2019autre mesure la fatigue. En bas, la hauteur atteinte au sommet'+(sl?' ; pointillé bleu = votre seuil de validité, '+
     'bande grise = la marge de \u00b1'+F(VBANDE)+' cm où une rep est dite limite':' ; le seuil de validité s\u2019affichera dès que vous aurez jugé '+
-    'au moins une rep ratée et une valide')+'. Couleur = votre jugement ('+VJ.ko.e+' rouge, '+VJ.dt.e+' ocre, '+VJ.ok.e+' bleu, '+VJ.franc.e+' vert), gris = pas encore jugée.</p>';
+    'au moins une rep ratée et une valide')+'. Couleur = votre jugement ('+VJ.ko.e+' rouge, '+VJ.dt.e+' ocre, '+VJ.ok.e+' bleu, '+VJ.franc.e+' vert), gris = pas encore jugée.</p></details>';
 }
 function veloCard(v,k){
   var q=v.resume||{}, ref=veloRef(v), L=S.lifts[v.li], rows='';
@@ -3155,7 +3243,10 @@ function veloCard(v,k){
     '<p class="note">'+(v.charge_systeme_kg?'Charge système '+F(v.charge_systeme_kg)+' kg. ':'')+
       'Rep 1 → dernière : <b>'+F(q.v_moy_rep1)+' → '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
       'Vitesse mini de la dernière rep '+F(q.v_mini_derniere)+' m/s, point dur vers '+F(q.hauteur_point_dur_cm)+' cm. '+
-      'Sommet : −'+F(q.perte_hauteur_sommet_cm)+' cm sur la série.'+
+      /* le script donne une « perte » signee : negative quand le sommet monte au fil de la serie */
+      (q.perte_hauteur_sommet_cm==null?'':q.perte_hauteur_sommet_cm<0
+        ?'Sommet : +'+F(-q.perte_hauteur_sommet_cm)+' cm entre la rep 1 et la dernière.'
+        :'Sommet : −'+F(q.perte_hauteur_sommet_cm)+' cm entre la rep 1 et la dernière.')+
       (L?'':' <b>Mouvement non reconnu</b> : non rattaché à un mouvement de l\'outil.')+'</p>'+
     cmp+al+veloSvg(v)+veloRepsSvg(v)+
     '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Rep</th><th>Course cm</th>'+
@@ -3304,7 +3395,7 @@ $('exportj').addEventListener('click',function(){
   dl('charges-'+todayISO()+'.json',JSON.stringify(S,null,2),'application/json');
 });
 $('exportc').addEventListener('click',function(){
-  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','rir','rirs','valid','state','note'];
+  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','note'];
   var VL={ko:'R',dt:'D',ok:'V',franc:'F'};
   var rows=[cols.join(';')].concat(S.log.map(function(e){
     return cols.map(function(c){
@@ -3398,12 +3489,12 @@ $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderTo
 load(); renderAll();
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
 
-$('foot').innerHTML='Modèle de charge : RPE Calculator (streetlifting) — 1RM = (PdC×30/29 + lest) × [1 + k(reps−1)] − PdC×30/29, k = 2,5 % par défaut. '+
+$('foot').innerHTML='<details><summary>Modèle de calcul et sources</summary>'+'Modèle de charge : RPE Calculator (streetlifting) — 1RM = (PdC×30/29 + lest) × [1 + k(reps−1)] − PdC×30/29, k = 2,5 % par défaut. '+
   'Vérifié sur neuf captures de l\'app, au quart de kilo près. '+
   'Programmes marqués « PDF Zlat » : structures et pourcentages du PDF. V2 et V3 : modifications faites avec vous. '+
   'Gabarits Helms : transposition en reps et reps en réserve, les réserves affichées sont une interprétation des RPE du livre. '+
   'Catalogue de mouvements : matrice de rapports de 1RM de Jovanović (fig. 3.28, d\'après Dan Baker 2015). '+
-  'Données enregistrées dans ce navigateur uniquement — exportez régulièrement. Schéma v'+SCHEMA+'.';
+  'Données enregistrées dans ce navigateur uniquement — exportez régulièrement. Schéma v'+SCHEMA+'.</details>';
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});

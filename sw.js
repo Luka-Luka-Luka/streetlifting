@@ -1,5 +1,5 @@
 /* Incrémentez CACHE à chaque mise en ligne d'une nouvelle version. */
-const CACHE = 'charges-v12';
+const CACHE = 'charges-v15';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
