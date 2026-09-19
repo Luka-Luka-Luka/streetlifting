@@ -50,7 +50,25 @@ nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width
 nav button[aria-selected="true"]{color:var(--ink)}
 nav button[aria-selected="true"] svg{stroke-width:2.4}
 nav button[aria-selected="true"]::after{content:"";width:18px;height:3px;border-radius:2px;background:var(--a1);margin-top:1px}
-@media print{nav{display:none}}
+@media print{nav,#navtog{display:none}}
+/* encoche : replie la barre d'onglets et la rappelle. Visible sur le bord haut de la barre,
+   puis seule en bas de l'ecran quand la barre est rentree. Zone tactile 64 x 44 px. */
+:root{--navh:63px}
+nav{transition:transform .22s ease}
+body.navmin nav{transform:translateY(100%)}
+#navtog{position:fixed;left:50%;z-index:41;width:64px;height:44px;margin-left:-32px;border:0;background:none;cursor:pointer;
+  bottom:calc(var(--navh) + env(safe-area-inset-bottom) - 22px);transition:bottom .22s ease;display:flex;align-items:flex-end;justify-content:center;padding:0 0 22px}
+#navtog span{display:flex;align-items:center;justify-content:center;width:44px;height:16px;border-radius:8px 8px 0 0;
+  background:var(--surface);border:1px solid var(--rule);border-bottom:0;color:var(--muted)}
+#navtog svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s ease}
+body.navmin #navtog{bottom:env(safe-area-inset-bottom);padding:0 0 0}
+body.navmin #navtog span{border-radius:8px 8px 0 0;height:18px;box-shadow:0 -1px 3px rgba(20,23,28,.12)}
+body.navmin #navtog svg{transform:rotate(180deg)}
+/* fondu au changement d'onglet */
+section.page.on{animation:pgfade .2s ease-out}
+@keyframes pgfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){section.page.on{animation:none}}
+body.navmin{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 
 section.page{display:none;padding-top:13px}
 section.page.on{display:block}
@@ -136,7 +154,7 @@ td.bad{color:var(--bad);font-weight:600}
 .card.folded>h2{margin-bottom:0;border-bottom:0;padding-bottom:0}
 .liftcard.folded>.tagname{margin-bottom:0!important}
 h2[data-fold],.tagname[data-fold]{cursor:pointer;-webkit-user-select:none;user-select:none}
-.day.folded .line{display:none}
+.day.folded .line,.day.folded .hidnote{display:none}
 .day.folded .dayn{margin-bottom:0}
 [data-fold]{cursor:pointer;-webkit-user-select:none;user-select:none}
 .fchev{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-right:4px;border-radius:50%;background:var(--soft);font-size:12px;color:var(--ink);flex:0 0 auto}
@@ -155,6 +173,8 @@ h2[data-fold]{min-height:40px;display:flex;align-items:center}
 .line.s-ok{border-left-color:var(--ok)}
 .line.s-mod{border-left-color:var(--warn)}
 .line.s-miss{border-left-color:var(--bad)}
+.line.s-skip{border-left-color:var(--muted);opacity:.55}
+.line.s-skip .nm{text-decoration:line-through}
 .line .nm{font:600 12.5px/1.3 var(--txt);flex:1 1 auto}
 .line .nm em{font-style:normal;font-weight:400;color:var(--muted)}
 .line .pr{font:600 17px/1 var(--num);white-space:nowrap}
@@ -188,7 +208,9 @@ svg.plot{width:100%;height:190px;display:block;margin-top:8px}
 .mk{font:400 12px/1 var(--txt);margin-left:4px;white-space:nowrap}
 .rirset{display:flex;gap:6px;align-items:center;margin-top:5px}
 .rirset>span{font:600 12px/1 var(--num);color:var(--muted);flex:0 0 22px}
-.rirset .pill{min-width:30px;padding:7px 4px}
+.rirset .pill{flex:1 1 0;min-width:0;padding:9px 0}
+[data-rirrow=last]{flex-wrap:nowrap}
+[data-rirrow=last] .pill{flex:1 1 0;min-width:0;padding-left:0;padding-right:0}
 .chk{display:flex;align-items:center;gap:7px;font:400 12.5px/1.3 var(--txt);color:var(--muted);margin:0;cursor:pointer}
 .chk input{width:18px;height:18px;flex:0 0 auto}
 .brush{font-size:15px;min-width:auto;padding:7px 6px;font-family:var(--txt)}
@@ -245,6 +267,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <button data-p="velo" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/></svg>Vitesse</button>
   <button data-p="lifts" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Mouvements</button>
 </nav>
+<button id="navtog" aria-label="Replier les onglets" aria-expanded="true"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
 
 <!-- ======================= SÉANCE DU JOUR ======================= -->
 <section class="page on" id="p-today">
@@ -692,8 +715,9 @@ function incField(i,P){
 }
 function fold(k){return !!(S.fold&&S.fold[k]);}
 function chev(k){return '<span class="fchev">'+(fold(k)?'\u25b8':'\u25be')+'</span>';}
-function loadLab(L,v){return (L&&L.useBw&&Math.abs(v)<0.01)?'PDC':F(v);}
-function loadKg(L,v){return (L&&L.useBw&&Math.abs(v)<0.01)?'PDC':F(v)+' kg';}
+/* lest nul = mouvement au poids du corps (tractions, leg raises...) : on ecrit PdC plutot que 0 */
+function loadLab(L,v){return (L&&Math.abs(+v||0)<0.01)?'PdC':F(v);}
+function loadKg(L,v){return (L&&Math.abs(+v||0)<0.01)?'PdC':F(v)+' kg';}
 function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ================= ajustements =================
@@ -729,11 +753,11 @@ var ZLAT={
  novice:{name:'Advanced novice — top set + back-off',src:'PDF Zlat',perUnit:2,ranges:true,calc:'recalc',refReps:5,
   note:"Deux séances lourdes de structure identique, une décision de progression à chaque séance lourde.",
   info:["Top set unique suivi de back-off à 90 % de la charge système du top set.",
-        "Le J2 est une séance secondaire à 80 %, en variante : ce n'est pas un jour de progression.",
+        "Le J2 est une séance secondaire à 80 %, en variante : ce n'est pas un jour de progression. Le PDF donne 4-5 reps ; ici 5 reps fixes, votre choix.",
         "Zlat prescrit des fourchettes (3-5 au top set, 5-7 aux back-off) et non des reps fixes : vous montez la charge, les reps redescendent dans la fourchette.",
         "À quitter quand deux séances lourdes d'affilée ratent le bas de la fourchette."],
   days:[{label:'J1',lines:[Z(100,1,'3-5','top'),Z(90,3,'5-7','back')]},
-        {label:'J2',lines:[Z(80,2,'4-5','',1)]},
+        {label:'J2',lines:[Z(80,2,'5','',1)]},
         {label:'J3',lines:[Z(100,1,'3-5','top'),Z(90,2,'5-7','back')]}]},
 
  novice2:{name:'Advanced novice V2 — pic en J1',src:'modifié avec vous',perUnit:1,ranges:true,calc:'recalc',refReps:5,
@@ -743,7 +767,7 @@ var ZLAT={
         "L'écart est réglable, mais uniquement par multiples impairs de 1,25 kg. C'est la condition pour que les deux échelles ne se croisent jamais : un écart de 2,5 ou 5 kg ferait rejouer au J3 des charges déjà faites en J1.",
         "Concessions assumées par rapport au PDF : le J3 est sous le J1 au lieu d'être au-dessus, la décision est hebdomadaire au lieu d'être par séance, et le rythme est de moitié."],
   days:[{label:'J1',lines:[Z(100,1,'3-5','top'),Z(90,3,'5-7','back')]},
-        {label:'J2',lines:[Z(80,2,'4-5','',1)]},
+        {label:'J2',lines:[Z(80,2,'5','',1)]},
         {label:'J3',offGap:true,lines:[Z(100,1,'3-5','top'),Z(90,2,'5-7','back')]}]},
 
  novice3:{name:'Advanced novice V3 — J3 volume + série maximale',src:'modifié avec vous',perUnit:2,cadSwitch:true,ranges:true,calc:'recalc',refReps:5,
@@ -753,7 +777,7 @@ var ZLAT={
         "Elle sert de test : notez ses reps, c'est le point le plus informatif du bloc pour ajuster votre courbe.",
         "Cadence réglable : « à chaque séance lourde » suit Zlat et fait monter la charge deux fois par semaine ; « une fois par semaine » aligne le J3 sur le J1, comme dans le V2."],
   days:[{label:'J1',lines:[Z(100,1,'3-5','top'),Z(90,3,'5-7','back')]},
-        {label:'J2',lines:[Z(80,2,'4-5','',1)]},
+        {label:'J2',lines:[Z(80,2,'5','',1)]},
         {label:'J3',lines:[Z(90,3,'5-7','back'),Z(90,1,'max','amrap')]}]},
 
  inter:{name:'Intermediate — volume + max out',src:'PDF Zlat',perUnit:1,ranges:false,calc:'offset',refReps:7,
@@ -866,6 +890,7 @@ function accPlan(L,i){
       out.push({w:w,lab:lab,load:load,reps:reps});
       if(P.accMode==='maintien'||P.accMode==='calendrier')return;
       var e=S.log.filter(function(x){return x.key==='c|'+i+'|'+w+'|'+lab+'|0'+BK();})[0];
+      if(e&&e.state==='skip')return;
       var ok=true;
       if(e){var sv=e.sets||[];
         ok=sv.length>0&&sv.every(function(v){return v!=null&&v>=reps;})&&(e.load==null||e.load>=load-0.01);}
@@ -1026,6 +1051,12 @@ $('foldall').addEventListener('click',function(){
 });
 
 /* ================= navigation ================= */
+function applyNavMin(){
+  document.body.classList.toggle('navmin',!!S.navMin);
+  $('navtog').setAttribute('aria-expanded',S.navMin?'false':'true');
+  $('navtog').setAttribute('aria-label',S.navMin?'Afficher les onglets':'Replier les onglets');
+}
+$('navtog').addEventListener('click',function(){ S.navMin=!S.navMin; save(); applyNavMin(); });
 $('nav').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b)return;
   Array.prototype.forEach.call(this.children,function(x){x.setAttribute('aria-selected',x===b);});
@@ -1860,7 +1891,7 @@ function renderPlan(into,weeks,pfx,scope){
           '<span class="in">'+x.info+'</span></div>';
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
-      if(hid)html+='<div class="note" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
+      if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
       html+='</div>';
     });
     html+='</div></div>';
@@ -2209,6 +2240,7 @@ function panelHTML(key){
       '</div></div>':'')+
     '<div class="btnrow"><button class="act" style="flex:1 1 auto;min-height:48px" data-save="'+key+'">Enregistrer</button>'+
       '<button class="act ghost" style="min-height:48px" data-close="1">Fermer</button>'+
+      (e&&e.state==='skip'?'':'<button class="act ghost" style="min-height:48px" data-skip="'+key+'">Sauté</button>')+
       (e?'<button class="act ghost mini" data-clear="'+key+'">Effacer</button>':'')+
       (x.role==='extra'?'<button class="act ghost mini" data-xdel="'+key+'">Retirer de la séance</button>':'')+'</div>'+
   '</div>';
@@ -2283,6 +2315,7 @@ function panelClick(e){
       refreshV(p); e.stopPropagation(); return;
     }
     if(b.dataset.xdel){delExtra(b.dataset.xdel);e.stopPropagation();return;}
+    if(b.dataset.skip){skipLine(p,b.dataset.skip);e.stopPropagation();return;}
     if(b.dataset.rir!=null){
       var dr=b.dataset.rir, rrow=b.closest('[data-rirrow]')||p;
       if(dr==='h'){                                  /* modificateur : s'ajoute au chiffre choisi */
@@ -2355,6 +2388,26 @@ function saveLine(p,key){
   save(); closePanel(); refreshPlans();
   if(inToday){
     /* la prochaine ligne non saisie de la seance s'ouvre d'elle-meme */
+    var ls=Array.prototype.slice.call(document.querySelectorAll('#todayout .line[data-key]'));
+    var i=ls.map(function(l){return l.dataset.key;}).indexOf(key), nx=null;
+    for(var j=i+1;j<ls.length&&!nx;j++)if(!entryOf(ls[j].dataset.key))nx=ls[j];
+    if(nx){ openPanel(nx,nx.dataset.key); nx.scrollIntoView({block:'start',behavior:'smooth'}); }
+  }
+}
+/* Saute : la ligne n'a pas ete faite, par choix. Ce n'est ni un echec (pas de repetition,
+   pas de -10 %) ni une reussite (pas de progression) : la ligne est simplement hors compte.
+   Enregistrer normalement une ligne sautee annule le saut. */
+function skipLine(p,key){
+  var f=findLine(key); if(!f)return;
+  var x=f.line, L=S.lifts[x.li], noteEl=p.querySelector('[data-fld=note]');
+  keepJuge(key);
+  var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:x.li,lift:L.name,tpl:L.prog.tpl,week:f.w+1,day:f.day,
+    role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,load:null,sets:[],rir:null,
+    bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl?noteEl.value.trim():'',setNotes:[],state:'skip'};
+  S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
+  var inToday=!!(p.closest&&p.closest('#todayout'));
+  save(); closePanel(); refreshPlans();
+  if(inToday){
     var ls=Array.prototype.slice.call(document.querySelectorAll('#todayout .line[data-key]'));
     var i=ls.map(function(l){return l.dataset.key;}).indexOf(key), nx=null;
     for(var j=i+1;j<ls.length&&!nx;j++)if(!entryOf(ls[j].dataset.key))nx=ls[j];
@@ -2762,7 +2815,7 @@ function blockStats(from,to){
       return e.li===i&&(!from||e.date>=from)&&(!to||e.date<=to);
     }).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
     var n=0,ok=0;
-    es.forEach(function(e){ if(e.state&&e.role!=='extra'){n++; if(e.state==='ok')ok++;} });
+    es.forEach(function(e){ if(e.state&&e.state!=='skip'&&e.role!=='extra'){n++; if(e.state==='ok')ok++;} });
     var us=es.filter(function(e){return ['top','amrap','pr'].indexOf(e.role)>=0&&predRM(L,e)!=null;});
     var best=null,bestD=null;
     us.forEach(function(e){var v=predRM(L,e); if(best===null||v>best){best=v;bestD=e.date;}});
@@ -2845,7 +2898,7 @@ $('newblock').addEventListener('click',function(){
 function renderData(){
   /* conformité */
   var byLift=S.lifts.map(function(L,i){
-    var es=S.log.filter(function(e){return e.li===i&&e.state&&e.role!=='extra';});
+    var es=S.log.filter(function(e){return e.li===i&&e.state&&e.state!=='skip'&&e.role!=='extra';});
     var ok=es.filter(function(e){return e.state==='ok';}).length;
     return {L:L,i:i,n:es.length,ok:ok};
   });
@@ -2877,6 +2930,11 @@ function renderData(){
   if(!S.log.length){$('loglist').innerHTML='<p class="note">Vide.</p>';}
   else{
     $('loglist').innerHTML=S.log.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(e){
+      if(e.state==='skip')return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
+        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
+        '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
+        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+'</span>'+
+        '<button class="act ghost mini" data-rm="'+esc(e.id)+'" aria-label="Supprimer">\u00d7</button></div>';
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/')+
         (e.tries?' <i>(tentées '+e.tries.map(function(v){return v==null?'—':v;}).join('/')+')</i>':'');
       var vl=(e.valid||[]).map(function(a,st){
@@ -3486,7 +3544,7 @@ $('showacc').addEventListener('change',function(){
 });
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
-load(); renderAll();
+load(); renderAll(); applyNavMin();
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
 
 $('foot').innerHTML='<details><summary>Modèle de calcul et sources</summary>'+'Modèle de charge : RPE Calculator (streetlifting) — 1RM = (PdC×30/29 + lest) × [1 + k(reps−1)] − PdC×30/29, k = 2,5 % par défaut. '+
