@@ -1,9 +1,14 @@
 /* Incrémentez CACHE à chaque mise en ligne d'une nouvelle version. */
-const CACHE = 'charges-v20';
+const CACHE = 'charges-v22';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  /* cache:'reload' : on va chercher les fichiers sur le serveur, pas dans le cache HTTP du
+     navigateur. Sans cela, GitHub Pages autorisant 10 minutes de cache, une nouvelle version
+     pouvait s'installer... avec l'ancien index.html dedans. */
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -27,7 +32,7 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;   /* polices et CDN : on laisse passer */
   e.respondWith(
     caches.match(e.request).then(hit => {
-      const net = fetch(e.request).then(r => {
+      const net = fetch(e.request.url, {cache: 'no-cache'}).then(r => {
         if (r && r.status === 200) {
           const copy = r.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
