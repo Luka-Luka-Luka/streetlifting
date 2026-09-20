@@ -237,6 +237,25 @@ svg.plot{width:100%;height:190px;display:block;margin-top:8px}
 .linkbtn{background:none;border:0;padding:0;color:var(--a2);font:600 12.5px/1.4 var(--txt);cursor:pointer;text-decoration:underline}
 .logrow.hl{background:var(--hl)}
 svg.vplot{width:100%;max-width:460px;display:block;margin-top:8px;overflow:visible}
+.vhead{margin:0 0 10px}
+.vtabs{display:flex;gap:6px;align-items:center}
+.vtabs .pill{flex:1 1 0;padding:10px 4px}
+.vtabs #veloadd{flex:0 0 auto;min-height:36px}
+.vrow{border-top:1px solid var(--rule);padding:9px 0 6px;cursor:pointer}
+.vrow:first-of-type{border-top:0}
+.vrh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:14px}
+.vrh b{font-weight:700}
+.vrh > span:last-child{margin-left:auto;white-space:nowrap}
+.vseg{display:flex;gap:5px}.vseg .pill{flex:1 1 0;padding:10px 4px}
+.vrf{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
+.muted{color:var(--muted);font-weight:400}
+svg.vbars{width:100%;display:block;margin:4px 0 2px}
+svg.vbars text{font-family:var(--num);font-size:11px;fill:currentColor}
+svg.vbars .lb{opacity:.6;font-size:10px}
+.vwarm{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--rule);
+  padding:10px 0;font:600 13.5px/1.2 var(--txt);color:var(--ink);cursor:pointer}
+.vtitle{font:700 15px/1.3 var(--txt);margin-top:6px}
+.vlist{padding:6px 0;border-top:1px solid var(--rule)}
 svg.vplot text{font-family:var(--num);font-size:11px;fill:currentColor}
 svg.vplot .g{stroke:currentColor;opacity:.13}
 svg.vplot .ax{stroke:currentColor;opacity:.45}
@@ -518,15 +537,15 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 
 <!-- ======================= VITESSE ======================= -->
 <section class="page" id="p-velo">
-  <div class="card">
-    <h2>Analyses vidéo <em>vitesse et hauteur de chaque rep</em></h2>
-    <div class="btnrow">
-      <button class="act" id="veloadd">Importer une analyse</button>
-      <input type="file" id="velofile" accept=".json,application/json" multiple style="display:none">
+  <div class="vhead">
+    <div class="vtabs">
+      <button class="pill" data-vs="seance">Séance</button>
+      <button class="pill" data-vs="comparer">Comparer</button>
+      <button class="pill" data-vs="seuil">Seuil</button>
+      <button class="act ghost mini" id="veloadd">Importer</button>
     </div>
-    <p class="note" id="velomsg">Un fichier <b>seance-AAAA-MM-JJ.json</b> contient toutes les vidéos du jour : un seul import.
-    Les anciens <b>.serie.json</b> s'importent toujours. Réimporter la même analyse la remplace.
-    Elles sont conservées dans la sauvegarde de l'outil.</p>
+    <input type="file" id="velofile" accept=".json,application/json" multiple style="display:none">
+    <p class="note" id="velomsg" style="margin:4px 0 0"></p>
   </div>
   <div id="velolist"></div>
 </section>
@@ -589,7 +608,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=3;
-var APPV='v25';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v26';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -1301,9 +1320,8 @@ function goLog(key){
   if(el){ unfoldTo(el); el.classList.add('hl'); el.scrollIntoView({block:'center'}); }
 }
 function goVelo(id){
-  if(S.fold)delete S.fold['c:vc-'+id];
-  save(); goTab('velo'); applyFolds();
-  var el=$('vc-'+id); if(el){ unfoldTo(el); el.scrollIntoView({block:'start'}); }
+  var U=vui(); U.from='seance'; U.open=id; U.scr='serie';
+  save(); goTab('velo'); window.scrollTo(0,0);
 }
 document.addEventListener('click',function(ev){
   var t=ev.target; if(!t||!t.closest)return;
@@ -3540,7 +3558,7 @@ $('addlog').addEventListener('click',function(){
    les profils vitesse/hauteur de la premiere et de la derniere rep — les seules dont
    la comparaison ait un interet. Le reste du fichier est ecarte a l'import. */
 var VSCHEMA='velocite-serie/v1';
-var VREPK=['rep','course_cm','hauteur_sommet_cm','montee_s','vitesse_moy_ms','vitesse_pic_ms',
+var VREPK=['rep','course_cm','hauteur_cm','hauteur_sommet_cm','montee_s','vitesse_moy_ms','vitesse_pic_ms',
            'vitesse_point_dur_ms','hauteur_point_dur_cm','temps_sous_02_s','descente_s',
            'vitesse_pic_descente_ms','puissance_moy_w','pause_apres_s'];
 function veloLi(nom){
@@ -3558,7 +3576,9 @@ function veloTrim(d){
     return o;
   });
   var m=d.mesure||{};
-  return {id:d.id,date:d.date,mouvement:d.mouvement,li:veloLi(d.mouvement),
+  var rf=m.reference||{};
+  return {id:d.id,n:d.n||null,date:d.date,mouvement:d.mouvement,li:veloLi(d.mouvement),
+    ref_ecart_bas:rf.ecart_point_bas_cm!=null?rf.ecart_point_bas_cm:null,ref_sd:rf.ecart_type_cm!=null?rf.ecart_type_cm:null,
     lest_kg:d.lest_kg,poids_corps_kg:d.poids_corps_kg,charge_systeme_kg:d.charge_systeme_kg,
     semaine:d.semaine,seance:d.seance,type_serie:d.type_serie,variante:d.variante||null,reps_annoncees:d.reps_annoncees,
     px_cm:m.px_par_cm,echelle_epinglee:!!m.echelle_epinglee,
@@ -3681,21 +3701,22 @@ function lienSelect(v){
   if(cur&&o.indexOf(' selected')<0)o+='<option value="'+esc(cur)+'" selected>série effacée du journal</option>';
   return '<select data-velolien="'+esc(v.id)+'">'+o+'</select>';
 }
-function veloHauteurs(mouvement){
+function veloHauteurs(mouvement,ref){
   var ko=[],ok=[],fr=[],mixte=false,verif=null;
   (S.velo||[]).forEach(function(v){
     if(v.mouvement!==mouvement)return;
+    if(ref&&vRef(v)!==ref)return;         /* deux mesures de hauteur differentes ne se melangent pas */
     v.reps.forEach(function(r){
       var j=jugeOf(v,r.rep);
       if(!j||j==='dt')return;
       if(verif===null)verif=v.echelle_verifiee; else if(verif!==v.echelle_verifiee)mixte=true;
-      (j==='ko'?ko:j==='ok'?ok:fr).push(r.hauteur_sommet_cm);
+      (j==='ko'?ko:j==='ok'?ok:fr).push(hOf(v,r));
     });
   });
   return {ko:ko,ok:ok,franc:fr,mixte:mixte};
 }
-function veloSeuil(mouvement){
-  var h=veloHauteurs(mouvement);
+function veloSeuil(mouvement,ref){
+  var h=veloHauteurs(mouvement,ref);
   if(!h.ko.length||!h.ok.length)return null;
   var maxKo=Math.max.apply(null,h.ko), minOk=Math.min.apply(null,h.ok);
   var seuil=(maxKo+minOk)/2, chevauche=Math.max(0,maxKo-minOk);
@@ -3710,10 +3731,10 @@ function veloSeuil(mouvement){
 function veloVerdict(v,r){
   var j=jugeOf(v,r.rep);
   if(j)return VJ[j].e+' '+(j==='ko'?'<b>'+VJ[j].n+'</b>':VJ[j].n);
-  var s=veloSeuil(v.mouvement);
+  var s=seuilOf(v);
   if(!s)return '—';
-  var d=r.hauteur_sommet_cm-s.valide;
-  if(d>VBANDE)return (s.franche&&r.hauteur_sommet_cm>=s.franche)?'franche':'valide';
+  var d=hOf(v,r)-s.valide;
+  if(d>VBANDE)return (s.franche&&hOf(v,r)>=s.franche)?'franche':'valide';
   if(d<-VBANDE)return '<b>non valide</b>';
   return 'limite';
 }
@@ -3736,8 +3757,8 @@ function veloSvg(v){
   /* Le profil part du debut de la montee (0 a course_cm) ; le sommet se mesure au-dessus
      du point le plus bas de la video. On decale chaque courbe de sa hauteur de depart
      (sommet - course) pour que les deux graphiques et le seuil partagent le meme zero. */
-  var off=function(r){return (r.hauteur_sommet_cm!=null&&r.course_cm!=null)?r.hauteur_sommet_cm-r.course_cm:0;};
-  var sl=veloSeuil(v.mouvement), xs=[],ys=[0];
+  var off=function(r){return (hOf(v,r)!=null&&r.course_cm!=null)?hOf(v,r)-r.course_cm:0;};
+  var sl=seuilOf(v), xs=[],ys=[0];
   sel.forEach(function(r){xs=xs.concat(r.profil_hauteur_cm.map(function(x){return x+off(r);})); ys=ys.concat(r.profil_vitesse_ms);});
   if(sl)xs.push(sl.valide+VBANDE);
   var tx=niceTicks(Math.min(0,Math.min.apply(null,xs)),Math.max.apply(null,xs),5),
@@ -3757,7 +3778,7 @@ function veloSvg(v){
      '<line x1="'+X(sl.valide).toFixed(1)+'" y1="'+mt+'" x2="'+X(sl.valide).toFixed(1)+'" y2="'+(H-mb)+'" stroke="var(--a2)" stroke-dasharray="5 4" stroke-width="1.5"/>';
   o+='<line class="ax" x1="'+ml+'" y1="'+(H-mb)+'" x2="'+(W-mr)+'" y2="'+(H-mb)+'"/>'+
      '<line class="ax" x1="'+ml+'" y1="'+mt+'" x2="'+ml+'" y2="'+(H-mb)+'"/>'+
-     '<text x="'+(W-mr)+'" y="'+(H-4)+'" text-anchor="end" class="lb">hauteur au-dessus du point le plus bas (cm) \u2192</text>'+
+     '<text x="'+(W-mr)+'" y="'+(H-4)+'" text-anchor="end" class="lb">hauteur (cm) \u2192</text>'+
      '<text x="'+(ml-30)+'" y="'+(mt-10)+'" class="lb">vitesse (m/s)</text>';
   sel.forEach(function(r,i){
     var pts=r.profil_hauteur_cm.map(function(x,k){return X(x+off(r)).toFixed(1)+','+Y(r.profil_vitesse_ms[k]).toFixed(1);}).join(' ');
@@ -3775,20 +3796,20 @@ function veloSvg(v){
   });
   return o+'</svg><details><summary class="note">Comment lire</summary><p class="note">Chaque courbe suit la ceinture pendant la montée : départ à gauche, '+
     'sommet à droite. Plus la courbe est haute, plus ça monte vite ; le rond marque le point dur, là où la vitesse retombe le plus. '+
-    'L\u2019écart entre les deux courbes, c\u2019est ce que la série vous a coûté. Les hauteurs partent du point le plus bas de la vidéo, '+
-    'comme la hauteur au sommet : là où une courbe s\u2019arrête, c\u2019est son sommet'+(sl?', et le pointillé bleu est votre seuil de validité':'')+'.</p></details>';
+    'L\u2019écart entre les deux courbes, c\u2019est ce que la série vous a coûté. Les hauteurs partent de la même référence '+
+    'que la hauteur au sommet : là où une courbe s\u2019arrête, c\u2019est son sommet'+(sl?', et le pointillé bleu est votre seuil de validité':'')+'.</p></details>';
 }
 /* Rep par rep : vitesse moyenne en haut, hauteur au sommet en bas avec le seuil de validite.
    Meme axe horizontal pour les deux, pour lire d'un coup d'oeil quelle rep a lache. */
 function veloRepsSvg(v){
-  var R=v.reps.filter(function(r){return r.vitesse_moy_ms!=null||r.hauteur_sommet_cm!=null;});
+  var R=v.reps.filter(function(r){return r.vitesse_moy_ms!=null||hOf(v,r)!=null;});
   if(R.length<2)return '';
   var W=360,ml=36,mr=12,top=26,h1=92,gap=44,h2=84,bot=36,H=top+h1+gap+h2+bot, n=R.length;
   var bw=(W-ml-mr)/n, XC=function(i){return ml+bw*(i+.5);};
   var vs=R.map(function(r){return r.vitesse_moy_ms||0;});
   var ty=niceTicks(0,Math.max.apply(null,vs),3);
   var Y1=function(y){return top+h1-(y-ty.lo)/(ty.hi-ty.lo)*h1;};
-  var sl=veloSeuil(v.mouvement), hs=R.map(function(r){return r.hauteur_sommet_cm;}).filter(function(x){return x!=null;});
+  var sl=seuilOf(v), hs=R.map(function(r){return hOf(v,r);}).filter(function(x){return x!=null;});
   var ext=hs.slice(); if(sl){ext.push(sl.valide-VBANDE,sl.valide+VBANDE); if(sl.franche)ext.push(sl.franche);}
   var t2=niceTicks(Math.min.apply(null,ext),Math.max.apply(null,ext),3), y2=top+h1+gap;
   var Y2=function(y){return y2+h2-(y-t2.lo)/(t2.hi-t2.lo)*h2;};
@@ -3819,12 +3840,12 @@ function veloRepsSvg(v){
        '<text x="'+(W-mr)+'" y="'+(Y2(sl.franche)-4).toFixed(1)+'" text-anchor="end" style="font-size:10px;fill:var(--ok)">franche</text>';
   }
   var pts=[];
-  R.forEach(function(r,i){ if(r.hauteur_sommet_cm!=null)pts.push(XC(i).toFixed(1)+','+Y2(r.hauteur_sommet_cm).toFixed(1)); });
+  R.forEach(function(r,i){ if(hOf(v,r)!=null)pts.push(XC(i).toFixed(1)+','+Y2(hOf(v,r)).toFixed(1)); });
   o+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="currentColor" opacity=".35" stroke-width="1.2"/>';
   R.forEach(function(r,i){
-    if(r.hauteur_sommet_cm==null)return;
+    if(hOf(v,r)==null)return;
     var j=jugeOf(v,r.rep), c=j?JCOL[j]:'var(--a8)';
-    o+='<circle cx="'+XC(i).toFixed(1)+'" cy="'+Y2(r.hauteur_sommet_cm).toFixed(1)+'" r="4.5" fill="'+c+'" stroke="var(--surface)" stroke-width="1.5"/>';
+    o+='<circle cx="'+XC(i).toFixed(1)+'" cy="'+Y2(hOf(v,r)).toFixed(1)+'" r="4.5" fill="'+c+'" stroke="var(--surface)" stroke-width="1.5"/>';
   });
   o+='<line class="ax" x1="'+ml+'" y1="'+(y2+h2)+'" x2="'+(W-mr)+'" y2="'+(y2+h2)+'"/>';
   R.forEach(function(r,i){
@@ -3837,148 +3858,262 @@ function veloRepsSvg(v){
     'bande grise = la marge de \u00b1'+F(VBANDE)+' cm où une rep est dite limite':' ; le seuil de validité s\u2019affichera dès que vous aurez jugé '+
     'au moins une rep ratée et une valide')+'. Couleur = votre jugement ('+VJ.ko.e+' rouge, '+VJ.dt.e+' ocre, '+VJ.ok.e+' bleu, '+VJ.franc.e+' vert), gris = pas encore jugée.</p></details>';
 }
-function veloCard(v,k){
-  var q=v.resume||{}, ref=veloRef(v), L=S.lifts[v.li], rows='';
-  v.reps.forEach(function(r){
-    var j=jugeOf(v,r.rep);
-    var b=function(code){
-      return '<button class="act ghost mini'+(j===code?' on':'')+'" data-juge="'+esc(v.id)+'|'+r.rep+'|'+code+
-        '" title="'+VJ[code].n+'" aria-label="Rep '+r.rep+' '+VJ[code].n+'" style="padding:3px 5px;margin:0 1px;font-size:14px">'+VJ[code].e+'</button>';
-    };
-    rows+='<tr><td>'+r.rep+'</td><td>'+F(r.course_cm)+'</td><td>'+F(r.montee_s)+'</td><td>'+
-      F(r.vitesse_moy_ms)+'</td><td>'+F(r.vitesse_point_dur_ms)+'</td><td>'+F(r.hauteur_sommet_cm)+'</td><td>'+
-      veloVerdict(v,r)+'</td><td style="white-space:nowrap">'+VJO.map(b).join('')+'</td></tr>';
-  });
-  var cmp='';
-  if(ref){
-    var d1=ref.resume.v_moy_rep1, d2=q.v_moy_rep1;
-    var pc=d1?Math.round(1000*(d2-d1)/d1)/10:null;
-    cmp='<p class="note">Contre le '+frDate(ref.date)+' à charge comparable : rep 1 '+
-      (pc>0?'+':'')+F(pc)+' % ('+F(d1)+' → '+F(d2)+' m/s)'+
-      ((ref.echelle_epinglee&&v.echelle_epinglee&&ref.px_cm!==v.px_cm)?
-        ' — échelles différentes ('+F(ref.px_cm)+' contre '+F(v.px_cm)+' px/cm), écart absolu à prendre avec précaution':'')+'.</p>';
+/* ================= onglet Vitesse (v26) =================
+   Quatre ecrans, un seul affiche a la fois :
+     Seance   — jusqu'ou chaque rep est montee ce jour-la (ecran par defaut)
+     Comparer — a charge egale, series alignees dans le temps, une mesure a la fois
+     Seuil    — d'ou vient le seuil de validite ; import et liste des analyses
+     Serie    — detail d'une serie, ouvert en touchant une ligne
+   Hauteur : depuis la suspension stable avant la 1re rep (script v7, champ hauteur_cm).
+   Les analyses plus anciennes n'ont que la hauteur depuis le point le plus bas : elles
+   restent affichees, marquees, et ne se comparent pas en hauteur avec les nouvelles. */
+function hOf(v,r){ return r.hauteur_cm!=null?r.hauteur_cm:r.hauteur_sommet_cm; }
+function vRef(v){ return (v.reps||[]).some(function(r){return r.hauteur_cm!=null;})?'depart':'bas'; }
+function refLab(v){ return vRef(v)==='depart'?'au-dessus de la suspension de départ':'au-dessus du point le plus bas (ancienne mesure)'; }
+var BAREME={nonvalide:38.7,valide:40,franche:49.5};
+/* Seuil d'une serie : vos jugements d'abord (meme mouvement, meme reference de hauteur) ;
+   a defaut, le bareme du 19/09 (mesure a 15 kg depuis la suspension relachee), converti
+   pour la reference de depart avec l'ecart depart / point bas de cette video. */
+function seuilOf(v){
+  var s=veloSeuil(v.mouvement,vRef(v));
+  if(s)return {valide:s.valide,franche:s.franche,src:'vos jugements ('+s.n+' reps)',sure:true};
+  if(vRef(v)==='bas')return {valide:BAREME.valide,franche:BAREME.franche,src:'barème du 19/09, mesuré à 15 kg',sure:false};
+  var e=v.ref_ecart_bas; if(e==null)return null;
+  return {valide:Math.round((BAREME.valide-e)*10)/10,franche:Math.round((BAREME.franche-e)*10)/10,
+    src:'barème du 19/09 converti (−'+F(e)+' cm pour cette vidéo), provisoire',sure:false};
+}
+function isWarm(v){ return /chauf|warm/i.test(String(v.type_serie||'')); }
+function typeLab(v){
+  var t=String(v.type_serie||'').toLowerCase();
+  return /chauf|warm/.test(t)?'Échauffement':/top/.test(t)?'Top set':/back/.test(t)?'Back-off':/max|amrap/.test(t)?'Série max':'Série';
+}
+function serieLab(v){
+  return typeLab(v)+' '+(+v.lest_kg?F(v.lest_kg):'PdC')+'×'+v.reps.length+(v.variante?' · '+esc(v.variante):'');
+}
+function vui(){ if(!S.vui)S.vui={scr:'seance',date:'',mv:'',open:null,warm:false,cmv:'',cgrp:'',ctype:'',cmes:'h'}; return S.vui; }
+function vById(id){ return (S.velo||[]).filter(function(x){return x.id===id;})[0]||null; }
+function hCol(h,s){
+  if(h==null)return 'var(--muted)';
+  if(!s)return 'var(--a2)';
+  return h>=s.valide+VBANDE?'var(--ok)':(h>=s.valide-VBANDE?'var(--warn)':'var(--bad)');
+}
+function vDates(){ var d={}; (S.velo||[]).forEach(function(v){d[v.date]=1;}); return Object.keys(d).sort().reverse(); }
+function vSortN(a,b){ return (a.n||0)-(b.n||0)||String(a.id).localeCompare(String(b.id)); }
+function vSel(key,vals,cur,fmt){
+  return '<select data-vsel="'+key+'">'+vals.map(function(x){
+    return '<option value="'+esc(x)+'"'+(String(x)===String(cur)?' selected':'')+'>'+(fmt?fmt(x):esc(x))+'</option>';}).join('')+'</select>';
+}
+/* barres d'une serie : une par rep, echelle commune a tout l'ecran (lo, hi) */
+function barsSvg(v,lo,hi,mes){
+  var R=v.reps, n=R.length, W=340, H=92, mt=16, mb=16, bw=Math.min(44,(W-8)/Math.max(n,1)), x0=4;
+  var s=mes==='v'?null:seuilOf(v);
+  var val=function(r){return mes==='v'?r.vitesse_moy_ms:hOf(v,r);};
+  var Y=function(y){return mt+(H-mt-mb)*(1-(y-lo)/(hi-lo));};
+  var o='<svg class="vbars" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(mes==='v'?'vitesse':'hauteur')+' de chaque rep">';
+  if(s){
+    o+='<rect x="0" y="'+Y(s.valide+VBANDE).toFixed(1)+'" width="'+W+'" height="'+(Y(s.valide-VBANDE)-Y(s.valide+VBANDE)).toFixed(1)+'" fill="currentColor" opacity=".07"/>'+
+       '<line x1="0" x2="'+W+'" y1="'+Y(s.valide).toFixed(1)+'" y2="'+Y(s.valide).toFixed(1)+'" stroke="var(--ink)" stroke-dasharray="4 4" opacity=".55"/>';
   }
-  var al=(v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'';
-  var le=lienEntry(v), lienTxt;
-  if(le)lienTxt='<p class="note" style="margin-top:0">Rattachée à <b>'+frDate(le.date)+(le.week?', S'+le.week+' '+esc(le.day):'')+
-    ', '+roleLab(le.role)+(le.sets.length>1?', série '+(v.lien.set+1):'')+'</b>'+(v.lien.auto?' (automatiquement)':'')+
-    ' : les jugements ci-dessous et ceux de la séance sont les mêmes. '+
-    '<button class="linkbtn" data-open="'+esc(le.key)+'">Ouvrir la séance</button></p>';
-  else lienTxt='<p class="note" style="margin-top:0"><b>Pas rattachée à une série enregistrée</b> : les jugements restent ici '+
-    'et ne remontent pas dans la séance. Choisissez la série ci-dessous.</p>';
-  return '<div class="card" id="vc-'+esc(v.id)+'">'+
-    '<h2>'+frDate(v.date)+' — '+esc(v.mouvement)+' '+F(v.lest_kg)+' kg × '+v.reps.length+
-      (v.semaine?' <em>S'+v.semaine+'J'+v.seance+(v.type_serie?', '+esc(v.type_serie):'')+'</em>':'')+'</h2>'+
-    lienTxt+'<div class="row" style="margin-bottom:6px"><div class="field w"><label>Série correspondante</label>'+lienSelect(v)+'</div></div>'+
-    '<p class="note">'+(v.charge_systeme_kg?'Charge système '+F(v.charge_systeme_kg)+' kg. ':'')+
-      'Rep 1 → dernière : <b>'+F(q.v_moy_rep1)+' → '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
-      'Vitesse mini de la dernière rep '+F(q.v_mini_derniere)+' m/s, point dur vers '+F(q.hauteur_point_dur_cm)+' cm. '+
-      /* le script donne une « perte » signee : negative quand le sommet monte au fil de la serie */
-      (q.perte_hauteur_sommet_cm==null?'':q.perte_hauteur_sommet_cm<0
-        ?'Sommet : +'+F(-q.perte_hauteur_sommet_cm)+' cm entre la rep 1 et la dernière.'
-        :'Sommet : −'+F(q.perte_hauteur_sommet_cm)+' cm entre la rep 1 et la dernière.')+
-      (L?'':' <b>Mouvement non reconnu</b> : non rattaché à un mouvement de l\'outil.')+'</p>'+
-    cmp+al+veloSvg(v)+veloRepsSvg(v)+
-    '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Rep</th><th>Course cm</th>'+
-      '<th>Montée s</th><th>V moy</th><th>V mini</th><th>Sommet cm</th><th>Validité</th><th>Votre jugement</th></tr></thead>'+
-      '<tbody>'+rows+'</tbody></table></div>'+
-    (v.notes?'<p class="note">'+esc(v.notes)+'</p>':'')+
-    (v.echelle_verifiee===false?'<p class="note">Échelle non vérifiée pour ce cadrage : cm et m/s indicatifs.</p>':'')+
-    veloSeuilNote(v.mouvement)+
-    '<p class="note">Échelle '+F(v.px_cm)+' px/cm'+(v.echelle_epinglee?' (épinglée)':' (estimée)')+
-      ', suivi '+F(v.qualite)+'. Hauteurs mesurées à la ceinture, pas au menton.</p>'+
-    '<div class="btnrow"><button class="act ghost mini" data-velodel="'+k+'">Supprimer cette analyse</button></div>'+
-    '</div>';
-}
-/* ---------- comparaison a charge egale ----------
-   Les series ne sont comparables qu'a charge systeme equivalente. Le classement
-   s'appuie d'abord sur des grandeurs sans echelle (nombre de reps, perte de vitesse
-   en %, duree du concentrique en s), parce que les centimetres et les m/s dependent
-   de l'etalonnage px/cm, qui n'est pas verifie pour tous les cadrages. */
-function veloGroupes(){
-  var g={};
-  (S.velo||[]).forEach(function(v){
-    var k=v.mouvement+'|lest'+v.lest_kg;
-    (g[k]=g[k]||[]).push(v);
+  R.forEach(function(r,i){
+    var y=val(r); if(y==null)return;
+    var x=x0+i*bw+bw*.14, w=bw*.72, yy=Y(Math.max(lo,Math.min(hi,y)));
+    var c=mes==='v'?'var(--a2)':hCol(y,s), j=jugeOf(v,r.rep);
+    o+='<rect x="'+x.toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(H-mb-yy).toFixed(1)+'" rx="2" fill="'+c+'"/>'+
+       '<text x="'+(x+w/2).toFixed(1)+'" y="'+(yy-3).toFixed(1)+'" text-anchor="middle">'+(mes==='v'?F(Math.round(y*100)/100):F(Math.round(y*10)/10))+'</text>'+
+       '<text x="'+(x+w/2).toFixed(1)+'" y="'+(H-3)+'" text-anchor="middle" class="lb">'+(j?VJ[j].e:r.rep)+'</text>';
   });
-  return g;
+  return o+'</svg>';
 }
-function veloClasse(l){
-  return l.slice().sort(function(a,b){
-    if(a.reps.length!==b.reps.length)return b.reps.length-a.reps.length;
-    var pa=a.resume.perte_v_moy_pct||0, pb=b.resume.perte_v_moy_pct||0;
-    if(Math.abs(pa-pb)>3)return pb-pa;
-    var ma=a.resume.v_mini_derniere||0, mb=b.resume.v_mini_derniere||0;
-    if(Math.abs(ma-mb)>0.05)return mb-ma;
-    return (b.resume.v_moy_rep1||0)-(a.resume.v_moy_rep1||0);
+function scaleOf(list,mes){
+  var xs=[];
+  list.forEach(function(v){
+    v.reps.forEach(function(r){ var y=mes==='v'?r.vitesse_moy_ms:hOf(v,r); if(y!=null)xs.push(y); });
+    if(mes!=='v'){ var s=seuilOf(v); if(s)xs.push(s.valide-VBANDE,s.valide+VBANDE); }
   });
+  if(!xs.length)return {lo:0,hi:1};
+  var lo=Math.min.apply(null,xs), hi=Math.max.apply(null,xs);
+  return mes==='v'?{lo:0,hi:hi*1.12}:{lo:Math.floor(lo-6),hi:Math.ceil(hi+3)};
 }
-function veloMotif(a,b){
-  if(!b)return 'seule série à cette charge.';
-  if(a.reps.length!==b.reps.length)
-    return a.reps.length+' reps contre '+b.reps.length+' à la même charge.';
-  var pa=a.resume.perte_v_moy_pct||0, pb=b.resume.perte_v_moy_pct||0;
-  if(Math.abs(pa-pb)>3)return 'même nombre de reps, mais '+F(Math.abs(pa))+' % de perte de vitesse contre '+F(Math.abs(pb))+' %.';
-  var ma=a.resume.v_mini_derniere||0, mb=b.resume.v_mini_derniere||0;
-  if(Math.abs(ma-mb)>0.05)return 'à égalité de reps et de perte, dernière rep moins proche de l\u2019arrêt ('+F(ma)+' contre '+F(mb)+' m/s au point dur).';
-  return 'séries très proches ; départ un peu plus rapide ('+F(a.resume.v_moy_rep1)+' contre '+F(b.resume.v_moy_rep1)+' m/s).';
+function vMini(v){ var h=v.reps.map(function(r){return hOf(v,r);}).filter(function(x){return x!=null;}); return h.length?Math.min.apply(null,h):null; }
+function vLast(v){ var r=v.reps[v.reps.length-1]; return r?r.vitesse_moy_ms:null; }
+function serieRow(v,sc,idx){
+  var s=seuilOf(v), mn=vMini(v), vl=vLast(v), m=(s&&mn!=null)?mn-s.valide:null, al=(v.alertes||[]).length;
+  return '<div class="vrow" data-vopen="'+esc(v.id)+'">'+
+    '<div class="vrh"><b>'+serieLab(v)+(idx?' <span class="muted">'+idx+'</span>':'')+'</b>'+
+      '<span>mini <b>'+(mn==null?'—':F(mn))+'</b> cm</span></div>'+
+    barsSvg(v,sc.lo,sc.hi,'h')+
+    '<div class="vrf"><span>dern. rep '+(vl==null?'—':F(vl)+' m/s')+'</span>'+
+      '<span>'+(m==null?'':'<b style="color:'+hCol(mn,s)+'">'+(m>=0?'+':'−')+F(Math.abs(Math.round(m*10)/10))+' cm</b> vs seuil')+
+      (al?' · ⚠'+al:'')+' ›</span></div></div>';
 }
-function veloCompare(){
-  var g=veloGroupes(), out='';
-  Object.keys(g).forEach(function(k){
-    var l=veloClasse(g[k]); if(l.length<2)return;
-    var v0=l[0], douteux=l.some(function(v){return v.echelle_verifiee===false;});
-    var sys=l.map(function(v){return v.charge_systeme_kg;}).filter(function(x){return x!=null;});
-    var ecart=sys.length>1?(Math.max.apply(null,sys)-Math.min.apply(null,sys)):0;
-    var manque=l.filter(function(v){return v.charge_systeme_kg==null;}).length;
-    var rows=l.map(function(v,i){
-      var q=v.resume, d1=v.reps[0]||{};
-      return '<tr'+(i===0?' class="best"':'')+'><td>'+(i+1)+'</td><td>'+frDate(v.date)+'</td><td>'+
-        (v.charge_systeme_kg?F(v.charge_systeme_kg):'—')+'</td><td>'+
-        v.reps.length+'</td><td>'+F(q.v_moy_rep1)+'</td><td>'+F(q.perte_v_moy_pct)+' %</td><td>'+
-        F(q.v_mini_derniere)+'</td><td>'+F(d1.montee_s)+' s</td><td>'+F(d1.course_cm)+'</td><td>'+
-        F(q.perte_hauteur_sommet_cm)+'</td></tr>';
-    }).join('');
-    out+='<div class="card"><h2>Comparaison à charge égale <em>'+esc(l[0].mouvement)+' '+
-      F(l[0].lest_kg)+' kg'+(l[0].charge_systeme_kg?', système '+F(l[0].charge_systeme_kg)+' kg':'')+'</em></h2>'+
-      '<div class="scroll"><table><thead><tr><th>#</th><th>Date</th><th>Système kg</th><th>Reps</th><th>V rep 1</th>'+
-      '<th>Perte V</th><th>V mini fin</th><th>Montée rep 1</th><th>Course rep 1 cm</th>'+
-      '<th>Perte sommet cm</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-      '<p class="note"><b>Meilleure série : '+frDate(v0.date)+'</b> — '+veloMotif(v0,l[1])+'</p>'+
-      '<p class="note">Classement : nombre de reps à charge égale, puis perte de vitesse, puis '+
-      'proximité de l\u2019arrêt sur la dernière rep, puis vitesse de départ. Les reps, les % et '+
-      'les secondes ne dépendent pas de l\u2019étalonnage ; les centimètres et les m/s, oui.</p>'+
-      (ecart>1?'<p class="note">Charge système : '+F(ecart)+' kg d\u2019écart entre ces séries, '+
-        'soit '+F(Math.round(1000*ecart/Math.max.apply(null,sys))/10)+' % — le poids de corps a bougé.</p>':'')+
-      (manque?'<p class="note">'+manque+' série'+(manque>1?'s':'')+' sans poids de corps noté : '+
-        'regroupement fait au lest, charge système inconnue pour elle'+(manque>1?'s':'')+'.</p>':'')+
-      (douteux?'<div class="flag">Une série au moins a une échelle px/cm non vérifiée pour son cadrage : '+
-        'les colonnes en cm et en m/s sont indicatives, le reste tient.</div>':'')+'</div>';
+function vScrSeance(){
+  var U=vui(), ds=vDates();
+  if(!ds.length)return '<div class="card"><p class="note">Aucune analyse importée. Touchez <b>Importer</b> et choisissez le fichier <b>seance-…json</b> du jour.</p></div>';
+  if(ds.indexOf(U.date)<0)U.date=ds[0];
+  var day=S.velo.filter(function(v){return v.date===U.date;});
+  var mvs=[]; day.forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
+  if(mvs.indexOf(U.mv)<0)U.mv=mvs[0];
+  var l=day.filter(function(v){return v.mouvement===U.mv;}).sort(vSortN);
+  var work=l.filter(function(v){return !isWarm(v);}), warm=l.filter(isWarm);
+  var sc=scaleOf(U.warm?l:(work.length?work:l),'h');
+  var cnt={}, idx=function(v){ var k=typeLab(v)+v.lest_kg; cnt[k]=(cnt[k]||0)+1; return cnt[k]; };
+  var tot={}; work.forEach(function(v){var k=typeLab(v)+v.lest_kg; tot[k]=(tot[k]||0)+1;});
+  var s0=l.length?seuilOf(work[0]||l[0]):null;
+  var h='<div class="card"><div class="row"><div class="field md"><label>Séance</label>'+vSel('date',ds,U.date,frDate)+'</div>'+
+    (mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('mv',mvs,U.mv)+'</div>':'')+'</div>'+
+    work.map(function(v){var k=typeLab(v)+v.lest_kg, i=idx(v); return serieRow(v,sc,tot[k]>1?i:0);}).join('')+
+    (warm.length?'<button class="vwarm" data-vwarm="1">Échauffements ('+warm.length+') '+(U.warm?'▾':'▸')+'</button>'+
+      (U.warm?warm.map(function(v){return serieRow(v,sc,0);}).join(''):''):'')+
+    '<p class="note">Hauteur de la ceinture '+(l[0]?refLab(l[0]):'')+', en cm. Pointillé : seuil de validité'+
+      (s0?(s0.sure?'':' <b>provisoire</b>'):'')+' — voir l\'écran Seuil. Touchez une série pour le détail.</p></div>';
+  return h;
+}
+/* ---------- charge egale ----------
+   Meme mouvement, meme variante, charge systeme (PdC du jour + lest) a 1,25 kg pres d'un
+   centre de groupe. Sans PdC, regroupement au lest, signale. */
+function vGroups(mv){
+  var l=(S.velo||[]).filter(function(v){return v.mouvement===mv;});
+  var key=function(v){return v.charge_systeme_kg!=null?+v.charge_systeme_kg:null;};
+  var out=[];
+  l.slice().sort(function(a,b){return (key(a)||+a.lest_kg||0)-(key(b)||+b.lest_kg||0);}).forEach(function(v){
+    var c=key(v), va=v.variante||'', g=null;
+    out.forEach(function(G){
+      if(G.va!==va||G.bw!==(c!=null))return;
+      if(c!=null?Math.abs(c-G.c)<=1.25+1e-6:(+v.lest_kg===G.c))g=g||G;
+    });
+    if(!g){ g={c:c!=null?c:+v.lest_kg,bw:c!=null,va:va,l:[]}; out.push(g); }
+    g.l.push(v);
   });
-  return out;
+  out.forEach(function(G){
+    G.id=(G.bw?'s':'l')+F(G.c)+'|'+G.va;
+    var d={}; G.l.forEach(function(v){d[v.date]=1;}); G.nd=Object.keys(d).length;
+  });
+  return out.filter(function(G){return G.l.length>=2;});
 }
-function veloSeuilNote(mouvement){
-  var s=veloSeuil(mouvement), h=veloHauteurs(mouvement);
-  if(!s){
-    var n=h.ko.length+h.ok.length+h.franc.length;
-    return '<p class="note">Seuil de validité pas encore calculable : il faut au moins une rep jugée '+
-      'non valide et une jugée valide. '+(n?n+' rep(s) jugée(s) pour l\u2019instant.':'Aucune rep jugée.')+'</p>';
-  }
-  return '<p class="note">Seuil de validité estimé à <b>'+F(s.valide)+' cm</b> de hauteur au sommet, '+
-    'd\u2019après '+s.n+' rep(s) que vous avez jugées'+
-    (s.franche?', et seuil de rep franche à <b>'+F(s.franche)+' cm</b>':'')+'. '+
-    'Une rep est déclarée limite à moins de '+F(VBANDE)+' cm du seuil : c\u2019est la dispersion mesurée '+
-    'entre hauteur de hanche et hauteur de tête.'+
-    (s.chevauche>0?' <b>Attention</b> : vos jugements se chevauchent sur '+F(s.chevauche)+' cm — '+
-      'une rep jugée non valide est plus haute qu\u2019une rep jugée valide.':'')+
-    (s.mixte?' Les reps jugées viennent de vidéos d\u2019échelles différentes, le seuil est approximatif.':'')+'</p>';
+function vScrComparer(){
+  var U=vui(), mvs=[];
+  (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
+  if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
+  if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
+  var gs=vGroups(U.cmv);
+  var head='<div class="card"><div class="row">'+(mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div>':'');
+  if(!gs.length)return head+'</div><p class="note">Aucune charge filmée deux fois pour ce mouvement. La comparaison apparaît dès la deuxième série à la même charge (±1,25 kg de charge système).</p></div>';
+  var ids=gs.map(function(G){return G.id;});
+  if(ids.indexOf(U.cgrp)<0){ var last=gs.slice().sort(function(a,b){return b.l.length-a.l.length;})[0]; U.cgrp=last.id; }
+  var G=gs[ids.indexOf(U.cgrp)];
+  var types=[]; G.l.forEach(function(v){var t=typeLab(v); if(types.indexOf(t)<0)types.push(t);});
+  if(U.ctype!=='tous'&&types.indexOf(U.ctype)<0)U.ctype=types.indexOf('Top set')>=0?'Top set':types[0];
+  var l=G.l.filter(function(v){return U.ctype==='tous'||typeLab(v)===U.ctype;})
+    .sort(function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);});
+  var mes=U.cmes==='v'?'v':'h';
+  var refNow=l.length?vRef(l[l.length-1]):'depart';
+  var sc=scaleOf(l,mes);
+  var perDay={}, prev=null;
+  var rows=l.map(function(v){
+    perDay[v.date]=(perDay[v.date]||0)+1;
+    var val=mes==='v'?vLast(v):vMini(v), other=(mes==='h'&&vRef(v)!==refNow);
+    var d=(prev!=null&&val!=null&&!other)?val-prev:null; if(!other&&val!=null)prev=val;
+    return '<div class="vrow" data-vopen="'+esc(v.id)+'">'+
+      '<div class="vrh"><b>'+frDate(v.date)+(l.filter(function(x){return x.date===v.date;}).length>1?' <span class="muted">· '+perDay[v.date]+'</span>':'')+
+        ' <span class="muted">'+serieLab(v)+'</span></b>'+
+        '<span>'+(mes==='v'?'dern. rep ':'mini ')+'<b>'+(val==null?'—':F(val))+'</b>'+(d==null?'':' <b class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+F(Math.abs(Math.round(d*(mes==='v'?100:10))/(mes==='v'?100:10)))+'</b>')+'</span></div>'+
+      barsSvg(v,sc.lo,sc.hi,mes)+(other?'<p class="note" style="margin:0">Ancienne mesure de hauteur : non comparable.</p>':'')+'</div>';
+  }).join('');
+  var glab=function(id){ var g=gs[ids.indexOf(id)];
+    return (g.bw?'≈'+F(g.c)+' kg système':F(g.c)+' kg de lest (PdC absent)')+(g.va?' · '+g.va:'')+' — '+g.l.length+' séries, '+g.nd+' séance'+(g.nd>1?'s':''); };
+  return head+'<div class="field w"><label>Charge</label>'+vSel('cgrp',ids,U.cgrp,glab)+'</div></div>'+
+    '<div class="row" style="margin-top:8px"><div class="field md"><label>Type de série</label>'+vSel('ctype',types.concat(['tous']),U.ctype,function(t){return t==='tous'?'tous les types':t;})+'</div>'+
+    '<div class="field md"><label>Mesure</label><div class="vseg">'+
+      '<button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Hauteur</button>'+
+      '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Vitesse</button></div></div></div>'+
+    rows+
+    '<p class="note">'+(mes==='h'?'Hauteur la plus basse de chaque série, et écart avec la ligne précédente.':'Vitesse moyenne de la dernière rep, et écart avec la ligne précédente.')+
+      ' Charge égale : même mouvement, même variante, charge système (PdC du jour + lest) à 1,25 kg près.'+
+      (U.ctype==='tous'?' <b>Types mélangés</b> : un back-off fait après le top set n\'est pas une série fraîche.':'')+'</p></div>';
+}
+function vScrSerie(v){
+  var s=seuilOf(v), le=lienEntry(v);
+  var rows=v.reps.map(function(r){
+    var j=jugeOf(v,r.rep), h=hOf(v,r);
+    var b=function(code){return '<button class="act ghost mini'+(j===code?' on':'')+'" data-juge="'+esc(v.id)+'|'+r.rep+'|'+code+
+      '" title="'+VJ[code].n+'" aria-label="Rep '+r.rep+' '+VJ[code].n+'" style="padding:3px 5px;margin:0 1px;font-size:14px">'+VJ[code].e+'</button>';};
+    return '<tr><td>'+r.rep+'</td><td style="color:'+hCol(h,s)+';font-weight:700">'+(h==null?'—':F(h))+'</td><td>'+F(r.vitesse_moy_ms)+
+      '</td><td style="white-space:nowrap">'+VJO.map(b).join('')+'</td></tr>';
+  }).join('');
+  var more='<tr><th>Rep</th><th>Course</th><th>Montée s</th><th>V pic</th><th>Point dur</th></tr>'+v.reps.map(function(r){
+    return '<tr><td>'+r.rep+'</td><td>'+F(r.course_cm)+'</td><td>'+F(r.montee_s)+'</td><td>'+F(r.vitesse_pic_ms)+'</td><td>'+
+      F(r.vitesse_point_dur_ms)+' m/s à '+F(r.hauteur_point_dur_cm)+' cm</td></tr>';}).join('');
+  return '<div class="card"><button class="linkbtn" data-vback="1">‹ Retour</button>'+
+    '<div class="vtitle">'+serieLab(v)+'</div>'+
+    '<p class="note" style="margin-top:2px">'+frDate(v.date)+' · '+esc(v.mouvement)+(v.semaine?' · S'+v.semaine+' J'+v.seance:'')+
+      (v.charge_systeme_kg?' · charge système '+F(v.charge_systeme_kg)+' kg':'')+'</p>'+
+    '<div class="scroll"><table><thead><tr><th>Rep</th><th>Hauteur cm</th><th>Vitesse m/s</th><th>Votre jugement</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<p class="note">Seuil '+(s?'<b>'+F(s.valide)+' cm</b> — '+s.src:'inconnu')+'. Hauteur '+refLab(v)+'.</p>'+
+    ((v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'')+
+    '<div class="row" style="margin-top:8px"><div class="field w"><label>Série du journal</label>'+lienSelect(v)+'</div></div>'+
+    (le?'<p class="note">Jugements partagés avec la séance du '+frDate(le.date)+'. <button class="linkbtn" data-open="'+esc(le.key)+'">Ouvrir la séance</button></p>':
+      '<p class="note">Non rattachée : les jugements restent ici.</p>')+
+    '<details><summary class="note">Plus : course, montée, point dur, courbes</summary>'+
+      '<div class="scroll"><table>'+more+'</table></div>'+veloRepsSvg(v)+veloSvg(v)+
+      '<p class="note">Échelle '+F(v.px_cm)+' px/cm'+(v.echelle_epinglee?' (reprise d\'une autre vidéo)':'')+', suivi '+F(v.qualite)+'.'+
+        (v.ref_sd!=null?' Suspension de départ stable à '+F(v.ref_sd)+' cm près.':'')+'</p>'+
+      '<div class="btnrow"><button class="act ghost mini" data-velodel="'+esc(v.id)+'">Supprimer cette analyse</button></div>'+
+    '</details></div>';
+}
+function vScrSeuil(){
+  var mvs=[]; (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
+  var h='<div class="card">';
+  if(!mvs.length)h+='<p class="note">Aucune analyse.</p>';
+  mvs.forEach(function(mv){
+    ['depart','bas'].forEach(function(ref){
+      var l=S.velo.filter(function(v){return v.mouvement===mv&&vRef(v)===ref;}); if(!l.length)return;
+      var sj=veloSeuil(mv,ref), hs=veloHauteurs(mv,ref);
+      h+='<div class="vtitle">'+esc(mv)+(ref==='bas'?' <span class="muted">· ancienne mesure</span>':'')+'</div>';
+      if(sj)h+='<p class="note">Seuil <b>'+F(Math.round(sj.valide*10)/10)+' cm</b> ±'+F(VBANDE)+', tiré de vos jugements : '+
+        hs.ko.length+' 😑, '+hs.ok.length+' 😀, '+hs.franc.length+' 😎.'+(sj.chevauche>0?' <b>Jugements qui se chevauchent de '+F(Math.round(sj.chevauche*10)/10)+' cm</b> : le seuil est flou.':'')+'</p>';
+      else if(ref==='bas')h+='<p class="note">Pas de jugement : barème du 19/09 (validée à 40 cm, franche à 49,5 cm, mesurés à 15 kg).</p>';
+      else h+='<p class="note">Pas encore de jugement sur cette mesure : le seuil de chaque vidéo est le barème du 19/09 converti, '+
+        '<b>provisoire</b>. Le barème part de la suspension relâchée, la hauteur part de la suspension de départ ; l\'écart entre les deux est mesuré dans chaque vidéo. '+
+        'Jugez quelques reps (au moins une 😑 et une 😀) dans le détail d\'une série : le seuil viendra alors de vous.</p>';
+    });
+  });
+  var ds=vDates();
+  h+='<div class="vtitle" style="margin-top:12px">Analyses importées</div>'+
+    ds.map(function(d){var n=S.velo.filter(function(v){return v.date===d;}).length;
+      return '<div class="vrh vlist"><span>'+frDate(d)+' — '+n+' série'+(n>1?'s':'')+'</span><button class="act ghost mini" data-vdeldate="'+esc(d)+'">Supprimer</button></div>';}).join('')+
+    '<p class="note">Hauteurs mesurées à la ceinture, pas au menton.</p></div>';
+  return h;
 }
 function renderVelo(){
   veloAutoAll();
-  var l=(S.velo||[]).slice().reverse();
-  $('velolist').innerHTML=(l.length?veloCompare()+l.map(function(v){return veloCard(v,v.id);}).join('')
-    :'<div class="card"><p class="note">Aucune analyse importée.</p></div>');
+  var U=vui();
+  if(U.scr==='serie'&&!vById(U.open))U.scr='seance';
+  Array.prototype.forEach.call(document.querySelectorAll('#p-velo [data-vs]'),function(b){
+    b.setAttribute('aria-pressed',String(b.dataset.vs===U.scr||(U.scr==='serie'&&b.dataset.vs===U.from)));
+  });
+  $('velolist').innerHTML=U.scr==='comparer'?vScrComparer():U.scr==='seuil'?vScrSeuil():
+    U.scr==='serie'?vScrSerie(vById(U.open)):vScrSeance();
 }
+$('p-velo').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
+  if(!b||e.target.closest('[data-juge],[data-velodel],select,a,[data-open]'))return;
+  var U=vui();
+  if(b.dataset.vs){ U.scr=b.dataset.vs; }
+  else if(b.dataset.vopen){ U.from=(U.scr==='serie'?U.from:U.scr); U.open=b.dataset.vopen; U.scr='serie'; window.scrollTo(0,0); }
+  else if(b.dataset.vback){ U.scr=U.from||'seance'; }
+  else if(b.dataset.vwarm){ U.warm=!U.warm; }
+  else if(b.dataset.vmes){ U.cmes=b.dataset.vmes; }
+  else if(b.dataset.vdeldate){
+    var d=b.dataset.vdeldate, n=S.velo.filter(function(v){return v.date===d;}).length;
+    if(!confirm('Supprimer les '+n+' analyses du '+frDate(d)+' ?'))return;
+    S.velo=S.velo.filter(function(v){return v.date!==d;});
+  }
+  save(); renderVelo();
+});
+$('p-velo').addEventListener('change',function(e){
+  var t=e.target; if(!t.dataset||!t.dataset.vsel)return;
+  vui()[t.dataset.vsel]=t.value; save(); renderVelo();
+});
 $('velolist').addEventListener('change',function(e){
   var t=e.target; if(!t||!t.dataset||t.dataset.velolien==null)return;
   var v=(S.velo||[]).filter(function(x){return x.id===t.dataset.velolien;})[0]; if(!v)return;
