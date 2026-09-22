@@ -701,6 +701,10 @@ function load(){
       var p=newProg(1.25); if(!L.prog)L.prog=p;
       for(var key in p){if(L.prog[key]===undefined)L.prog[key]=p[key];}
     });
+    /* B1 : un bloc deja entame garde les valeurs qu'il affiche aujourd'hui */
+    REFSTAMP++; REFC={};
+    S.lifts.forEach(function(L,i){ var d=fzFirst(i); if(d)fzEnsure(L,d); });
+    draftPurge();   /* B7 */
   }catch(e){}
 }
 
@@ -831,6 +835,211 @@ function keyUnit(key){
   var t=tplOf(L.prog.tpl); if(!t)return null;
   return unitIndex(t,+q[2],q[3],L.prog);
 }
+/* ================= échecs : règle attachée au gabarit (lot 2 : B2, Q2, Q3, Q6) =================
+   P.fl : une décision par ligne ratée {w,d,n,m,a,r,l,bw,s,b,t,pr}. m : 'z' règle de Zlat, 'h' règle du
+   livre (Helms), 'stop' arrêt, 'no' pas un échec ; a = appliquée d'office à l'enregistrement (série sous
+   la cible) ; r reps faites ; l lest du top set raté ; bw PdC du jour ; s départ du nouveau run.
+   Portée : bloc, gabarit et rep range en cours. La répétition de charge (hors Zlat) reste dans P.adj. */
+function flOf(L){
+  var P=L.prog;
+  return (P.fl||[]).filter(function(v){return v.b===S.blockId&&v.t===P.tpl&&(v.pr||'')===(P.pair||'');})
+    .sort(function(a,b){return sessOrd(a.w,a.d)-sessOrd(b.w,b.d)||a.n-b.n;});
+}
+function flAt(L,w,d,n){return flOf(L).filter(function(v){return v.w===w&&v.d===d&&v.n===n;})[0]||null;}
+function flDrop(L,w,d,n,auto){
+  var P=L.prog;
+  P.fl=(P.fl||[]).filter(function(v){return !(v.b===S.blockId&&v.t===P.tpl&&(v.pr||'')===(P.pair||'')&&
+    v.w===w&&v.d===d&&v.n===n&&(!auto||v.a));});
+}
+function flDropKey(key,auto){var q=String(key).split('|'), L=S.lifts[+q[1]]; if(L&&/^[zh]$/.test(q[0]))flDrop(L,+q[2],q[3],+q[4],auto);}
+function flStop(L){var o=null; flOf(L).forEach(function(v){if(v.m==='stop'&&o==null)o=sessOrd(v.w,v.d);}); return o;}
+/* Zlat sur tout le bloc. Fourchette : une rep de moins aux tops (et back-off) suivants, sans descendre
+   sous ce qui a été fait. Sous le bas de la fourchette, ou à reps fixes : fin du run → deload à la séance
+   lourde suivante (2 × 5, 50 % du lest du top set raté, choix C3), séances légères intermédiaires
+   supprimées (repos du PDF), puis nouveau run à la séance lourde d'après, un incrément au-dessus du départ
+   du run fini en charge système (modifiable). Intermediate : fin au 3e stall d'affilée (≤ 4 reps au max
+   out) ; intermediate peaking : fin au single raté. */
+function zSess(t){
+  var out=[];
+  for(var w=0;w<S.nwk;w++)t.days.forEach(function(d){
+    out.push({w:w,lab:d.label,o:sessOrd(w,d.label),heavy:d.lines.some(function(l){return l.tag==='top'||l.tag==='amrap';})});
+  });
+  return out.sort(function(a,b){return a.o-b.o;});
+}
+function zRuns(L){
+  var P=L.prog, t=tplOf(P.tpl), R={resets:[],stop:null,skip:{},dl:{},cut:[],out:{}};
+  if(!t||!isZlat(P.tpl))return R;
+  var ss=zSess(t), top=null, z=fzOf(L);
+  t.days.forEach(function(d){d.lines.forEach(function(l){if(!top&&l.tag==='top')top=l;});});
+  var rMax=P.pair?+P.pair.split('/')[0]:repMax(top?top.reps:5), rMin=P.pair?rMax:repMin(top?top.reps:3),
+      cr=rMax, until=-1, stall=0, lastW=-9, rsD=z?z.s0:startLoad(L,t), rBw=z?z.bw:S.bw;
+  flOf(L).forEach(function(v){
+    var o=sessOrd(v.w,v.d), id=v.w+'|'+v.d+'|'+v.n;
+    if(R.stop!=null||o<=until||(v.m!=='z'&&v.m!=='stop'&&v.m!=='dl'))return;
+    if(v.m==='stop'){R.stop=o;R.out[id]={k:'stop'};return;}
+    if(t.calc==='offset'){
+      if(t.refReps===1){R.stop=o;R.out[id]={k:'end'};return;}
+      if(v.m==='dl')return;
+      stall=(v.w===lastW+1)?stall+1:1; lastW=v.w;
+      if(stall<3){R.out[id]={k:'stall',n:stall};return;}
+      /* V5 : 3e stall → comme le PDF, J1 et J2 suivants sautés, test du 7-8RM au J3, nouveau run depuis le lest
+         du test (enregistré, sinon proposé ; modifiable). « Arrêter le run » garde l'arrêt sans test. */
+      var td=null, tn=null, tb=v.bw!=null?+v.bw:rBw;
+      ss.forEach(function(q){if(q.o<=o)return; if(!td){if(q.heavy)td=q; else R.skip[q.o]=1;} else if(!tn)tn=q;});
+      if(!td){R.stop=o;R.out[id]={k:'stall3'};return;}
+      var tl=rnd(e1rm(L,+v.l||0,Math.max(1,+v.r||1),0,tb)/(1+L.k*7)-eff(L,tb),L.step);
+      var te=entryOf('z|'+S.lifts.indexOf(L)+'|'+td.w+'|'+td.lab+'|9'+BK());
+      var ts=(v.su&&v.s!=null)?+v.s:(te&&te.load!=null&&(te.sets||[]).some(function(x){return x>0;}))?+te.load:tl;
+      R.dl[td.o]={l:tl,from:+v.l||0,test:1};
+      if(tn){R.resets.push({o:tn.o,s0:ts,u0:adjUnit(P,unitIndex(t,tn.w,tn.lab,P)),bw:tb,sD:ts}); rsD=ts; rBw=tb;}
+      stall=0; lastW=-9; until=tn?tn.o-1:Infinity;
+      R.out[id]={k:'stall3',od:td,on:tn,dl:tl,s:ts};
+      return;
+    }
+    var nr=v.r!=null?Math.min(cr-1,v.r):cr-1;
+    if(v.m!=='dl'&&!P.pair&&nr>=rMin){cr=nr;R.cut.push({f:o+0.5,n:rMax-cr});R.out[id]={k:'cut',n:cr};return;}
+    var od=null,on=null;
+    ss.forEach(function(q){if(q.o<=o||!q.heavy)return; if(!od)od=q; else if(!on)on=q;});
+    ss.forEach(function(q){if(q.o>o&&(!on||q.o<on.o)&&(!od||q.o!==od.o))R.skip[q.o]=1;});
+    var dl=rnd(0.5*(+v.l||0),L.step), bw=v.bw!=null?+v.bw:rBw;
+    var s=v.s!=null?+v.s:rnd(rsD+bwZ(L,rBw)+P.inc-bwZ(L,bw),L.step);
+    if(od)R.dl[od.o]={l:dl,from:+v.l||0};
+    if(on){
+      R.resets.push({o:on.o,s0:s-P.inc*adjUnit(P,unitIndex(t,on.w,on.lab,P)),bw:bw,sD:s});
+      cr=rMax; R.cut.push({f:on.o-0.5,n:0}); rsD=s; rBw=bw;
+    }
+    until=on?on.o-1:Infinity;
+    R.out[id]={k:'reset',od:od,on:on,dl:dl,s:s};
+  });
+  return R;
+}
+function zCut(R,o){var n=0; R.cut.forEach(function(c){if(c.f<o)n=c.n;}); return n;}
+function repLess(r,n){
+  if(!n)return r;
+  var q=/^(\d+)\s*-\s*(\d+)$/.exec(String(r));
+  if(q)return +q[2]-n>+q[1]?q[1]+'-'+(+q[2]-n):q[1];
+  return /^\d+$/.test(String(r))?String(Math.max(1,+r-n)):r;
+}
+function zRunAt(L,o){ /* run en cours à une séance : départ affiché et PdC */
+  var z=fzOf(L), r={sD:z?z.s0:startLoad(L,tplOf(L.prog.tpl)),bw:z?z.bw:S.bw};
+  zRuns(L).resets.forEach(function(x){if(x.o<=o){r.sD=x.sD;r.bw=x.bw;}});
+  return r;
+}
+function flSet(L,key,x,m,e,a){
+  var P=L.prog, q=String(key).split('|'), w=+q[2], d=q[3], n=+q[4];
+  var tr=e?(e.sets||[]).filter(function(s){return s!=null;}):[];
+  flDrop(L,w,d,n);
+  var v={w:w,d:d,n:n,m:m,a:a?1:0,r:tr.length?Math.min.apply(null,tr):null,b:S.blockId,t:P.tpl,pr:P.pair||''};
+  if((m==='z'||m==='dl')&&isZlat(P.tpl)){
+    var fa=fzAt(L,w,d), run=zRunAt(L,sessOrd(w,d));
+    v.l=(e&&e.load!=null)?+e.load:x.load;
+    v.bw=(e&&e.bw!=null)?+e.bw:(fa?fa.bw:S.bw);
+    v.s=rnd(run.sD+bwZ(L,run.bw)+P.inc-bwZ(L,v.bw),L.step);
+  }
+  (P.fl=P.fl||[]).push(v);
+  return v;
+}
+/* À l'enregistrement : série sous la cible → règle par défaut du gabarit, appliquée d'office et
+   modifiable dans le panneau ; cible de nouveau atteinte → la décision d'office disparaît. */
+function failAuto(L,x,key,e){
+  var q=String(key).split('|'), P=L.prog, t=tplOf(P.tpl); if(!t||(q[0]!=='z'&&q[0]!=='h'))return false;
+  var w=+q[2], d=q[3], n=+q[4], inter=q[0]==='z'&&x.role==='amrap'&&t.calc==='offset'&&t.refReps!==1;
+  if(!(q[0]==='z'&&(x.role==='top'||inter))&&!(q[0]==='h'&&(x.role==='work'||x.role==='var')))return false;
+  var v=flAt(L,w,d,n), u=q[0]==='z'?keyUnit(key):null, rep=u!=null&&(P.adj||[]).indexOf(u)>=0;
+  var tr=(e.sets||[]).filter(function(s){return s!=null;}), tg=repMax(x.reps);
+  var short=e.state!=='skip'&&tr.length>0&&(inter?tr[0]<=4:(tg>0&&tr.some(function(s){return s<tg;})));
+  if(short&&!rep&&(!v||v.a)){flSet(L,key,x,q[0]==='z'?'z':'h',e,1); return true;}
+  if(!short&&v&&v.a)flDrop(L,w,d,n);
+  return false;
+}
+function failTxt(L,id,m){
+  if(m==='rep')return 'Charge répétée à la séance lourde suivante, tout ce qui suit recule d\'un cran (hors Zlat : le top set est répété).';
+  if(m==='stop')return 'Arrêt : plus rien de programmé pour ce mouvement après cette séance.';
+  if(m==='h')return 'Semaine suivante : même charge, avec les reps de sa semaine (vague conservée). Deux échecs d\'affilée : −10 % de la charge système.';
+  var o=zRuns(L).out[id]; if(!o)return 'Règle Zlat : sans effet ici (séance hors du run en cours).';
+  if(o.k==='cut')return 'Règle Zlat, fourchette : tops suivants à '+o.n+' reps, back-off à '+(o.n+2)+'.';
+  if(o.k==='stall')return 'Règle Zlat : semaine de stall '+o.n+'/3 (≤ 4 reps au max out). Fin du run à la 3e d\'affilée.';
+  if(o.k==='stall3')return o.od?'Règle Zlat : 3e stall d\'affilée, fin du run. Comme le PDF : J1 et J2 sautés, test du 7-8RM en S'+(o.od.w+1)+' '+o.od.lab+
+    ' (proposé à '+loadKg(L,o.dl)+', 0 rep en réserve)'+(o.on?', puis nouveau run depuis le lest du test ('+loadKg(L,o.s)+') dès S'+(o.on.w+1)+' '+o.on.lab:'')+
+    '. Sans test : « Arrêter le run ».':'Règle Zlat : 3e stall d\'affilée, fin du run. Le PDF : sauter J1 et J2 la semaine suivante, tester un nouveau 7-8RM au J3, qui sert de départ.';
+  if(o.k==='end')return 'Règle Zlat : single raté, fin du run. Le PDF : ne pas relancer le même programme, repasser à du volume en 3-6 reps.';
+  if(o.k==='stop')return failTxt(L,id,'stop');
+  var fw=+String(id).split('|')[0];
+  return (m==='dl'?'Fin du run, votre choix':'Règle Zlat : fin du run')+'. Deload 2 × 5 à '+loadKg(L,o.dl)+(o.od?' en S'+(o.od.w+1)+' '+o.od.lab:' après le bloc')+
+    (o.on?', puis nouveau run à '+loadKg(L,o.s)+' dès S'+(o.on.w+1)+' '+o.on.lab:'')+
+    '. Le PDF prévoit 3-4 jours de repos complet avant le deload, 2-3 après.'+
+    (o.od&&o.od.w>fw?' Ici le deload suit la dernière séance lourde de la semaine : repos court. Autre choix (V5) : « Répéter la charge » '+
+      'à la séance lourde suivante ; si la reprise rate, la règle s\'applique d\'office ; si elle passe mais trop dure, '+
+      (L.prog.pair?'« Règle Zlat »':'« Fin du run »')+' sur la reprise. Le deload tombe alors à la séance lourde d\'après, le nouveau run à la suivante.':'');
+}
+function failUI(key,x,L){
+  var q=String(key).split('|'), P=L.prog, t=tplOf(P.tpl); if(!t)return '';
+  var zl=q[0]==='z'&&(x.role==='top'||x.role==='amrap'), hl=q[0]==='h'&&(x.role==='work'||x.role==='var');
+  if(!zl&&!hl)return '';
+  var w=+q[2], d=q[3], n=+q[4], id=w+'|'+d+'|'+n, v=flAt(L,w,d,n), u=zl?keyUnit(key):null,
+      rep=u!=null&&(P.adj||[]).indexOf(u)>=0, cur=rep?'rep':(v?v.m:null), zz=zl&&(x.role==='top'||t.calc==='offset');
+  var B=function(m,s){return '<button class="act ghost mini" data-fm="'+m+'" data-fk="'+key+'" aria-pressed="'+(cur===m)+'">'+s+'</button>';};
+  var h='<div class="row" style="margin-top:8px"><div class="field w"><label>Échec — suite du programme</label>';
+  if(cur==='no')h+='<p class="note">Marqué « pas un échec » : le programme ne change pas.</p>';
+  else if(cur)h+='<p class="note"><b>'+failTxt(L,id,cur)+'</b>'+(v&&v.a&&!rep?' Appliqué d\'office : série sous la cible.':'')+'</p>';
+  h+='<div class="btnrow">'+(zl?(zz?B('z','Règle Zlat'):'')+(t.calc!=='offset'&&!P.pair?B('dl','Fin du run'):'')+B('rep','Répéter la charge')+B('stop','Arrêter le run')
+    :B('h','Règle du livre')+B('stop','Arrêter'))+(cur&&cur!=='no'?B('no','Pas un échec'):'')+'</div>';
+  var zo=((cur==='z'||cur==='dl')&&v)?(zRuns(L).out[id]||{}):{};
+  if(zo.on&&(zo.k==='reset'||zo.k==='stall3')){
+    h+='<div class="field sm" style="margin-top:6px"><label>Départ du nouveau run, lest</label><input data-frs="'+key+
+      '" type="text" inputmode="decimal" value="'+F(zo.s)+'"></div>';
+    if(zo.k==='reset'){   /* V2 : « un peu plus haut », au choix, modifiable ensuite */
+      var ru=zRunAt(L,sessOrd(w,d)), a1=rnd(ru.sD+bwZ(L,ru.bw)+P.inc-bwZ(L,v.bw),L.step), a2=rnd(ru.sD+P.inc,L.step);
+      if(a1!==a2)h+='<div class="btnrow">'+[[a1,'+1 incrément, charge système'],[a2,'+1 incrément de lest']].map(function(c){
+        return '<button class="act ghost mini" data-frv="'+key+'" data-v="'+c[0]+'" aria-pressed="'+(zo.s===c[0])+'">'+c[1]+' : '+F(c[0])+'</button>';}).join('')+'</div>';
+    }
+  }
+  h+='<details><summary class="note">Ce que prévoient Zlat et Helms</summary><p class="note">Zlat : une charge ratée ne se répète pas. '+
+    'En fourchette, on perd une rep et on continue ; sous le bas de la fourchette, ou à reps fixes dès que le nombre choisi n\'est plus tenu, '+
+    'le run est fini : 3-4 jours de repos, deload 2 × 5 à 50 % du dernier top set, 2-3 jours de repos, puis nouveau run un peu plus haut. '+
+    'L\'outil prend 50 % du lest, pas de la charge système (votre choix). Helms : même charge la semaine suivante, −10 % après deux échecs '+
+    'd\'affilée. Répéter la charge est votre adaptation, pas une règle de ces programmes.</p></details>';
+  return h+'</div></div>';
+}
+function failPick(key,m,today){
+  var f=findLine(key); if(!f)return;
+  var x=f.line, L=S.lifts[x.li], P=L.prog, q=String(key).split('|'), w=+q[2], d=q[3], n=+q[4];
+  var u=q[0]==='z'?keyUnit(key):null, ia=u!=null?(P.adj||[]).indexOf(u):-1, v=flAt(L,w,d,n), cur=ia>=0?'rep':(v?v.m:null);
+  if(m===cur&&m!=='no')m='off';
+  if(ia>=0)P.adj.splice(ia,1);
+  flDrop(L,w,d,n);
+  if(/^[zh]\|/.test(key))fzEnsure(L);
+  if(m==='rep'){if(!P.adj)P.adj=[]; P.adj.push(u); P.adj.sort(function(a,b){return a-b;});}
+  else if(m!=='off')flSet(L,key,x,m,entryOf(key),0);
+  save(); closePanel(); renderAssign(); refreshPlans(); failReopen(key,today?'todayout':'out');
+}
+function failReopen(key,box){
+  var b=$(box); if(!b||!b.querySelectorAll)return;
+  var l=Array.prototype.filter.call(b.querySelectorAll('.line[data-key]'),function(y){return y.dataset.key===key;})[0];
+  if(l)openPanel(l,key);
+}
+function flNote(L,i){ /* décisions après échec, dans Programme */
+  var v=flOf(L).filter(function(x){return x.m!=='no';});
+  if(!v.length)return '';
+  return '<p class="note"><b>Après échec</b> : '+v.map(function(x){
+    return 'S'+(x.w+1)+' '+x.d+' — '+failTxt(L,x.w+'|'+x.d+'|'+x.n,x.m);}).join(' ; ')+'</p>';
+}
+/* Q6 : semaine w d'un gabarit Helms → vague c, semaine ww de la vague ; dl = semaine de deload S4,
+   insérée à la demande après les vagues listées dans P.hdl. Sans deload : c = w / weeks, ww = w % weeks. */
+function hWk(L,w){
+  var t=tplOf(L.prog.tpl), n=(t&&t.weeks)||3, dl=L.prog.hdl||[], c=0, ww=0, d=false;
+  for(var k=0;k<w;k++){
+    if(d){d=false;c++;ww=0;}
+    else if(ww<n-1)ww++;
+    else if(dl.indexOf(c)>=0)d=true;
+    else{c++;ww=0;}
+  }
+  return {c:c,ww:d?n-1:ww,dl:d};
+}
+function hW0(L,c){
+  for(var w=0;w<200;w++){var k=hWk(L,w); if(k.c===c&&!k.dl)return w; if(k.c>c)break;}
+  return c*((tplOf(L.prog.tpl)||{}).weeks||3);
+}
 /* Échauffement : « BW*5, 30%*3, 60%*2, 85%*1 ». Les pourcentages portent sur le LEST du top set,
    pas sur la charge système : à 86 kg de corps, 50 % de la charge système est sous le poids du corps
    et ne veut rien dire. BW = une série sans lest. */
@@ -871,9 +1080,9 @@ var ZLAT={
  novice:{name:'Advanced novice — top set + back-off',src:'PDF Zlat',perUnit:2,ranges:true,calc:'recalc',refReps:5,
   note:"Deux séances lourdes de structure identique, une décision de progression à chaque séance lourde.",
   info:["Top set unique suivi de back-off à 90 % de la charge système du top set.",
-        "Le J2 est une séance secondaire à 80 %, en variante : ce n'est pas un jour de progression. Le PDF donne 4-5 reps ; ici 5 reps fixes, votre choix.",
+        "Le J2 est une séance secondaire à 80 % de la charge système du top set le plus lourd de la semaine (le J3, primaire à venir, comme le PDF), toujours recalculé, en variante : ce n'est pas un jour de progression. Le PDF donne 4-5 reps ; ici 5 reps fixes, votre choix.",
         "Zlat prescrit des fourchettes (3-5 au top set, 5-7 aux back-off) et non des reps fixes : vous montez la charge, les reps redescendent dans la fourchette.",
-        "À quitter quand deux séances lourdes d'affilée ratent le bas de la fourchette."],
+        "Fin du run dès qu'un top set rate (PDF) : à reps fixes, dès que le nombre choisi n'est plus tenu ; en fourchette, une rep de moins par échec, et fin sous le bas de la fourchette. Puis deload 2 × 5 et nouveau run un peu plus haut."],
   days:[{label:'J1',lines:[Z(100,1,'3-5','top'),Z(90,3,'5-7','back')]},
         {label:'J2',lines:[Z(80,2,'5','',1)]},
         {label:'J3',lines:[Z(100,1,'3-5','top'),Z(90,2,'5-7','back')]}]},
@@ -933,7 +1142,7 @@ var ADVPEAK={name:'Advanced peaking 4-2 — microcycles',src:'PDF Zlat',special:
 function H(sets,reps,rir,vari){return {sets:sets,reps:reps,rir:rir,vari:!!vari};}
 var HELMS={
  'msp-n':{name:'MSP-N — Novice, progression linéaire',src:'Helms, transposé',weeks:3,
-  note:"Un seul schéma, la charge monte chaque semaine. À quitter dès que deux séances de suite ratent la cible.",
+  note:"Un seul schéma, la charge monte chaque semaine. Échec : même charge la semaine suivante, −10 % après deux échecs d'affilée. Blocage persistant : fin de cycle, deload, reprise 5 à 10 % plus bas avec un incrément réduit de moitié.",
   info:["Volume cible 10 à 12 séries par mouvement et par semaine.",
         "Pas de périodisation à ce stade : le livre dit qu'elle n'apporte rien tant que la progression linéaire tient."],
   days:[{label:'J1',lines:[H(4,[5,5,5],[3,2,1])]},
@@ -1449,7 +1658,7 @@ function deleteLift(d){
     if(e.li>d)e.li--;
     if(typeof e.key==='string'){                     /* cle de plan : type|lift|semaine|jour|ligne */
       var q=e.key.split('|');
-      if(q.length>=5&&/^\d+$/.test(q[1])&&+q[1]>d){ q[1]=String(+q[1]-1); e.key=q.join('|'); }
+      if(q.length>=5&&/^\d+$/.test(q[1])&&+q[1]>d){ var ok=e.key; q[1]=String(+q[1]-1); e.key=q.join('|'); if(e.id===ok)e.id=e.key; }   /* B20 */
     }
   });
   Object.keys(S.extra||{}).forEach(function(k){
@@ -1466,6 +1675,12 @@ function deleteLift(d){
       }
     }
   });
+  /* R4 : brouillons et échauffements du jour suivent leur mouvement ; ceux du mouvement supprimé partent */
+  var rk=function(k){ var q=String(k).split('|'); if(q.length>=5&&/^[a-z]$/.test(q[0])&&/^\d+$/.test(q[1])){ if(+q[1]===d)return null; if(+q[1]>d)q[1]=String(+q[1]-1); } return q.join('|'); };
+  var nd={}; Object.keys(DRAFTS).forEach(function(k){ var nk=rk(k); if(nk)nd[nk]=DRAFTS[k]; }); DRAFTS=nd; draftWrite();
+  var nw={}; Object.keys(S.warmDay||{}).forEach(function(k){ var m=/^(.*)\|(\d+)$/.exec(k); if(!m){nw[k]=S.warmDay[k];return;}
+    if(+m[2]!==d)nw[m[1]+'|'+(+m[2]>d?+m[2]-1:+m[2])]=S.warmDay[k]; }); S.warmDay=nw;
+  if(S.active>d)S.active--;
   S.lifts.splice(d,1);
   if(S.active>=S.lifts.length)S.active=Math.max(0,S.lifts.length-1);
   REFC={}; save(); renderAll();
@@ -1716,6 +1931,181 @@ function renderCharges(){
 $('cbest').addEventListener('click',function(){fillCharges();bestNote();});
 
 /* ================= assignation ================= */
+/* ================= depart du bloc fige (B1, N4, Q1) =================
+   Le depart du bloc (lest du 1er top set pour Zlat, 1RM d'ancrage pour Helms) et le PdC qui a
+   servi a le calculer sont figes au 1er enregistrement du mouvement dans le bloc : ensuite ni le
+   PdC d'en-tete, ni la reference, ni un ajustement de courbe ne deplacent le bloc en cours.
+   P.fz = {b:bloc, t:gabarit, pr:rep range, s0:lest de depart (Zlat), rm:1RM d'ancrage (Helms),
+   bw:PdC de depart, d:date, rb:[recalculs au PdC du jour, par seance], cy:{vague:reancrage Helms}}.
+   Changer de gabarit ou de rep range invalide le gel : le suivant se fait au prochain enregistrement. */
+function inBlock(key){var bk=BK(), m=/\|b(\d+)$/.exec(String(key)); return bk?(!!m&&+m[1]===+S.blockId):!m;}
+function fzKind(L){var t=L&&L.prog&&tplOf(L.prog.tpl); return (!t||t.acc||t.special)?'':(isZlat(L.prog.tpl)?'z':'h');}
+function fzOk(L){var P=L&&L.prog, z=P&&P.fz; return !!(z&&z.b===S.blockId&&z.t===P.tpl&&(z.pr||'')===(P.pair||''));}
+function fzOf(L){return fzOk(L)?L.prog.fz:null;}
+function fzSnap(L,d){
+  var P=L.prog, z={b:S.blockId,t:P.tpl,pr:P.pair||'',bw:S.bw,d:d||todayISO(),rb:[],cy:{}};
+  if(fzKind(L)==='z')z.s0=startLoad(L,tplOf(P.tpl)); else{ var a=hAnchor(L); z.rm=a.rm; z.src=a.src; }
+  return z;
+}
+function fzEnsure(L,d){ if(fzKind(L)&&!fzOk(L))L.prog.fz=fzSnap(L,d); }
+function fzFirst(i){ /* date du 1er enregistrement du mouvement dans le bloc, null s'il n'y en a pas */
+  var d=null;
+  S.log.forEach(function(e){ if(e.li===i&&/^[zh]\|/.test(String(e.key))&&inBlock(e.key)){ var x=String(e.date||todayISO()); if(!d||x<d)d=x; } });
+  return d;
+}
+function sessOrd(w,lab){var i=DORDER.indexOf(lab); return w*100+(i<0?99:i);}
+function fzAt(L,w,lab){ /* depart et PdC applicables a une seance, recalculs et nouveaux runs (B2) compris */
+  var z=fzOf(L); if(!z)return null;
+  var o=sessOrd(w,lab), r={s0:z.s0,bw:z.bw,u0:0}, last=null;
+  (z.rb||[]).map(function(b){return {o:b.o,k:1,b:b};})
+    .concat((fzKind(L)==='z'?zRuns(L).resets:[]).map(function(x){return {o:x.o,k:0,x:x};}))
+    .sort(function(a,b){return a.o-b.o||a.k-b.k;})
+    .forEach(function(q){
+      if(q.o>o)return;
+      if(!q.k){r.s0=q.x.s0;r.bw=q.x.bw;r.u0=q.x.u0||0;last=q.x;}
+      else if(last){r.s0=rnd(last.s0-(q.b.bw-last.bw),L.step);r.bw=q.b.bw;}   /* recalcul apres un nouveau run */
+      else{if(q.b.s0!=null)r.s0=q.b.s0;r.bw=q.b.bw;}
+    });
+  return r;
+}
+/* N4 : 1RM d'ancrage d'un gabarit Helms (convention de l'app), choisi comme le depart Zlat */
+function hAnchor(L,mode){
+  var P=L.prog; mode=mode||P.hStart||'ref';
+  if(mode==='man'&&P.hMan!=null)return {rm:e1rm(L,+P.hMan||0,1,0,S.bw),src:'manuel'};
+  if(mode==='rec'||mode==='cur'){
+    var e=lastExploitable(L,mode==='rec');
+    if(e)return {rm:e1rm(L,+e.load||0,+e.sets[e.sets.length-1],+e.rir||0,(+e.bw||S.bw)),src:mode==='rec'?'1RM record':'1RM du moment'};
+  }
+  return {rm:rmOf(L),src:'référence'};
+}
+function hAt(L,w,lab){ /* 1RM, PdC et vague d'ancrage applicables a une seance Helms */
+  var t=tplOf(L.prog.tpl), cy=hWk(L,w).c, z=fzOf(L);   /* Q6 */
+  if(!z)return {rm:hAnchor(L).rm,bw:S.bw,c:0};
+  var o=sessOrd(w,lab), r={rm:z.rm,bw:z.bw,c:0,o:-1};
+  for(var c=cy;c>=1;c--){ var a=z.cy&&z.cy[c]; if(a){ r={rm:a.rm,bw:a.bw,c:c,o:hW0(L,c)*100-1}; break; } }
+  (z.rb||[]).forEach(function(b){ if(b.o<=o&&b.o>r.o)r.bw=b.bw; });
+  return r;
+}
+function fzNote(L,i){
+  if(!fzKind(L))return '';
+  var z=fzOf(L);
+  if(!z)return '<p class="note">Départ non figé : il suit ces réglages et le PdC d\'en-tête jusqu\'au 1er enregistrement du bloc.</p>';
+  var rb=(z.rb||[]).slice(-1)[0];
+  return '<p class="note">Départ figé le <b>'+frDate(z.d)+'</b> (1er enregistrement du bloc) : '+
+    (fzKind(L)==='z'?'<b>'+F(z.s0)+' kg</b>':'1RM <b>'+F(rnd(z.rm-eff(L,z.bw),0.25))+' kg</b> de lest ('+(z.src||'référence')+')')+
+    (L.useBw?', PdC de départ <b>'+F(z.bw)+' kg</b>':'')+
+    (rb?' ; recalculé au PdC de '+F(rb.bw)+' kg à partir de S'+(Math.floor(rb.o/100)+1)+' '+(DORDER[rb.o%100]||''):'')+
+    '. Les réglages de départ valent pour le prochain bloc.</p>'+
+    '<div class="btnrow"><button class="act ghost mini" onclick="fzReset('+i+')">Refiger sur les réglages actuels</button></div>';
+}
+function fzReset(i){
+  var L=S.lifts[i]; if(!L||!fzKind(L))return;
+  if(!confirm('Refiger le départ de '+L.name+' sur les réglages actuels ?\n\nToutes les charges du bloc en cours sont recalculées, '+
+    'séances passées comprises, au PdC d\'en-tête ('+F(S.bw)+' kg). Les séries déjà enregistrées ne changent pas.'))return;
+  REFSTAMP++; REFC={}; var d=fzFirst(i); L.prog.fz=null;
+  if(d)L.prog.fz=fzSnap(L,d);
+  save(); renderAssign(); refreshPlans();
+}
+/* N4 : choix de l'ancre du 1RM, puis reancrage possible en S1 de chaque vague */
+function hStartUI(L,i,P,t){
+  var m=P.hStart||'ref', z=fzOf(L), a=hAnchor(L);
+  var h='<div class="row" style="margin-top:8px"><div class="field md"><label>Ancre du 1RM</label><select data-i="'+i+'" data-f="hStart">'+
+    [['ref','référence'],['rec','1RM record'],['cur','1RM du moment'],['man','manuel']].map(function(o){
+      return '<option value="'+o[0]+'"'+(m===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>'+
+    (m==='man'?'<div class="field sm"><label>1RM, lest</label><input data-i="'+i+'" data-f="hMan" type="text" inputmode="decimal" value="'+
+      (P.hMan!=null?F(P.hMan):'')+'"></div>':'')+'</div>';
+  h+='<p class="note">Avec ce réglage : 1RM <b>'+F(rnd(a.rm-eff(L),0.25))+' kg</b> de lest'+(L.useBw?' au PdC d\'en-tête':'')+' ('+a.src+')'+
+    ((m==='rec'||m==='cur')&&a.src==='référence'?' — aucune série exploitable (top set, AMRAP, record) : la référence est utilisée':'')+
+    (z?'. Il sert aux réajustements de vague et au prochain bloc':'')+'.</p>';
+  h+=fzNote(L,i)+flNote(L,i);
+  if(z&&t.weeks<S.nwk){
+    var nC=hWk(L,S.nwk-1).c+1, rows=[];   /* Q6 */
+    for(var c=1;c<nC;c++){
+      var w0=hW0(L,c), begun=S.log.some(function(e){return e.li===i&&/^h\|/.test(String(e.key))&&inBlock(e.key)&&(+e.week-1)>=w0;});
+      var ra=z.cy&&z.cy[c];
+      if(ra)rows.push('<div class="note">Vague '+(c+1)+' (S'+(w0+1)+') réancrée le '+frDate(ra.d)+' : 1RM <b>'+F(rnd(ra.rm-eff(L,ra.bw),0.25))+
+        ' kg</b> de lest, PdC '+F(ra.bw)+' kg ('+ra.src+')'+(begun?'':' <button class="act ghost mini" onclick="hReanchor('+i+','+c+',1)">Annuler</button>')+'</div>');
+      else if(!begun)rows.push('<button class="act ghost mini" onclick="hReanchor('+i+','+c+')">Réajuster en S1 de la vague '+(c+1)+' (S'+(w0+1)+')</button>');
+    }
+    if(rows.length)h+='<div class="btnrow">'+rows.join(' ')+'</div>';
+  }
+  var dls=[];   /* Q6 : deload S4 a la demande apres une vague */
+  for(var c2=0;c2<=hWk(L,S.nwk-1).c;c2++){ var wd=hW0(L,c2)+t.weeks; if(wd>=S.nwk)break;
+    dls.push('<label class="chk"><input type="checkbox" data-i="'+i+'" data-f="hdl" data-c="'+c2+'"'+((P.hdl||[]).indexOf(c2)>=0?' checked':'')+
+      '>après la vague '+(c2+1)+' (S'+(wd+1)+')</label>'); }
+  if(dls.length)h+='<p class="note" style="margin-top:6px">Deload S4 à la demande (checklist du livre ; obligatoire tous les 3 cycles) : '+
+    'reps de la S'+t.weeks+' à la charge de la S1, deux tiers des séries. La suite du bloc est décalée d\'une semaine.</p><div class="btnrow">'+dls.join(' ')+'</div>';
+  return h;
+}
+function hReanchor(i,c,undo){
+  var L=S.lifts[i], z=fzOf(L); if(!z)return;
+  if(!z.cy)z.cy={};
+  if(undo)delete z.cy[c];
+  else{
+    var a=hAnchor(L), bw=(S.tbw!=null?S.tbw:S.bw);
+    if(!confirm('Réajuster '+L.name+' à partir de la S1 de la vague '+(c+1)+' ?\n\n1RM d\'ancrage : '+F(rnd(a.rm-eff(L,bw),0.25))+
+      ' kg de lest au PdC de '+F(bw)+' kg ('+a.src+'). Les vagues suivantes progressent à partir de là.'))return;
+    z.cy[c]={rm:a.rm,bw:bw,src:a.src,d:todayISO()};
+  }
+  save(); renderAssign(); refreshPlans();
+}
+/* Q1 : PdC de depart, PdC du jour et ecart, toujours affiches en Seance du jour. Au-dela de
+   +1,25 kg, proposition de recalculer la suite du bloc au PdC du jour (charge systeme gardee). */
+function pdcDep(L,w,lab){
+  var k=fzKind(L); if(!k||!L.useBw)return null;
+  if(k==='z'){ var a=fzAt(L,w,lab); return a?{bw:a.bw,f:1}:{bw:S.bw,f:0}; }
+  return fzOf(L)?{bw:hAt(L,w,lab).bw,f:1}:{bw:S.bw,f:0};
+}
+function pdcCard(k){
+  var a=String(k).split('|'), w=+a[0], lab=a[1], jour=(S.tbw!=null?S.tbw:S.bw), deps=[], up=false;
+  S.lifts.forEach(function(L,i){
+    var d=pdcDep(L,w,lab); if(!d)return;
+    if(!PLAN.some(function(wk){return wk.w===w&&wk.days.some(function(dd){return dd.label===lab&&dd.lines.some(function(x){return x.li===i;});});}))return;
+    deps.push({n:L.name,bw:d.bw,f:d.f});
+    if(d.f&&jour-d.bw>=1.25-1e-9&&!S.done[k])up=true;
+  });
+  if(!deps.length)return '';
+  var same=deps.every(function(x){return x.bw===deps[0].bw;});
+  var ec=function(b){var e=Math.round((jour-b)*100)/100; return (e>0?'+':(e<0?'\u2212':'\u00b1'))+F(Math.abs(e));};
+  var h='<p class="note" id="pdcline">PdC de départ '+(same?'<b>'+F(deps[0].bw)+'</b>':deps.map(function(x){return x.n+' <b>'+F(x.bw)+'</b>';}).join(', '))+
+    ' · du jour <b>'+F(jour)+'</b> ('+(same?ec(deps[0].bw):deps.map(function(x){return ec(x.bw);}).join(' / '))+' kg)'+
+    (deps.some(function(x){return !x.f;})?' — départ pas encore figé : il suit l\'en-tête jusqu\'au 1er enregistrement du bloc':'')+'</p>';
+  if(up)h+='<div class="flag"><b>PdC du jour au moins 1,25 kg au-dessus du départ.</b> Au lest prévu, la charge système dépasse le plan. '+
+    'Recalculer la suite du bloc à '+F(jour)+' kg garde la charge système prévue et baisse le lest d\'autant.'+
+    '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button></div></div>';
+  return h;
+}
+function pdcRebase(){
+  var k=S.tsel; if(!k)return;
+  var a=k.split('|'), w=+a[0], lab=a[1], o=sessOrd(w,lab), jour=(S.tbw!=null?S.tbw:S.bw), old={}, chg=[], rep=[];
+  S.lifts.forEach(function(L,i){
+    var z=fzOf(L); if(!z||!L.useBw)return;
+    old[i]=JSON.stringify(z.rb||[]);
+    var e={o:o,bw:jour};
+    if(fzKind(L)==='z'){ var fa=fzAt(L,w,lab); e.s0=rnd(fa.s0-(jour-fa.bw),L.step); chg.push(L.name+' : départ '+F(fa.s0)+' → '+F(e.s0)+' kg'); }
+    else chg.push(L.name+' : PdC '+F(hAt(L,w,lab).bw)+' → '+F(jour)+' kg');
+    z.rb=(z.rb||[]).filter(function(b){return b.o<o;}); z.rb.push(e);
+  });
+  if(!chg.length)return;
+  buildPlan();
+  /* top sets que le recalcul ferait repeter : lest deja fait dans le bloc, ou prevu avant cette seance */
+  S.lifts.forEach(function(L,i){
+    if(old[i]==null||fzKind(L)!=='z')return;
+    var before={}, r0=-1, r1=1e9;   /* B2 : run en cours seulement */
+    zRuns(L).resets.forEach(function(x){ if(x.o<=o)r0=x.o; else if(x.o<r1)r1=x.o; });
+    S.log.forEach(function(e){ if(e.li===i&&e.role==='top'&&inBlock(e.key)&&e.load!=null&&sessOrd(+e.week-1,e.day)>=r0)before[F(+e.load)]='fait le '+frDate(e.date); });
+    PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){
+      if(x.li!==i||x.role!=='top')return;
+      var lb='S'+(wk.w+1)+' '+d.label;
+      if(sessOrd(wk.w,d.label)<o){ if(sessOrd(wk.w,d.label)>=r0&&!before[F(x.load)])before[F(x.load)]='prévu en '+lb; }
+      else if(sessOrd(wk.w,d.label)<r1&&before[F(x.load)])rep.push(L.name+' '+lb+' : '+F(x.load)+' kg, déjà '+before[F(x.load)]);
+    });});});
+  });
+  var msg='Recalculer la suite du bloc au PdC du jour ('+F(jour)+' kg), à partir de S'+(w+1)+' '+lab+' ?\n\n'+chg.join('\n')+
+    (rep.length?'\n\nTop sets répétés que cela créerait :\n'+rep.join('\n'):'\n\nAucun top set répété.');
+  if(!confirm(msg)){ S.lifts.forEach(function(L,i){ if(old[i]!=null)L.prog.fz.rb=JSON.parse(old[i]); }); buildPlan(); return; }
+  save(); renderAssign(); refreshPlans();
+}
 function startLoad(L,t){
   var P=L.prog;
   if(!isZlat(P.tpl))return 0;
@@ -1734,7 +2124,7 @@ function startLoad(L,t){
    du bloc et le back-off repete de temps en temps la charge de la seance precedente. */
 function boGap(L,P,pct){
   var t=tplOf(P.tpl); if(!t)return 0;
-  var s0=startLoad(L,t), bz=bwZ(L);
+  var z=fzOf(L), s0=z?z.s0:startLoad(L,t), bz=z?bwZ(L,z.bw):bwZ(L);
   return s0-rnd((bz+s0)*pct/100-bz,L.step);
 }
 function unitIndex(t,w,day,P){
@@ -1742,7 +2132,11 @@ function unitIndex(t,w,day,P){
   if(pu===2){
     var heavy=t.days.filter(function(d){return d.lines.some(function(l){return l.tag==='top'||l.tag==='amrap';});})
       .map(function(d){return d.label;});
-    var k=heavy.indexOf(day); if(k<0)k=0;
+    var k=heavy.indexOf(day);
+    if(k<0){   /* B15 / Q4 : jour léger → unité du top set le plus lourd de la semaine (novice : J3 ; V3 : J1) */
+      var tops=t.days.filter(function(d){return d.lines.some(function(l){return l.tag==='top';});}).map(function(d){return d.label;});
+      k=Math.max(0,heavy.indexOf(tops[tops.length-1]));
+    }
     return w*heavy.length+k;
   }
   return w;
@@ -1902,17 +2296,18 @@ function renderAssign(){
           startLoad(L,t)+'"></div>';
       }
       h+='</div>';
-      var s0=startLoad(L,t), target=P.pair?+P.pair.split('/')[0]:(t.refReps||5);
+      var fz0=fzOf(L), s0=fz0?fz0.s0:startLoad(L,t), target=P.pair?+P.pair.split('/')[0]:(t.refReps||5);
       var lastU=unitIndex(t,S.nwk-1,t.days[t.days.length-1].label,P);
-      var nAdj=(P.adj||[]).length, sEnd=s0+P.inc*adjUnit(P,lastU);
+      var nAdj=(P.adj||[]).length, faE=fzAt(L,S.nwk-1,t.days[t.days.length-1].label), sEnd=(faE?faE.s0:s0)+P.inc*adjUnit(P,lastU);   /* B2 */
       var rir0=rirOf(L,s0,target), rirEnd=rirOf(L,sEnd,target);
       var wall=wallOf(i,L);
       h+='<p class="note">Départ <b>'+F(s0)+' kg</b> pour '+target+' reps, réserve implicite '+F(Math.round(rir0*10)/10)+
         ' · arrivée <b>'+F(sEnd)+' kg</b> en S'+S.nwk+', réserve '+F(Math.round(rirEnd*10)/10)+
         (wall.zero?' · <b>réserve nulle prévue en '+wall.zero.lab+'</b> ('+wall.zero.txt+')':' · la réserve ne tombe pas à zéro dans ce bloc')+'</p>';
+      h+=fzNote(L,i)+flNote(L,i);
       var boL=null; t.days.forEach(function(d){d.lines.forEach(function(l){if(!boL&&l.tag==='back')boL=l;});});
       if(t.calc==='recalc'&&boL){
-        var bzz=bwZ(L), g0=boGap(L,P,boL.pct), g1=sEnd-rnd((bzz+sEnd)*boL.pct/100-bzz,L.step);
+        var bzz=fz0?bwZ(L,fz0.bw):bwZ(L), g0=boGap(L,P,boL.pct), g1=sEnd-rnd((bzz+sEnd)*boL.pct/100-bzz,L.step);
         h+='<p class="note">Back-off : '+(P.boMode==='fixe'
           ?'<b>'+F(g0)+' kg sous le top set</b> à chaque séance, du début à la fin du bloc.'
           :'recalculés à '+F(boL.pct)+' % de chaque top set, écart <b>'+F(g0)+' kg</b> en S1 → <b>'+F(g1)+' kg</b> en S'+S.nwk+
@@ -1925,6 +2320,7 @@ function renderAssign(){
         ') : c\'est là que le mur est attendu. Chaque top set suivant qui passe est un record.</p>';
 
     }
+    if(!z&&!ap)h+=hStartUI(L,i,P,t);   /* N4 */
     if(ap){
       h+='<div class="row" style="margin-top:8px">'+
         '<div class="field sm"><label>Single d\'intro</label><input data-i="'+i+'" data-f="intro" type="number" step="0.25" value="'+
@@ -1956,12 +2352,14 @@ function renderAssign(){
 }
 $('assign').addEventListener('input',function(e){
   var t=e.target, i=t.dataset.i; if(i==null)return; var L=S.lifts[+i], P=L.prog, f=t.dataset.f, v=t.value;
-  if(f==='tpl'){P.tpl=v;P.top=null;P.prLoad=null;P.pair='';}
+  if(f==='tpl'){P.tpl=v;P.top=null;P.prLoad=null;P.pair='';P.hdl=[];}
   else if(f==='inc')P.inc=num(v,P.inc)||1.25;
   else if(f==='incSel'){ if(v==='libre'){ if(INCS.indexOf(+P.inc)>=0)P.inc=+P.inc+0.25; } else P.inc=+v; }
   else if(f==='repMode')P.repMode=v;
   else if(f==='pair'){P.pair=v;P.top=null;P.prLoad=null;}
   else if(f==='startMode')P.startMode=v;
+  else if(f==='hStart')P.hStart=v;
+  else if(f==='hMan'){ var hv=num(v,null); P.hMan=(hv==null?null:hv); }
   else if(f==='rir')P.rir=+v;
   else if(f==='prWeek')P.prWeek=+v;
   else if(f==='prDay')P.prDay=v;
@@ -1972,6 +2370,8 @@ $('assign').addEventListener('input',function(e){
   else if(f==='intro')P.intro=+v||0;
   else if(f.slice(0,4)==='jump'){if(!P.jumps)P.jumps=[5,2.5,2.5];P.jumps[+f.slice(4)]=+v;}
   else if(f==='warm'){P.warm=v;save();generate();renderToday();return;}
+  else if(f==='hdl'){var hc=+t.dataset.c, hl=(P.hdl||[]).filter(function(x){return x!==hc;}); if(t.checked)hl.push(hc);
+    P.hdl=hl.sort(function(x,y){return x-y;}); save(); renderAssign(); generate(); renderToday(); return;}   /* Q6 */
   else if(f==='gap')P.gap=+v;
   else if(f==='cad')P.cad=v;
   else if(f==='boMode')P.boMode=v;
@@ -1985,7 +2385,7 @@ $('assign').addEventListener('input',function(e){
   else if(f==='accMode')P.accMode=v;
   else if(f==='accEvery')P.accEvery=Math.max(1,+v||1);
   save();
-  if(['tpl','startMode','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0)renderAssign();
+  if(['tpl','startMode','hStart','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0)renderAssign();
   if(f==='refMode'){renderLifts();renderHead();generate();renderToday();}
   generate();
 });
@@ -1998,7 +2398,7 @@ $('assign').addEventListener('input',function(e){
 /* ================= génération ================= */
 var PLAN=[], LASTTXT='';
 function buildPlan(){
-  PLAN=[];
+  PLAN=[]; var HS={};   /* Q3 : creneaux Helms (jour, ligne) d'une semaine a l'autre */
   var active=S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){return o.L.prog.tpl!=='off'&&tplOf(o.L.prog.tpl);});
   if(!active.length)return;
   var nw=S.nwk, maxW=0;
@@ -2034,35 +2434,58 @@ function buildPlan(){
           return;
         }
         var days=t.days;
-        if(!isZlat(P.tpl)&&t.alt&&t.daysB&&Math.floor(w/t.weeks)%2===1)days=t.daysB;
+        if(!isZlat(P.tpl)&&t.alt&&t.daysB&&hWk(L,w).c%2===1)days=t.daysB;   /* Q6 */
         var day0=null; days.forEach(function(d){if(d.label===lab)day0=d;});
         if(!day0)return;
         if(isZlat(P.tpl)){
           if(w>=S.nwk)return;
-          var u=unitIndex(t,w,lab,P), s0=startLoad(L,t), ue=adjUnit(P,u), rep_=isRepeatUnit(P,u);
+          var zr=zRuns(L), zo=sessOrd(w,lab), zc=zCut(zr,zo);   /* B2 / Q2 */
+          if((zr.stop!=null&&zo>zr.stop)||zr.skip[zo])return;
+          if(zr.dl[zo]&&zr.dl[zo].test){ day.lines.push({li:o.i,name:L.name,role:'test',sets:1,reps:'7-8',load:zr.dl[zo].l,
+            info:'test du 7-8RM (PDF, après 3 stalls) : 0 rep en réserve ; son lest devient le départ du nouveau run',key:'z|'+o.i+'|'+w+'|'+lab+'|9'+BK()}); return; }
+          if(zr.dl[zo]){ day.lines.push({li:o.i,name:L.name,role:'deload',sets:2,reps:'5',load:zr.dl[zo].l,
+            info:'deload du reset Zlat : 50 % du lest du top set raté ('+F(zr.dl[zo].from)+' kg), choix C3',key:'z|'+o.i+'|'+w+'|'+lab+'|9'+BK()}); return; }
+          var zNew=zr.resets.some(function(x){return x.o===zo;});
+          var fa=fzAt(L,w,lab), u=unitIndex(t,w,lab,P), s0=fa?fa.s0:startLoad(L,t), ue=adjUnit(P,u), rep_=isRepeatUnit(P,u);
           var dOff=day0.offGap?-gapOf(P,L):(day0.off||0);
-          var refAdd=s0+P.inc*ue+dOff, bz=bwZ(L), refSys=bz+refAdd;
+          var refAdd=s0+P.inc*ue+dOff, bz=fa?bwZ(L,fa.bw):bwZ(L), refSys=bz+refAdd;
           day0.lines.forEach(function(li,li_i){
             var reps=li.reps;
             if(P.pair&&li.tag==='top')reps=P.pair.split('/')[0];
             if(P.pair&&li.tag==='back')reps=P.pair.split('/')[1];
             reps=repPick(reps,P);
-            var v, fixed=(t.calc==='recalc'&&P.boMode==='fixe'&&li.pct<100);
+            if(zc&&(li.tag==='top'||li.tag==='back'))reps=repLess(reps,zc);   /* Q2 : fourchette, une rep de moins par echec */
+            var v, fixed=(t.calc==='recalc'&&P.boMode==='fixe'&&li.pct<100&&(li.tag==='back'||li.tag==='amrap'));   /* B15 / Q4 : J2 toujours recalculé */
             if(fixed)v=refAdd-boGap(L,P,li.pct);
             else if(t.calc==='recalc')v=refSys*li.pct/100-bz;
-            else v=(bz+s0)*li.pct/100-bz+P.inc*ue+dOff;
+            else v=(bz+s0)*li.pct/100-bz+P.inc*(ue-(fa&&fa.u0||0))+dOff;   /* V5 : % ancrés sur le départ du run en cours */
             day.lines.push({li:o.i,name:li.vari?varName(L):L.name,role:li.tag||'work',
-              sets:li.sets,reps:reps,load:rnd(v,L.step),info:(fixed?'top set \u2212 '+F(boGap(L,P,li.pct))+' kg (\u00e9cart fixe)':F(li.pct)+' %')+(rep_?' \u00b7 charge r\u00e9p\u00e9t\u00e9e':''),
+              sets:li.sets,reps:reps,load:rnd(v,L.step),info:(fixed?'top set \u2212 '+F(boGap(L,P,li.pct))+' kg (\u00e9cart fixe)':F(li.pct)+' %')+(rep_?' \u00b7 charge r\u00e9p\u00e9t\u00e9e':'')+(zc&&(li.tag==='top'||li.tag==='back')?' \u00b7 \u2212'+zc+' rep (\u00e9chec)':'')+(zNew&&li_i===0?' \u00b7 nouveau run':''),
               key:'z|'+o.i+'|'+w+'|'+lab+'|'+li_i+BK()});
           });
         }else{
-          var cy=Math.floor(w/t.weeks), ww=w%t.weeks;
+          var hk=hWk(L,w), cy=hk.c, ww=hk.ww;   /* Q6 */
           if(w>=S.nwk)return;
-          var rm=rmOf(L)+P.inc*cy;
+          var hso=flStop(L); if(hso!=null&&sessOrd(w,lab)>hso)return;   /* B2 : arret */
+          var ha=hAt(L,w,lab), rm=ha.rm, dInc=P.inc*(cy-ha.c);   /* B4 : charges de la vague d'ancrage + incrément × vagues, en charge système */
           day0.lines.forEach(function(li,li_i){
-            var r=li.reps[ww], q=li.rir[ww], v=loadAt(L,rm,r,q);
-            day.lines.push({li:o.i,name:li.vari?varName(L):L.name,role:li.vari?'var':'work',
-              sets:li.sets,reps:String(r),rir:q,load:rnd(v,L.step),info:q+' en réserve',
+            var r=li.reps[ww], q=li.rir[ww], sets=li.sets, role=li.vari?'var':'work', info=q+' en réserve', sysP, sys, tag='';
+            if(hk.dl){   /* Q6 : deload S4 = reps de la derniere semaine, charge de la S1, deux tiers des series */
+              sysP=sys=rm/(1+L.k*(li.reps[0]+(li.rir[0]||0)-1))+dInc; q=null; role='deload';
+              sets=Math.max(1,Math.round(li.sets*2/3)); info='deload S4 : reps de S'+t.weeks+', charge de S1, 2/3 des séries';
+            }else{   /* B2 / Q3 : regle du livre, par creneau ; le decalage vaut jusqu'a la fin de la vague */
+              sysP=rm/(1+L.k*(r+(q||0)-1))+dInc;
+              var sk=o.i+'|'+lab+'|'+li_i, hs=HS[sk], dd=(hs&&hs.c===cy)?hs.d:0;
+              sys=sysP+dd; if(dd<0)tag=' · décalée (échec)';
+              if(hs&&hs.f){
+                if(hs.st>=2){ if(0.9*hs.sys<sys){sys=0.9*hs.sys; tag=' · −10 % après deux échecs';} }
+                else if(hs.sys<sys){sys=hs.sys; tag=' · même charge qu\'en S'+(hs.w+1)+' (échec)';}
+              }
+              var fv=flAt(L,w,lab,li_i), fl=!!(fv&&fv.m==='h');
+              HS[sk]={sys:sys,f:fl,st:fl?((hs&&hs.f&&hs.st<2)?hs.st:0)+1:0,d:sys-sysP,c:cy,w:w};
+            }
+            day.lines.push({li:o.i,name:li.vari?varName(L):L.name,role:role,
+              sets:sets,reps:String(r),rir:q,load:rnd(sys-eff(L,ha.bw),L.step),info:info+tag,
               key:'h|'+o.i+'|'+w+'|'+lab+'|'+li_i+BK()});
           });
         }
@@ -2086,6 +2509,7 @@ function apDays(w){
   return ((w-1)%2===0)?['Lun','Mar','Ven','Sam']:['Mar','Ven'];
 }
 function apLines(L,idx,w,lab,day){
+  if(w>=S.nwk||apDays(w).indexOf(lab)<0)return;   /* B3 */
   var P=L.prog, st=L.step, e=bwZ(L);
   var intro=(P.intro==null?rnd(loadAt(L,rmOf(L),1,1),st):P.intro);
   var push=function(role,sets,reps,load,info,li_i){
@@ -2160,7 +2584,7 @@ function renderPlan(into,weeks,pfx,scope){
           txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n'; return; }
         var st=lineState(x.key);
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
-          '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':'')+lineMarks(x.key)+(DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
+          '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
           '<span class="in">'+x.info+'</span></div>';
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
@@ -2178,7 +2602,7 @@ function weekTag(w){
   S.lifts.forEach(function(L){
     var t=tplOf(L.prog.tpl); if(!t||L.prog.tpl==='off')return;
     if(t.special)tags.push(w===0?'intro':((w-1)%2===0?'volume':'intensité'));
-    else if(!isZlat(L.prog.tpl))tags.push('cycle '+(Math.floor(w/t.weeks)+1)+', S'+(w%t.weeks+1));
+    else if(!isZlat(L.prog.tpl)&&!t.acc){var hk=hWk(L,w); tags.push(hk.dl?'deload S4 après le cycle '+(hk.c+1):'cycle '+(hk.c+1)+', S'+(hk.ww+1));}   /* Q6 */
   });
   return tags.filter(function(v,i,a){return a.indexOf(v)===i;}).join(' · ');
 }
@@ -2212,7 +2636,7 @@ function trackLift(i){
     wk.days.forEach(function(d){d.lines.forEach(function(x){
       if(x.li!==i||x.role==='extra')return;
       n+=(+x.sets||1);
-      if(x.role==='var'||x.role==='acc')return;
+      if(x.role==='var'||x.role==='acc'||x.role==='deload')return;
       if(x.role==='amrap'||!/^\d/.test(String(x.reps))){ if(amrap===null)amrap={w:wk.w,d:d.label}; return; }
       var reps=repMax(x.reps); if(!reps)return;
       var dem=(eff(L)+x.load)*(1+L.k*(reps+(+x.rir||0)-1))-eff(L);
@@ -2466,8 +2890,6 @@ function panelHTML(key){
     nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
-  var uKey=keyUnit(key);
-  var fail=(uKey!=null&&(x.role==='top'||x.role==='amrap'))?((L.prog.adj||[]).indexOf(uKey)>=0):null;
   var rirNow=e?(e.rir===null?null:e.rir):undefined;
   var each=x.sets>1&&(e&&e.rirs?true:(e?false:!!S.rirEach));
   var trNow=e?(e.tries||e.sets):null;
@@ -2507,12 +2929,7 @@ function panelHTML(key){
           '<input data-setnote="'+q+'" type="text" value="'+esc(e&&e.setNotes?e.setNotes[q]:'')+'" placeholder="repos, exécution, sensation"></div>';
       }).join('')+'</details>':'')+
     nxt+
-    (fail!=null?'<div class="row" style="margin-top:8px"><div class="field w">'+
-      '<label>Ajustement du programme</label>'+
-      '<button class="act ghost mini" data-fail="'+key+'">'+(fail?'Annuler la répétition de charge':'Échec — répéter cette charge la fois suivante')+'</button>'+
-      '<details><summary class="note">Ce que prévoient Zlat et Helms</summary><p class="note">Zlat ne prévoit pas la répétition : chez lui une charge ratée termine le run, deload et reset. '+
-      'Helms prévoit la même charge la semaine suivante, puis −10 % après deux échecs. Répéter est donc votre adaptation, pas une règle du programme.</p></details>'+
-      '</div></div>':'')+
+    failUI(key,x,L)+   /* B2 */
     '<div class="btnrow"><button class="act" style="flex:1 1 auto;min-height:48px" data-save="'+key+'">Enregistrer</button>'+
       '<button class="act ghost" style="min-height:48px" data-close="1">Fermer</button>'+
       (e&&e.state==='skip'?'':'<button class="act ghost" style="min-height:48px" data-skip="'+key+'">Sauté</button>')+
@@ -2529,7 +2946,8 @@ function panelHTML(key){
    panneau qui etait ouvert se rouvre de lui-meme. */
 var DRAFTS={}; try{ DRAFTS=JSON.parse(localStorage.getItem('cp-drafts')||'{}')||{}; }catch(e){ DRAFTS={}; }
 var DRT=null, LASTOPEN=null;
-function draftPersist(){ clearTimeout(DRT); DRT=setTimeout(function(){ try{localStorage.setItem('cp-drafts',JSON.stringify(DRAFTS));}catch(e){} },250); }
+function draftWrite(){ clearTimeout(DRT); DRT=null; try{localStorage.setItem('cp-drafts',JSON.stringify(DRAFTS));}catch(e){} }
+function draftPersist(now){ clearTimeout(DRT); if(now){ draftWrite(); return; } DRT=setTimeout(draftWrite,250); }   /* B6 */
 function draftRead(p){
   var o={}, el;
   el=p.querySelector('[data-fld=load]'); if(el)o.load=el.value;
@@ -2576,14 +2994,20 @@ function markDraft(key){
     if(!DRAFTS[key]&&m)m.remove();
   });
 }
-function draftSnap(p){
+function draftSnap(p,now){
   p=p||document.querySelector('[data-panel]'); if(!p||p.dataset.nodraft)return;
   var key=p.dataset.panel, o=draftRead(p);
   if(JSON.stringify(o)===p.dataset.pristine){ if(!DRAFTS[key])return; delete DRAFTS[key]; }
   else { o.t=Date.now(); DRAFTS[key]=o; }
-  draftPersist(); markDraft(key);
+  draftPersist(now); markDraft(key);
 }
 function draftDrop(p,key){ if(p)p.dataset.nodraft='1'; delete DRAFTS[key]; draftPersist(); markDraft(key); }
+function draftPurge(){   /* B7 / R3 : brouillons d'un autre bloc, ou vieux de plus de 14 jours */
+  var n=0, lim=Date.now()-14*864e5;
+  Object.keys(DRAFTS).forEach(function(k){ var o=DRAFTS[k]; if(!inBlock(k)||!o||!(+o.t>lim)){ delete DRAFTS[k]; n++; } });
+  if(n)draftWrite();
+  return n;
+}
 function openPanel(el,key){
   closePanel();
   PV=panelValid(key,entryOf(key));
@@ -2607,7 +3031,9 @@ function reopenPanel(where){
 document.addEventListener('click',function(){ draftSnap(); setTimeout(function(){draftSnap();},0); },true);
 document.addEventListener('input',function(e){ if(e.target.closest&&e.target.closest('[data-panel]'))draftSnap(); },true);
 document.addEventListener('change',function(e){ if(e.target.closest&&e.target.closest('[data-panel]'))setTimeout(function(){draftSnap();},0); },true);
-document.addEventListener('visibilitychange',function(){ if(document.hidden)draftSnap(); });
+function draftFlush(){ draftSnap(null,1); if(DRT)draftWrite(); }   /* B6 : synchrone, la page peut être tuée juste après */
+document.addEventListener('visibilitychange',function(){ if(document.hidden)draftFlush(); });
+window.addEventListener('pagehide',draftFlush);
 /* prompt() est bloque par certains navigateurs des la deuxieme boite d'affilee, et en
    application installee il ne s'ouvre pas du tout : la correction d'une serie deja saisie
    devenait alors impossible. Le choix se fait donc en ligne, dans le panneau. */
@@ -2684,10 +3110,16 @@ function panelClick(e){
       }
       e.stopPropagation(); return;
     }
+    if(b.dataset.fm){failPick(b.dataset.fk,b.dataset.fm,!!p.closest('#todayout'));e.stopPropagation();return;}   /* B2 */
+    if(b.dataset.frv){   /* V2 : départ du nouveau run, proposition choisie */
+      var rk=b.dataset.frv, rq=rk.split('|'), rf=findLine(rk), rL=rf&&S.lifts[rf.line.li], rv=rL&&flAt(rL,+rq[2],rq[3],+rq[4]);
+      if(rv){rv.s=+b.dataset.v; rv.su=1; rv.a=0; save(); closePanel(); renderAssign(); refreshPlans(); failReopen(rk,p.closest('#todayout')?'todayout':'out');}
+      e.stopPropagation(); return;
+    }
     if(b.dataset.fail){toggleFail(b.dataset.fail);e.stopPropagation();return;}
     if(b.dataset.close){LASTOPEN=null;closePanel();e.stopPropagation();return;}
     if(b.dataset.drop){var kd=p.dataset.panel, ln=p.previousElementSibling; draftDrop(p,kd); closePanel(); if(ln)openPanel(ln,kd); e.stopPropagation(); return;}
-    if(b.dataset.clear){draftDrop(p,b.dataset.clear);LASTOPEN=null;keepJuge(b.dataset.clear);S.log=S.log.filter(function(x){return x.key!==b.dataset.clear;});save();closePanel();refreshPlans();e.stopPropagation();return;}
+    if(b.dataset.clear){flDropKey(b.dataset.clear,1);draftDrop(p,b.dataset.clear);LASTOPEN=null;keepJuge(b.dataset.clear);S.log=S.log.filter(function(x){return x.key!==b.dataset.clear;});save();closePanel();refreshPlans();e.stopPropagation();return;}
     if(b.dataset.save){saveLine(p,b.dataset.save);e.stopPropagation();return;}
     return;
   }
@@ -2736,12 +3168,15 @@ function saveLine(p,key){
   if(rirs)e.rirs=rirs;
   if(valid)e.valid=valid;
   e.tries=sets.slice(); recount(e); if(!e.state)e.state=stateOf(e);
+  if(/^[zh]\|/.test(key))fzEnsure(L);   /* B1 */
+  var fAuto=failAuto(L,x,key,e);   /* B2 */
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
   draftDrop(p,key); LASTOPEN=null;
   /* la ligne devient la reference des jugements de ses analyses video */
   veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
   var inToday=!!(p.closest&&p.closest('#todayout'));
   save(); closePanel(); refreshPlans();
+  if(fAuto){ failReopen(key,inToday?'todayout':'out'); return; }   /* B2 : le choix apres echec s'affiche */
   if(inToday){
     /* la prochaine ligne non saisie de la seance s'ouvre d'elle-meme */
     var ls=Array.prototype.slice.call(document.querySelectorAll('#todayout .line[data-key]'));
@@ -2760,6 +3195,8 @@ function skipLine(p,key){
   var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:x.li,lift:L.name,tpl:L.prog.tpl,week:f.w+1,day:f.day,
     role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,load:null,sets:[],rir:null,
     bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl?noteEl.value.trim():'',setNotes:[],state:'skip'};
+  if(/^[zh]\|/.test(key))fzEnsure(L);   /* B1 */
+  flDropKey(key,1);   /* B2 : sautee = ni echec ni reussite */
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
   draftDrop(p,key); LASTOPEN=null;
   var inToday=!!(p.closest&&p.closest('#todayout'));
@@ -2883,6 +3320,10 @@ function panelChange(ev){
     S.rirEach=t.checked; save();
   }
   if(t.dataset&&t.dataset.fld==='reps')refreshV(p);
+  if(t.dataset&&t.dataset.frs){   /* B2 : depart du nouveau run, modifiable */
+    var fk=t.dataset.frs, ff=findLine(fk), fq=fk.split('|'), fL=ff&&S.lifts[ff.line.li], fv=fL&&flAt(fL,+fq[2],fq[3],+fq[4]), nv=num(t.value,null);
+    if(fv&&nv!=null){fv.s=rnd(nv,fL.step); fv.su=1; fv.a=0; save(); closePanel(); renderAssign(); refreshPlans(); failReopen(fk,p.closest('#todayout')?'todayout':'out');}
+  }
 }
 ['out','todayout'].forEach(function(id){
   $(id).addEventListener('change',panelChange);
@@ -3038,6 +3479,7 @@ function renderToday(){
   renderPlan($('todayout'),weeks,'t','day');
   $('todayout').insertAdjacentHTML('afterbegin',warmCard(weeks));
   $('todayout').insertAdjacentHTML('afterbegin',rappelCard(k));
+  $('todayout').insertAdjacentHTML('afterbegin',pdcCard(k));   /* Q1 */
   $('todayout').insertAdjacentHTML('beforeend',statsCard(wIdx,sel));
   $('todayout').insertAdjacentHTML('beforeend',extraCard(k));
   $('todayout').insertAdjacentHTML('beforeend',notesCard(wIdx,sel));
@@ -3350,6 +3792,14 @@ function formLine(st){
   return ' \u00b7 forme moyenne ' + F(Math.round(f.avg*10)/10) + '/' + (f.mx||20) + ' sur ' + f.n +
     ' s\u00e9ance' + (f.n>1?'s':'') + ' not\u00e9e' + (f.n>1?'s':'') + ' (de ' + f.lo + ' \u00e0 ' + f.hi + ')';
 }
+function blockNotesHTML(b){   /* B21 : notes archivées à la clôture */
+  var dn=b.dayNotes||{}, nb=String(b.note||'').trim();
+  var ks=Object.keys(dn).filter(function(k){return String(dn[k]||'').trim();}).sort(function(x,y){
+    var a=x.split('|'), c=y.split('|'); return sessOrd(+a[0]||0,a[1])-sessOrd(+c[0]||0,c[1]);});
+  if(!nb&&!ks.length)return '';
+  return '<details><summary class="note">Notes du bloc</summary>'+(nb?'<p class="note"><b>Bloc</b> : '+esc(nb)+'</p>':'')+
+    ks.map(function(k){var q=k.split('|'); return '<p class="note"><b>'+(/^\d+$/.test(q[0])?'S'+(+q[0]+1)+' '+esc(q[1]||''):esc(k))+'</b> : '+esc(dn[k])+'</p>';}).join('')+'</details>';
+}
 function renderBilan(){
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
@@ -3361,7 +3811,7 @@ function renderBilan(){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
         ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+'</div>';
+        statsHTML(b.stats)+blockNotesHTML(b)+'</div>';
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -3372,19 +3822,21 @@ function renderBilan(){
 $('newblock').addEventListener('click',function(){
   if(!confirm('Cl\u00f4turer le bloc '+S.blockId+' ?\n\nLe bilan est archiv\u00e9 et reste consultable dans Donn\u00e9es. '+
     'Vos s\u00e9ries restent dans l\'historique et dans l\'ajustement de courbe. Le plan repart vierge : s\u00e9ances marqu\u00e9es '+
-    'faites, notes de s\u00e9ance, note de bloc et charges r\u00e9p\u00e9t\u00e9es apr\u00e8s \u00e9chec sont remises \u00e0 z\u00e9ro.'))return;
+    'faites et charges r\u00e9p\u00e9t\u00e9es apr\u00e8s \u00e9chec sont remises \u00e0 z\u00e9ro ; notes de s\u00e9ance, note de bloc et rep\u00e8res de forme sont archiv\u00e9s avec le bilan.'))return;
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   S.blocks.push({id:S.blockId,from:S.start||null,to:todayISO(),sess:sess.length,doneN:nd,form:formStats(),
     tpl:S.lifts.map(function(L){var t=tplOf(L.prog.tpl); return L.name+' : '+(t?t.name:L.prog.tpl)+', +'+F(L.prog.inc)+' kg';}),
-    stats:blockStats(S.start||null,todayISO())});
+    stats:blockStats(S.start||null,todayISO()),
+    note:S.blockNote||'', dayNotes:JSON.parse(JSON.stringify(S.dayNotes||{})), formData:JSON.parse(JSON.stringify(S.form||{}))});   /* B21 */
   S.lifts.forEach(function(L){
     var e=lastExploitable(L,true);
     if(e)L.refBlock=entryToRef(e);          /* Iterative : reprise de fin de phase */
   });
   S.blockId=(+S.blockId||1)+1;
   S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.form={};
-  S.lifts.forEach(function(L){L.prog.adj=[];});
+  S.lifts.forEach(function(L){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];});   /* B2, Q6 */
+  draftPurge();   /* B7 : brouillons du bloc clôturé */
   S.start=todayISO();
   dq().view='bilan';
   save(); renderAll();
@@ -3505,7 +3957,7 @@ function renderData(){
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
         '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+'</span>'+
-        '<button class="act ghost mini" data-rm="'+esc(e.id)+'" aria-label="Supprimer">\u00d7</button></div>';
+        '<button class="act ghost mini" data-rm="'+esc(e.key)+'" aria-label="Supprimer">\u00d7</button></div>';
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/')+
         (e.tries?' <i>(tentées '+e.tries.map(function(v){return v==null?'—':v;}).join('/')+')</i>':'');
       var vl=(e.valid||[]).map(function(a,st){
@@ -3523,14 +3975,15 @@ function renderData(){
         (vl?'<br>'+vl:'')+
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+
         (lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
-        '<button class="act ghost mini" data-rm="'+e.id+'">×</button></div>';
+        '<button class="act ghost mini" data-rm="'+esc(e.key)+'">×</button></div>';
     }).join('');
   }
 }
 $('loglist').addEventListener('click',function(e){
   var b=e.target.closest('[data-rm]'); if(!b)return;
-  S.log.forEach(function(x){ if(x.id===b.dataset.rm)keepJuge(x.key); });
-  S.log=S.log.filter(function(x){return x.id!==b.dataset.rm;}); save(); refreshPlans();
+  S.log.forEach(function(x){ if(x.key===b.dataset.rm)keepJuge(x.key); });   /* B20 : par clé, unique ; l'id peut être périmé */
+  flDropKey(b.dataset.rm,1);   /* série effacée : décision d'office retirée, comme dans le panneau */
+  S.log=S.log.filter(function(x){return x.key!==b.dataset.rm;}); save(); refreshPlans();
 });
 $('applyfit').addEventListener('click',function(){
   var done=[];
@@ -3685,7 +4138,7 @@ function veloAutoAll(){
   var ch=false; (S.velo||[]).forEach(function(v){ if(veloAuto(v))ch=true; });
   if(ch)save();
 }
-function roleLab(r){return r==='top'?'top set':r==='back'?'back-off':r==='amrap'?'série maximale':r==='pr'?'hors programme':r==='extra'?'ajout ponctuel':r==='acc'?'accessoire':'série';}
+function roleLab(r){return r==='top'?'top set':r==='back'?'back-off':r==='amrap'?'série maximale':r==='pr'?'hors programme':r==='extra'?'ajout ponctuel':r==='acc'?'accessoire':r==='deload'?'deload':r==='test'?'test 7-8RM':'série';}
 function lienSelect(v){
   var t=Date.parse(v.date)||0;
   var es=S.log.filter(function(e){return (v.li<0||e.li===v.li)&&e.sets&&e.sets.length;})
