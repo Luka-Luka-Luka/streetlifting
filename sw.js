@@ -1,5 +1,5 @@
 /* Incrémentez CACHE à chaque mise en ligne d'une nouvelle version. */
-const CACHE = 'charges-v27';
+const CACHE = 'charges-v30';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -30,16 +30,20 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;   /* polices et CDN : on laisse passer */
+  /* B14 : la mise a jour en arriere-plan (fetch PUIS put) est rattachee a e.waitUntil, et
+     waitUntil comme respondWith sont appeles tout de suite dans le gestionnaire. Sans cela
+     le navigateur peut arreter le service worker des que la reponse du cache est rendue :
+     le telechargement, ou le put, est coupe en route et le cache n'est jamais mis a jour --
+     l'outil restait indefiniment sur l'ancienne version. */
+  const net = fetch(e.request.url, {cache: 'no-cache'}).then(r => {
+    if (r && r.status === 200) {
+      const copy = r.clone();
+      return caches.open(CACHE).then(c => c.put(e.request, copy)).then(() => r, () => r);
+    }
+    return r;
+  });
+  e.waitUntil(net.catch(() => {}));
   e.respondWith(
-    caches.match(e.request).then(hit => {
-      const net = fetch(e.request.url, {cache: 'no-cache'}).then(r => {
-        if (r && r.status === 200) {
-          const copy = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-        }
-        return r;
-      }).catch(() => hit || caches.match('./index.html'));
-      return hit || net;
-    })
+    caches.match(e.request).then(hit => hit || net.catch(() => caches.match('./index.html')))
   );
 });
