@@ -30,7 +30,7 @@
 </head>
 <body>
 
-<h1>Prototype d'analyse vidéo — outil v34, lot 12</h1>
+<h1>Prototype d'analyse vidéo — outil v34, lot 13</h1>
 <p class="sub">Porte les mesures de <code>analyse_serie.py</code> v7.1 dans le navigateur, via WebCodecs.
 Rien n'est envoyé nulle part : tout se passe sur l'appareil.</p>
 
@@ -57,6 +57,15 @@ Rien n'est envoyé nulle part : tout se passe sur l'appareil.</p>
     <option value="180">180°</option><option value="270">270° horaire</option>
   </select>
 </div>
+<div>
+  Référence de comparaison :
+  <select id="ref">
+    <option value="s1">série 1 du 27/09/2026 — 1030 images (OpenCV)</option>
+    <option value="s4">série 4 du 27/09/2026 — 785 images (OpenCV, partielle)</option>
+    <option value="aucune">aucune — mesurer sans comparer</option>
+  </select>
+  <div class="rapport">La référence ne sert qu'à l'affichage des écarts. Choisir celle qui correspond à la vidéo chargée : comparer la série 4 à la référence de la série 1 produit des écarts qui ne veulent rien dire.</div>
+</div>
 <button id="go" disabled>Analyser</button>
 
 <h2>Écran 2 — Démultiplexage</h2>
@@ -82,9 +91,14 @@ Rien n'est envoyé nulle part : tout se passe sur l'appareil.</p>
 
 <h2>Écran 7 — Comparaison des passages</h2>
 <p class="rapport">À rapporter : ce tableau une fois les trois facteurs de réduction essayés (1, puis 2, puis 3, sur la même vidéo).</p>
-<table id="t_hist"><thead><tr><th>k</th><th>images</th><th>px/cm</th><th>écart</th><th>taux</th><th>trou</th><th>ms/img</th></tr></thead><tbody></tbody></table>
+<table id="t_hist"><thead><tr><th>k</th><th>images</th><th>px/cm</th><th>écart</th><th>taux</th><th>trou (ms)</th><th>ms/img</th></tr></thead><tbody></tbody></table>
 
-<h2>Écran 8 — Journal technique</h2>
+<h2>Écran 8 — Trajectoire</h2>
+<p class="rapport">À rapporter : les deux nombres, puis enregistrer le fichier et le joindre à la conversation. C'est la seule grandeur jamais comparée entre navigateur et OpenCV — celle dont sortent les vitesses.</p>
+<table id="t_traj"><tbody><tr><td class="n" colspan="2">—</td></tr></tbody></table>
+<button id="dl" disabled>Enregistrer la trajectoire (JSON)</button>
+
+<h2>Écran 9 — Journal technique</h2>
 <p class="rapport">À rapporter : uniquement s'il y a des lignes en rouge, ou si quelque chose a échoué avant l'écran 4.</p>
 <pre id="log">—</pre>
 
@@ -123,39 +137,43 @@ function masqueRose(data, W, H, stride) {
   return m;
 }
 
-// --- ouverture 3x3 pleine, bords comme cv2.morphologyEx(MORPH_OPEN) ---------
-// erosion : exterieur considere a 1 ; dilatation : exterieur a 0.
+// --- ouverture 3x3 creuse, bords comme cv2.morphologyEx(MORPH_OPEN) --------
+// Semantique identique a la version pleine du lot 12, bit pour bit :
+//   erosion    : exterieur considere a 1, donc er[i] = ET des voisins DANS l'image ;
+//                le centre etant un voisin, m[i] === 0 implique er[i] === 0 — d'ou le
+//                court-circuit, qui n'est pas une approximation.
+//   dilatation : exterieur a 0, donc di[p] = OU des voisins de p. Le voisinage 3x3
+//                etant symetrique, balayer les survivants et peindre leur voisinage
+//                (dispersion) donne exactement le meme masque que balayer tous les
+//                pixels et lire leur voisinage (collecte).
+// Gain mesure sur la serie 1 du 27/09 : 60,2 ms -> 5,2 ms par image (x11,9).
 function ouverture(m, W, H) {
-  const er = new Uint8Array(W * H);
+  const n = W * H;
+  const er = new Uint8Array(n);
+  const survivants = [];
   for (let y = 0; y < H; y++) {
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
     for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (!m[i]) continue;                       // court-circuit : centre a 0
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
       let ok = 1;
-      for (let dy = -1; dy <= 1 && ok; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= H) continue;         // exterieur = 1
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= W) continue;
-          if (m[yy * W + xx] === 0) { ok = 0; break; }
-        }
+      for (let dy = dy0; dy <= dy1 && ok; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) if (!m[b + dx]) { ok = 0; break; }
       }
-      er[y * W + x] = ok;
+      if (ok) { er[i] = 1; survivants.push(i); }
     }
   }
-  const di = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      let on = 0;
-      for (let dy = -1; dy <= 1 && !on; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= H) continue;         // exterieur = 0
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= W) continue;
-          if (er[yy * W + xx]) { on = 1; break; }
-        }
-      }
-      di[y * W + x] = on;
+  const di = new Uint8Array(n);
+  for (let s = 0; s < survivants.length; s++) {
+    const i = survivants[s];
+    const y = (i / W) | 0, x = i - y * W;
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+    const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+    for (let dy = dy0; dy <= dy1; dy++) {
+      const b = i + dy * W;
+      for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 1;
     }
   }
   return di;
@@ -316,7 +334,9 @@ function suivreMarque(tout, fixes, sautMax = 60.0) {
     const a = idx[k], b = idx[k + 1];
     y[i] = y[a] + ((y[b] - y[a]) * (i - a)) / (b - a);
   }
-  return { y, taux: e.taux, aire: e.aire, trou };
+  // `vus` : detection reelle image par image, avant interpolation. Necessaire au
+  // controle des trous en temps ecoule (lot 13) et a l'export de trajectoire.
+  return { y, vus: e.vus, taux: e.taux, aire: e.aire, trou };
 }
 
 
@@ -482,7 +502,17 @@ function demuxerCdn(fichier) {
 }
 
 /* ==================== pilotage ==================== */
-const REF = { images: 1030, fps: 29.95, d: 1398, pxcm: 6.086, ceinture: 5.477, taux: 1.0 };
+/* References de comparaison. Toutes les valeurs viennent d'analyse_serie.py v7.1
+   (OpenCV) sur la video correspondante. Celles qui n'ont pas ete mesurees valent null :
+   la ligne affiche alors « — » plutot qu'un ecart calcule sur un nombre invente.
+   serie 1 : capture du 28/09/2026, t/base/proto-video.json.
+   serie 4 : seule l'echelle a ete relevee (5,998 px/cm), d'ou les nulls. */
+const REFS = {
+  s1: { nom: 'série 1 du 27/09/2026', images: 1030, fps: 29.9523, d: 1398.176, pxcm: 6.085643, taux: 1.0 },
+  s4: { nom: 'série 4 du 27/09/2026', images: 785, fps: null, d: null, pxcm: 5.998, taux: null },
+  aucune: { nom: 'aucune', images: null, fps: null, d: null, pxcm: null, taux: null },
+};
+const TROU_MS_MAX = 100;   // 3 images a 30 im/s — critere en temps ecoule, pas en indice
 const FP = 0.90; // facteur de profondeur, calibration.json
 const $ = (i) => document.getElementById(i);
 const hist = [];
@@ -514,6 +544,7 @@ $('go').addEventListener('click', async () => {
 
 async function analyser() {
   const k = +$('k').value, filCm = +$('fil').value;
+  const REF = REFS[$('ref').value] || REFS.aucune;
   const t0 = performance.now();
 
   if (!('VideoDecoder' in window)) throw new Error("WebCodecs absent de ce navigateur (VideoDecoder non defini)");
@@ -572,7 +603,7 @@ async function analyser() {
   };
 
   // --- décodage
-  const tout = [];
+  const tout = [], tus = [];
   let attente = [], fini = false, erreurDec = null, tAnalyse = 0;
   const dec = new VideoDecoder({
     output: (f) => attente.push(f),
@@ -583,7 +614,13 @@ async function analyser() {
   const t1 = performance.now();
   let i = 0;
   $('etat').textContent = 'décodage…';
-  while (i < n || attente.length) {
+  // Sortie de boucle : `!fini` est indispensable. Sans lui, la boucle s'arrete des que
+  // la derniere image tamponnee vient d'etre analysee alors que le decodeur en retient
+  // encore (latence de reordonnancement) ; le flush() final les pousse dans `attente`,
+  // que plus personne ne lit, et 6 a 13 images sont perdues en silence. Le flush est en
+  // outre declenche des que le tampon descend a 2 images : le decodeur rend ses images
+  // retenues pendant qu'il reste du travail, au lieu d'un temps mort en fin de video.
+  while (i < n || attente.length || !fini) {
     if (erreurDec) throw new Error('decodage interrompu : ' + erreurDec.message);
     while (i < n && attente.length < 8 && dec.decodeQueueSize < 12) {
       const s = m.ech[i];
@@ -592,14 +629,16 @@ async function analyser() {
         type: s.cle ? 'key' : 'delta', timestamp: s.ts, data: donnees }));
       i++;
     }
-    if (!attente.length) {
-      if (i >= n && !fini) { fini = true; try { await dec.flush(); } catch (e) { journal('flush : ' + e.message, true); } }
-      if (!attente.length) { if (fini) break; await pause(); continue; }
+    if (i >= n && !fini && attente.length <= 2) {
+      fini = true;
+      try { await dec.flush(); } catch (e) { journal('flush : ' + e.message, true); }
     }
+    if (!attente.length) { if (fini) break; await pause(); continue; }
     const f = attente.shift();
     poser(cx, cw, ch, k);
     cx.drawImage(f, 0, 0);
     if (tout.length === 0) { poser(vx, vue.width, vue.height, 4); vx.drawImage(f, 0, 0); }
+    tus.push(f.timestamp);            // horodatage reel (us), lu avant close()
     f.close();
     const ta = performance.now();
     const px = cx.getImageData(0, 0, cw, ch).data;
@@ -613,8 +652,9 @@ async function analyser() {
       await pause();
     }
   }
-  try { await dec.flush(); } catch (e) {}
+  if (!fini) { try { await dec.flush(); } catch (e) {} }
   dec.close();
+  if (attente.length) { journal(attente.length + ' image(s) rendues apres la boucle : non analysees', true); for (const f of attente) f.close(); attente = []; }
   const tDecode = performance.now() - t1;
   $('barre').firstElementChild.style.width = '100%';
   $('etat').textContent = tout.length + ' images décodées en ' + (tDecode / 1000).toFixed(1) + ' s';
@@ -640,20 +680,42 @@ async function analyser() {
      lg('fréquence (im/s)', fps, REF.fps, 2),
      lg('distance marques du fil (px)', d, REF.d, 2),
      lg('échelle au fil (px/cm)', pxcm, REF.pxcm, 4),
-     lg('échelle ceinture (× 0,90)', pxcm ? pxcm * FP : null, REF.ceinture, 4),
+     lg('échelle ceinture (× 0,90)', pxcm ? pxcm * FP : null, REF.pxcm ? REF.pxcm * FP : null, 4),
      lg('taux de détection', suivi ? suivi.taux : null, REF.taux, 3),
     ].map((l) => '<tr>' + l.map((c, j) => `<td class="${j ? 'n' : ''}">${c}</td>`).join('') + '</tr>').join('') +
     `<tr><td>marques fixes trouvées</td><td class="n" colspan="3">${fixes.map((f) => 'y=' + f.y.toFixed(1) + ' x=' + f.x.toFixed(1) + ' aire=' + Math.round(f.aire)).join(' · ')}</td></tr>`;
 
+  // --- trous de detection, mesures en TEMPS ECOULE et non en indice d'image.
+  // Un trou de 3 images ne dit rien tant qu'on ignore la duree des images : la video
+  // est a frequence variable (premier intervalle 94 ms au lieu de 33). Ce qui compte
+  // pour une vitesse, c'est la duree sur laquelle la position a ete interpolee.
+  let trouIm = null, trouMs = null, nTrous = 0;
+  if (suivi && suivi.vus && tus.length === suivi.vus.length) {
+    trouIm = 0; trouMs = 0;
+    let a = -1;
+    for (let j = 0; j <= suivi.vus.length; j++) {
+      if (j < suivi.vus.length && !suivi.vus[j]) { if (a < 0) a = j; continue; }
+      if (a < 0) continue;
+      const b = j - 1;
+      nTrous++;
+      if (b - a + 1 > trouIm) trouIm = b - a + 1;
+      const ms = (tus[Math.min(tus.length - 1, b + 1)] - tus[Math.max(0, a - 1)]) / 1000;
+      if (ms > trouMs) trouMs = ms;
+      a = -1;
+    }
+  }
+
   // --- verdicts
   const v1 = tout.length === n;
-  const v2 = pxcm !== null && Math.abs((pxcm - REF.pxcm) / REF.pxcm) < 0.01;
-  const v3 = suivi !== null && suivi.trou <= 3;
+  const v2 = pxcm !== null && REF.pxcm !== null && Math.abs((pxcm - REF.pxcm) / REF.pxcm) < 0.01;
+  const v3 = trouMs !== null && trouMs <= TROU_MS_MAX;
   const mark = (b) => b ? '<span class="ok">RÉUSSI</span>' : '<span class="ko">ÉCHOUÉ</span>';
   tableau('t_verdict', [
-    ['1. toutes les images décodées', mark(v1) + ' — ' + tout.length + ' / ' + n],
-    ['2. échelle à moins de 1 %', mark(v2) + ' — ' + fmt(pxcm, 4) + ' px/cm'],
-    ['3. aucun trou de plus de 3 images', mark(v3) + ' — plus long trou : ' + (suivi ? suivi.trou : '—')],
+    ['1. images analysées = échantillons', mark(v1) + ' — ' + tout.length + ' / ' + n],
+    ['2. échelle à moins de 1 %', (REF.pxcm === null ? '<span class="n">sans référence</span>' : mark(v2)) + ' — ' + fmt(pxcm, 4) + ' px/cm'],
+    ['3. aucun trou de plus de ' + TROU_MS_MAX + ' ms',
+      (trouMs === null ? '<span class="ko">non mesurable</span>' : mark(v3)) +
+      ' — plus long trou : ' + (trouMs === null ? '—' : trouMs.toFixed(1) + ' ms (' + trouIm + ' image(s))')],
   ]);
 
   const total = performance.now() - t0;
@@ -665,11 +727,63 @@ async function analyser() {
   ]);
 
   hist.push([k, tout.length, fmt(pxcm, 4),
-    pxcm ? ((pxcm - REF.pxcm) / REF.pxcm * 100).toFixed(2) + ' %' : '—',
-    suivi ? fmt(suivi.taux, 3) : '—', suivi ? suivi.trou : '—',
+    (pxcm !== null && REF.pxcm !== null) ? ((pxcm - REF.pxcm) / REF.pxcm * 100).toFixed(2) + ' %' : '—',
+    suivi ? fmt(suivi.taux, 3) : '—', trouMs === null ? '—' : trouMs.toFixed(0),
     (tDecode / Math.max(1, tout.length)).toFixed(0)]);
   $('t_hist').querySelector('tbody').innerHTML = hist.map((l) =>
     '<tr>' + l.map((c) => `<td class="n">${c}</td>`).join('') + '</tr>').join('');
+
+  // --- export de la trajectoire, image par image, avec les horodatages reels.
+  // Les y sont en pixels PLEINE RESOLUTION (marques() a deja multiplie par k), donc
+  // directement comparables a la sortie d'analyse_serie.py quel que soit k.
+  const traj = {
+    format: 'proto-video.trajectoire',
+    version: 1,
+    source: fichier.name,
+    date: new Date().toISOString(),
+    navigateur: navigator.userAgent,
+    reference_choisie: REF.nom,
+    video: {
+      codec: m.codec, largeur_codee: m.largeur, hauteur_codee: m.hauteur,
+      rotation: rot, largeur: dispoW, hauteur: dispoH,
+      echantillons: n, images_analysees: tout.length,
+      fps_deduit: +fps.toFixed(4), reduction_k: k,
+    },
+    echelle: {
+      fil_cm: filCm, d_px: d === null ? null : +d.toFixed(4),
+      px_cm: pxcm === null ? null : +pxcm.toFixed(6),
+      facteur_profondeur: FP,
+      px_cm_ceinture: pxcm === null ? null : +(pxcm * FP).toFixed(6),
+    },
+    fixes: fixes.map((f) => ({ y: +f.y.toFixed(4), x: +f.x.toFixed(4), aire: Math.round(f.aire) })),
+    suivi: suivi ? {
+      taux: +suivi.taux.toFixed(4), aire_amorce: Math.round(suivi.aire),
+      trous: nTrous, trou_images: trouIm, trou_ms: trouMs === null ? null : +trouMs.toFixed(2),
+    } : null,
+    // t_us : horodatage de presentation de chaque image, en microsecondes, tel que rendu
+    // par le decodeur. y : position de la marque de ceinture, en pixels image, apres
+    // interpolation des trous. vu : 1 = marque reellement detectee, 0 = valeur interpolee.
+    t_us: tus,
+    y: suivi ? suivi.y.map((v) => +v.toFixed(4)) : null,
+    vu: suivi ? suivi.vus.map((v) => (v ? 1 : 0)) : null,
+    temps_ms: { demultiplexage: +tDemux.toFixed(0), decodage_analyse: +tDecode.toFixed(0), pixels: +tAnalyse.toFixed(0) },
+  };
+  const nomTraj = (fichier.name.replace(/\.[^.]+$/, '') || 'serie') + '.trajectoire.json';
+  tableau('t_traj', [
+    ['images avec horodatage', tus.length + ' / ' + n],
+    ['points de trajectoire', (traj.y ? traj.y.length : 0) + (traj.y && traj.y.length === tus.length ? ' (alignés)' : ' — DÉSALIGNÉS')],
+    ['trous interpolés', nTrous + (trouMs === null ? '' : ', le plus long ' + trouMs.toFixed(1) + ' ms')],
+    ['durée couverte', tus.length > 1 ? ((tus[tus.length - 1] - tus[0]) / 1e6).toFixed(2) + ' s' : '—'],
+    ['fichier', nomTraj],
+  ]);
+  const dl = $('dl');
+  dl.disabled = false;
+  dl.onclick = () => {
+    const u = URL.createObjectURL(new Blob([JSON.stringify(traj)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = u; a.download = nomTraj; a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 5000);
+  };
 
   journal('passage k=' + k + ' termine.');
 }
