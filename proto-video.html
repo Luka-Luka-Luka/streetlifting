@@ -102,6 +102,12 @@ Rien n'est envoyé nulle part : tout se passe sur l'appareil.</p>
 <p class="rapport">À rapporter : uniquement s'il y a des lignes en rouge, ou si quelque chose a échoué avant l'écran 4.</p>
 <pre id="log">—</pre>
 
+<h2>Rapport — tout ce qu'il y a à rapporter, en un bouton</h2>
+<p class="rapport">Remplace la recopie à la main des écrans 2 à 9. « Copier » met le rapport dans le presse-papiers ; si Android refuse (page ouverte en file://), le texte apparaît dans le cadre : appui long, tout sélectionner, copier. « Enregistrer » produit un .txt à joindre.</p>
+<button id="cp" disabled>Copier le rapport</button>
+<button id="dlr" disabled>Enregistrer le rapport (.txt)</button>
+<textarea id="rap" rows="6" style="display:none;width:100%;font:12px/1.4 monospace" readonly></textarea>
+
 <h2>Contrôle visuel (première image redressée)</h2>
 <p class="rapport">À rapporter : oui/non — l'image est-elle à l'endroit, en portrait, avec la barre en haut ?</p>
 <canvas id="vue" width="10" height="10"></canvas>
@@ -114,25 +120,65 @@ Rien n'est envoyé nulle part : tout se passe sur l'appareil.</p>
 // octets par pixel (4 pour RGBA du canvas, 3 pour rgb24 de ffmpeg).
 
 // --- HSV facon OpenCV 8 bits : H dans 0..179, S et V dans 0..255 -------------
-function masqueRose(data, W, H, stride) {
+// Lot 14. Ces fonctions acceptent un dernier argument `etat` facultatif, obtenu par
+// nouvelEtat(W, H) et reutilise d'une image a l'autre. Sans `etat` elles allouent
+// comme au lot 13. Avec ou sans, la sortie est la MEME, bit pour bit : c'est la
+// recette outils-lot14/t-prealloc.mjs qui l'exige, pas ce commentaire qui le promet.
+//
+// Ce que `etat` supprime, par image, en 1088x1920 : masque rose 2,09 Mo, masque ouvert
+// 2,09 Mo, etiquettes 8,36 Mo, plus le tableau `er` du lot 13 (2,09 Mo) qui etait ecrit
+// et jamais relu — supprime, pas remplace. Aucun de ces tableaux n'est remis a zero en
+// bloc : masqueRose ecrit tous les pixels, `di` est efface par le voisinage des
+// survivants de l'image precedente, `lab` par la liste des pixels etiquetes.
+function nouvelEtat(W, H) {
   const n = W * H;
-  const m = new Uint8Array(n);
+  return {
+    W, H, n,
+    m: new Uint8Array(n),           // masque rose
+    di: new Uint8Array(n),          // masque apres ouverture
+    lab: new Int32Array(n),         // etiquettes, premiere passe
+    surv: new Int32Array(1 << 14), nsurv: 0,    // survivants de l'erosion
+    etiq: new Int32Array(1 << 14),              // pixels etiquetes, en ordre de balayage
+    parent: new Int32Array(1024), fin: new Int32Array(1024),
+    sx: new Float64Array(256), sy: new Float64Array(256),
+    nb: new Int32Array(256), ya: new Int32Array(256), yb: new Int32Array(256),
+  };
+}
+
+// agrandit un tableau type en conservant son contenu (x2, comme `parent` au lot 12)
+function agrandir(t, mini) {
+  let L = t.length; while (L < mini) L *= 2;
+  const p = new t.constructor(L); p.set(t); return p;
+}
+
+// Rejet precoce du lot 14 : un pixel n'est retenu que si le maximum des trois canaux
+// est le ROUGE. Ce n'est pas une approximation, c'est une equivalence.
+//   si le max est le vert : h = 120 + 60*(b-r)/d avec |b-r| <= d, donc h dans [60,180],
+//                           hh = round(h/2) dans [30,90] — jamais >= 158 ni <= 8 ;
+//   si le max est le bleu : h = 240 + 60*(r-g)/d, donc h dans [180,300],
+//                           hh dans [90,150] — jamais retenu non plus.
+// En cas d'egalite, la cascade du lot 12 prend deja la branche rouge la premiere, donc
+// `r >= g && r >= b` reproduit exactement `mx === r`. Verifie par enumeration des
+// 16 777 216 triplets RGB dans t-prealloc.mjs : zero desaccord. Le gain vient de ce que
+// la division, l'arrondi et le calcul de teinte ne sont plus atteints que par une
+// fraction des pixels au lieu de tous.
+function masqueRose(data, W, H, stride, etat) {
+  const n = W * H;
+  const m = etat ? etat.m : new Uint8Array(n);
   for (let i = 0, p = 0; i < n; i++, p += stride) {
     const r = data[p], g = data[p + 1], b = data[p + 2];
-    let mx = r > g ? r : g; if (b > mx) mx = b;
-    if (mx < 70) continue;                       // V >= 70
-    let mn = r < g ? r : g; if (b < mn) mn = b;
-    const d = mx - mn;
-    if (d === 0) continue;                       // S = 0
-    if (Math.round((255 * d) / mx) < 60) continue; // S >= 60
-    let h;
-    if (mx === r) h = (60 * (g - b)) / d;
-    else if (mx === g) h = 120 + (60 * (b - r)) / d;
-    else h = 240 + (60 * (r - g)) / d;
-    if (h < 0) h += 360;
-    let hh = Math.round(h / 2);
-    if (hh >= 180) hh -= 180;
-    if (hh >= 158 || hh <= 8) m[i] = 1;          // rouge/rose
+    let v = 0;
+    if (r >= g && r >= b && r >= 70) {            // max = rouge, et V >= 70
+      const mn = g < b ? g : b, d = r - mn;
+      if (d !== 0 && Math.round((255 * d) / r) >= 60) {   // S > 0 et S >= 60
+        let h = (60 * (g - b)) / d;
+        if (h < 0) h += 360;
+        let hh = Math.round(h / 2);
+        if (hh >= 180) hh -= 180;
+        if (hh >= 158 || hh <= 8) v = 1;          // rouge/rose
+      }
+    }
+    m[i] = v;                                     // ecrit toujours : rien a effacer
   }
   return m;
 }
@@ -146,29 +192,44 @@ function masqueRose(data, W, H, stride) {
 //                etant symetrique, balayer les survivants et peindre leur voisinage
 //                (dispersion) donne exactement le meme masque que balayer tous les
 //                pixels et lire leur voisinage (collecte).
-// Gain mesure sur la serie 1 du 27/09 : 60,2 ms -> 5,2 ms par image (x11,9).
-function ouverture(m, W, H) {
+// Lot 14 : `er` supprime (ecrit, jamais relu) ; `di` efface par le voisinage des
+// survivants de l'image precedente, soit quelques dizaines de milliers d'ecritures au
+// lieu de 2 088 960.
+function ouverture(m, W, H, etat) {
   const n = W * H;
-  const er = new Uint8Array(n);
-  const survivants = [];
+  let di, surv;
+  if (etat) {
+    di = etat.di; surv = etat.surv;
+    for (let s = 0; s < etat.nsurv; s++) {
+      const i = surv[s], y = (i / W) | 0, x = i - y * W;
+      const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+      for (let dy = dy0; dy <= dy1; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 0;
+      }
+    }
+  } else { di = new Uint8Array(n); surv = new Int32Array(1 << 14); }
+  let ns = 0;
   for (let y = 0; y < H; y++) {
     const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
-      if (!m[i]) continue;                       // court-circuit : centre a 0
+      if (!m[i]) continue;                        // court-circuit : centre a 0
       const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
       let ok = 1;
       for (let dy = dy0; dy <= dy1 && ok; dy++) {
         const b = i + dy * W;
         for (let dx = dx0; dx <= dx1; dx++) if (!m[b + dx]) { ok = 0; break; }
       }
-      if (ok) { er[i] = 1; survivants.push(i); }
+      if (ok) {
+        if (ns >= surv.length) { surv = agrandir(surv, ns + 1); if (etat) etat.surv = surv; }
+        surv[ns++] = i;
+      }
     }
   }
-  const di = new Uint8Array(n);
-  for (let s = 0; s < survivants.length; s++) {
-    const i = survivants[s];
-    const y = (i / W) | 0, x = i - y * W;
+  for (let s = 0; s < ns; s++) {
+    const i = surv[s], y = (i / W) | 0, x = i - y * W;
     const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
     const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
     for (let dy = dy0; dy <= dy1; dy++) {
@@ -176,61 +237,87 @@ function ouverture(m, W, H) {
       for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 1;
     }
   }
+  if (etat) etat.nsurv = ns;
   return di;
 }
 
 // --- composantes connexes 8-connexite, equivalent de connectedComponentsWithStats
-function composantes(m, W, H) {
-  const lab = new Int32Array(W * H);
-  let parent = new Int32Array(1024), nl = 1;
+// Lot 14 : le quadruplet de voisins, qui allouait quatre tableaux et un iterateur par
+// pixel allume, est deroule — l'ordre de lecture est conserve tel quel. La premiere
+// passe note les pixels etiquetes dans `etiq`, EN ORDRE DE BALAYAGE ; la seconde
+// parcourt cette liste au lieu de rebalayer les 2 088 960 pixels. L'ordre d'apparition
+// etant le meme, la renumerotation « comme OpenCV » est la meme, donc la sortie aussi.
+// Au passage la seconde passe remet `lab` a zero sur ces seuls pixels.
+function composantes(m, W, H, etat) {
+  const n = W * H;
+  let lab, parent, etiq, sx, sy, nb, ya, yb, fin;
+  if (etat) { lab = etat.lab; parent = etat.parent; etiq = etat.etiq; }
+  else { lab = new Int32Array(n); parent = new Int32Array(1024); etiq = new Int32Array(1 << 14); }
+  let nl = 1, ne = 0;
   const trouver = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
   const unir = (a, b) => { a = trouver(a); b = trouver(b); if (a !== b) parent[a < b ? b : a] = a < b ? a : b; };
   const neuf = () => {
-    if (nl >= parent.length) { const p = new Int32Array(parent.length * 2); p.set(parent); parent = p; }
+    if (nl >= parent.length) { parent = agrandir(parent, nl + 1); if (etat) etat.parent = parent; }
     parent[nl] = nl; return nl++;
   };
   for (let y = 0; y < H; y++) {
+    const h = y * W, hp = h - W;
     for (let x = 0; x < W; x++) {
-      const i = y * W + x;
+      const i = h + x;
       if (!m[i]) continue;
-      let l = 0;
-      for (const [dy, dx] of [[-1, -1], [-1, 0], [-1, 1], [0, -1]]) {
-        const yy = y + dy, xx = x + dx;
-        if (yy < 0 || xx < 0 || xx >= W) continue;
-        const v = lab[yy * W + xx];
-        if (!v) continue;
-        if (!l) l = v; else unir(l, v);
+      let l = 0, v;
+      if (y > 0) {
+        if (x > 0) { v = lab[hp + x - 1]; if (v) l = v; }
+        v = lab[hp + x]; if (v) { if (!l) l = v; else unir(l, v); }
+        if (x < W - 1) { v = lab[hp + x + 1]; if (v) { if (!l) l = v; else unir(l, v); } }
       }
+      if (x > 0) { v = lab[i - 1]; if (v) { if (!l) l = v; else unir(l, v); } }
       lab[i] = l || neuf();
+      if (ne >= etiq.length) { etiq = agrandir(etiq, ne + 1); if (etat) etat.etiq = etiq; }
+      etiq[ne++] = i;
     }
   }
   // seconde passe : renumerotation dans l'ordre d'apparition (comme OpenCV)
-  const fin = new Int32Array(nl);
+  if (etat) {
+    if (etat.fin.length < nl) etat.fin = new Int32Array(Math.max(nl, etat.fin.length * 2));
+    fin = etat.fin; fin.fill(0, 0, nl);
+    sx = etat.sx; sy = etat.sy; nb = etat.nb; ya = etat.ya; yb = etat.yb;
+  } else {
+    fin = new Int32Array(nl);
+    sx = new Float64Array(256); sy = new Float64Array(256);
+    nb = new Int32Array(256); ya = new Int32Array(256); yb = new Int32Array(256);
+  }
   let k = 0;
-  const sx = [], sy = [], nb = [], y0 = [], y1 = [];
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!lab[i]) continue;
-      const r = trouver(lab[i]);
-      if (!fin[r]) { fin[r] = ++k; sx.push(0); sy.push(0); nb.push(0); y0.push(y); y1.push(y); }
-      const j = fin[r] - 1;
-      sx[j] += x; sy[j] += y; nb[j]++;
-      if (y < y0[j]) y0[j] = y;
-      if (y > y1[j]) y1[j] = y;
+  for (let p = 0; p < ne; p++) {
+    const i = etiq[p], y = (i / W) | 0, x = i - y * W;
+    const r = trouver(lab[i]);
+    if (!fin[r]) {
+      if (k >= nb.length) {
+        sx = agrandir(sx, k + 1); sy = agrandir(sy, k + 1);
+        nb = agrandir(nb, k + 1); ya = agrandir(ya, k + 1); yb = agrandir(yb, k + 1);
+        if (etat) { etat.sx = sx; etat.sy = sy; etat.nb = nb; etat.ya = ya; etat.yb = yb; }
+      }
+      fin[r] = ++k;
+      const j = k - 1;
+      sx[j] = 0; sy[j] = 0; nb[j] = 0; ya[j] = y; yb[j] = y;
     }
+    const j = fin[r] - 1;
+    sx[j] += x; sy[j] += y; nb[j]++;
+    if (y < ya[j]) ya[j] = y;
+    if (y > yb[j]) yb[j] = y;
+    lab[i] = 0;                                   // remise a zero ciblee
   }
   const out = [];
-  for (let j = 0; j < k; j++) out.push({ x: sx[j] / nb[j], y: sy[j] / nb[j], h: y1[j] - y0[j] + 1, aire: nb[j] });
+  for (let j = 0; j < k; j++) out.push({ x: sx[j] / nb[j], y: sy[j] / nb[j], h: yb[j] - ya[j] + 1, aire: nb[j] });
   return out;
 }
 
 // k = facteur de reduction applique a l'image (1 = pleine resolution).
 // Les taches sont renvoyees en pixels PLEINE RESOLUTION : tous les seuils en aval
 // (12, 14, 65, 60, 150, 120, 600) restent donc ceux du script Python, inchanges.
-function marques(data, W, H, stride, k = 1, aireMin = 40) {
-  const m = ouverture(masqueRose(data, W, H, stride), W, H);
-  const bl = composantes(m, W, H);
+function marques(data, W, H, stride, k = 1, aireMin = 40, etat) {
+  const m = ouverture(masqueRose(data, W, H, stride, etat), W, H, etat);
+  const bl = composantes(m, W, H, etat);
   if (k === 1) return bl.filter((b) => b.aire >= aireMin);
   const k2 = k * k;
   return bl.map((b) => ({ x: b.x * k, y: b.y * k, h: b.h * k, aire: b.aire * k2 }))
@@ -602,6 +689,11 @@ async function analyser() {
     else if (rot === 270) { ctx.translate(0, dispoH); ctx.rotate(-Math.PI / 2); }
   };
 
+  // --- etat de mesure prealloue (lot 14) : masque rose, masque ouvert, etiquettes et
+  // accumulateurs sont alloues UNE fois pour toute la video au lieu de 14,6 Mo par
+  // image. La sortie est identique bit pour bit — recette outils-lot14/t-prealloc.mjs.
+  const etatM = nouvelEtat(cw, ch);
+
   // --- décodage
   const tout = [], tus = [];
   let attente = [], fini = false, erreurDec = null, tAnalyse = 0;
@@ -642,7 +734,7 @@ async function analyser() {
     f.close();
     const ta = performance.now();
     const px = cx.getImageData(0, 0, cw, ch).data;
-    tout.push(marques(px, cw, ch, 4, k));
+    tout.push(marques(px, cw, ch, 4, k, 40, etatM));
     tAnalyse += performance.now() - ta;
     if (tout.length % 5 === 0) {
       const p = tout.length / n;
@@ -782,6 +874,58 @@ async function analyser() {
     const u = URL.createObjectURL(new Blob([JSON.stringify(traj)], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = u; a.download = nomTraj; a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 5000);
+  };
+
+  // --- rapport texte : tout ce que le prompt de passation demandait de recopier ------
+  // Lit les tableaux deja affiches, donc il ne peut pas diverger de l'ecran : s'il y a
+  // un chiffre dans le rapport, c'est celui que le proto a affiche.
+  const texte = () => {
+    const l = [];
+    l.push('# proto-video — rapport ' + new Date().toISOString());
+    l.push('fichier : ' + fichier.name + '  (' + (fichier.size / 1e6).toFixed(1) + ' Mo)');
+    l.push('navigateur : ' + navigator.userAgent);
+    l.push('référence : ' + (REFS[$('ref').value] ? REFS[$('ref').value].nom : $('ref').value) + '   k = ' + k);
+    const bloc = (titre, id) => {
+      const t = $(id); if (!t) return;
+      l.push(''); l.push('## ' + titre);
+      for (const tr of t.querySelectorAll('tr')) {
+        const c = [...tr.children].map((x) => x.textContent.trim());
+        if (c.join('')) l.push(c.join('\t'));
+      }
+    };
+    l.push(''); l.push('## Écran 2 — Démultiplexage'.slice(3));
+    bloc('Écran 2 — Démultiplexage', 't_demux');
+    l.push(''); l.push('## Écran 3 — Décodage'); l.push($('etat').textContent.trim());
+    bloc('Écran 4 — Mesures', 't_mes');
+    bloc('Écran 5 — Verdicts', 't_verdict');
+    bloc('Écran 6 — Temps', 't_temps');
+    bloc('Écran 7 — Comparaison des passages', 't_hist');
+    bloc('Écran 8 — Trajectoire', 't_traj');
+    l.push(''); l.push('## Écran 9 — Journal technique');
+    l.push($('log').textContent.trim());
+    l.push(''); l.push('## À compléter à la main (le proto ne peut pas le savoir)');
+    l.push('téléphone chaud : ___   écran resté allumé : ___   image de contrôle à l\'endroit : ___');
+    return l.join('\n');
+  };
+  const cp = $('cp'), dlr = $('dlr'), rap = $('rap');
+  cp.disabled = false; dlr.disabled = false;
+  cp.onclick = async () => {
+    const t = texte();
+    try {
+      await navigator.clipboard.writeText(t);
+      cp.textContent = 'Rapport copié ✓';
+      setTimeout(() => { cp.textContent = 'Copier le rapport'; }, 2500);
+    } catch (e) {
+      rap.style.display = 'block'; rap.value = t; rap.select();
+      cp.textContent = 'Presse-papiers refusé — copier depuis le cadre';
+    }
+  };
+  dlr.onclick = () => {
+    const u = URL.createObjectURL(new Blob([texte()], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = u; a.download = (fichier.name.replace(/\.[^.]+$/, '') || 'serie') + '.rapport.txt';
+    a.click();
     setTimeout(() => URL.revokeObjectURL(u), 5000);
   };
 
