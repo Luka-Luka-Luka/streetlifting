@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesure des taches</title>
+<style>
+:root{--bg:#f5f6f3;--fg:#1c221f;--mute:#5a645e;--line:#d3d9d2;--carte:#ffffff;--accent:#2d6a4d;--accent-fg:#fff;--ok:#2d6a4d;--ko:#a3271f;--ko-bg:#fbeceb}
+@media (prefers-color-scheme:dark){:root{--bg:#131815;--fg:#e3e8e3;--mute:#9aa49d;--line:#2c342f;--carte:#1a201c;--accent:#6fbf94;--accent-fg:#0d1310;--ok:#6fbf94;--ko:#ff8a80;--ko-bg:#2a1715}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:1rem/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px 16px 48px}
+main{max-width:34rem;margin:0 auto;display:grid;gap:1rem}
+h1{font-size:1.45rem;line-height:1.2;margin:0}
+.sous{color:var(--mute);margin:.2rem 0 0;font-size:.92rem}
+.carte{background:var(--carte);border:1px solid var(--line);border-radius:10px;padding:1rem;display:grid;gap:.7rem}
+.num{display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-weight:700;font-size:.9rem;margin-right:.4rem}
+h2{font-size:1.05rem;margin:0;display:flex;align-items:center}
+input[type=file]{font-size:1rem;max-width:100%}
+button{font:600 1.05rem system-ui,sans-serif;background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:.85rem 1.2rem;width:100%}
+button:disabled{opacity:.4}
+.barre{height:14px;border-radius:7px;background:var(--line);overflow:hidden}
+.barre>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+#etat{font-variant-numeric:tabular-nums}
+.petit{color:var(--mute);font-size:.88rem;margin:0}
+#erreur{display:none;background:var(--ko-bg);border:2px solid var(--ko);border-radius:10px;padding:1rem}
+#erreur h2{color:var(--ko)}
+#erreur p{margin:.4rem 0 0}
+#erreur code{font-size:.82rem;word-break:break-word}
+#fin{display:none}
+.ok{color:var(--ok);font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Mesure des taches — vidéo du téléphone</h1>
+<p class="sous">Outil v34 · lot 29 · tout se calcule ici, sur ce téléphone, sans réseau.</p></header>
+
+<section class="carte"><h2><span class="num">1</span>Choisir la vidéo</h2>
+<input type="file" id="fichier" accept="video/mp4,video/*">
+<p class="petit">Prenez la vidéo d'origine (VID_20260927_135804…), pas une copie envoyée par une messagerie : elle serait recompressée.</p></section>
+
+<section class="carte"><h2><span class="num">2</span>Lancer la mesure</h2>
+<button id="go" type="button" disabled>Lancer la mesure</button>
+<div class="barre" aria-hidden="true"><div></div></div>
+<p id="etat" role="status">En attente de la vidéo.</p>
+<p class="petit">Comptez quelques minutes. Laissez l'écran allumé et restez sur cette page jusqu'au bout.</p></section>
+
+<section class="carte" id="erreur" role="alert"><h2 id="err-titre">Échec</h2><p id="err-quoi"></p><p id="err-faire"></p><p><code id="err-tech"></code></p></section>
+
+<section class="carte" id="fin"><h2><span class="num">3</span>Récupérer le fichier</h2>
+<p id="fin-resume"></p>
+<button id="dl" type="button">Télécharger le fichier</button>
+<p class="petit">Il arrive dans le dossier <b>Téléchargements</b> du téléphone. C'est ce fichier qu'il faut joindre à la conversation du lot 30.</p></section>
+</main>
+
+<script>
+// <<< BLOC PARTAGE - DEBUT >>>
+// Ce bloc est le NOYAU DE MESURE. Il est porte a l'identique par trois fichiers :
+//   proto-video.html (premier bloc <script>), outils-lot12/mesure.mjs (module Node),
+//   et proto-lot13.html pour sa partie non figee.
+// Il est greffe par outils-lot15/greffer-bloc.mjs depuis outils-lot15/bloc-lot15.txt.
+// Les sentinelles ci-dessus et ci-dessous delimitent la greffe : ne pas les deplacer,
+// ne rien ecrire entre elles a la main. Le texte qui SUIT la sentinelle de fin n'est
+// pas le meme dans les deux fichiers (d'ou les sentinelles, et non plus un commentaire
+// de section comme au lot 14).
+//
+// Portage JS de analyse_serie.py v7.1 — fonctions de mesure uniquement.
+// Aucune dependance : le meme texte tourne dans Node, dans un vm, et dans le navigateur.
+// Entree pixels : tableau d'octets, canaux R,G,B aux offsets 0,1,2, `stride` octets par
+// pixel (4 pour RGBA du canvas, 3 pour rgb24 de ffmpeg).
+//
+// LOT 15, OPTION B — le noyau travaille ENTIEREMENT DANS L'IMAGE REDUITE.
+// Au lot 14, marques() remultipliait ses sorties par k et tous les seuils en aval
+// restaient ceux du Python (pleine resolution). Desormais :
+//   - marques() ne connait plus k du tout et rend des taches en pixels REDUITS ;
+//   - marquesFixes, echelleFil et suivreMarque recoivent k et DIVISENT leurs seuils ;
+//   - c'est L'APPELANT qui remultiplie les sorties par k avant de les afficher ou de
+//     les exporter (y, x, h, d en xk ; aire en xk²; px/cm en xk).
+// Consequence pratique : un seuil de longueur devient seuil/k, un seuil d'aire
+// devient seuil/(k*k), et le terme d'aire du score de suivi devient 0.02*k (il melange
+// une longueur et une aire, voir suivreMarque).
+//
+// aireMin est mis a l'echelle PAR L'APPELANT, SANS ARRONDI : SEUILS.AIRE_MIN / (k*k).
+// Arrondir ferait basculer des taches entieres — Math.round(40/9) = 4 accepterait les
+// taches d'aire 4 que le lot 14 rejetait, puisque le lot 14 testait aire*9 >= 40, soit
+// aire >= 4.444.
+//
+// A k = 1 la chaine complete est IDENTIQUE BIT POUR BIT au lot 14 : tous les seuils
+// divises par 1 valent eux-memes. C'est la recette outils-lot15/t-optionb.mjs qui
+// l'exige, pas ce commentaire qui le promet.
+
+// Seuils du noyau, en pixels PLEINE RESOLUTION. Les fonctions qui recoivent k les
+// divisent elles-memes ; aucune n'est a modifier ici pour changer de resolution.
+const SEUILS = {
+  AIRE_MIN: 40,       // aire minimale d'une tache retenue                (aire, /k²)
+  TOL: 6.0,           // ecart-type de y max pour une marque dite fixe    (longueur, /k)
+  PRESENCE: 0.5,      // fraction d'images ou la marque doit apparaitre   (sans unite)
+  VOISIN: 12,         // fenetre d'appariement d'une tache d'une image a l'autre  (/k)
+  H_MAX: 65,          // hauteur max d'une tache mobile                   (longueur, /k)
+  FIXE: 14,           // distance a une marque fixe pour l'ecarter du mobile      (/k)
+  SAUT_MAX: 60.0,     // deplacement max de la ceinture d'une image a l'autre     (/k)
+  AIRE_GROSSE: 150,   // aire minimale d'une marque du fil                (aire, /k²)
+  DX_MAX: 120,        // ecart horizontal max entre les deux marques du fil       (/k)
+  DY_MIN: 600,        // ecart vertical min entre les deux marques du fil         (/k)
+  PRIME_AIRE: 0.02,   // prime d'aire du score de suivi                   (voir ci-dessus)
+  TAUX_MIN: 0.5,      // en dessous, la marque est declaree perdue        (sans unite)
+};
+const FIL_CM = 229.75;          // longueur du fil entre centres, calibration.json
+const FACTEUR_PROFONDEUR = 0.90; // fil -> plan de la ceinture, calibration.json
+
+// --- HSV facon OpenCV 8 bits : H dans 0..179, S et V dans 0..255 -------------
+// Lot 14. Ces fonctions acceptent un dernier argument `etat` facultatif, obtenu par
+// nouvelEtat(W, H) et reutilise d'une image a l'autre. Sans `etat` elles allouent
+// comme au lot 13. Avec ou sans, la sortie est la MEME, bit pour bit : c'est la
+// recette outils-lot14/t-prealloc.mjs qui l'exige, pas ce commentaire qui le promet.
+//
+// Ce que `etat` supprime, par image, en 1088x1920 : masque rose 2,09 Mo, masque ouvert
+// 2,09 Mo, etiquettes 8,36 Mo, plus le tableau `er` du lot 13 (2,09 Mo) qui etait ecrit
+// et jamais relu — supprime, pas remplace. Aucun de ces tableaux n'est remis a zero en
+// bloc : masqueRose ecrit tous les pixels, `di` est efface par le voisinage des
+// survivants de l'image precedente, `lab` par la liste des pixels etiquetes.
+function nouvelEtat(W, H) {
+  const n = W * H;
+  return {
+    W, H, n,
+    m: new Uint8Array(n),           // masque rose
+    di: new Uint8Array(n),          // masque apres ouverture
+    lab: new Int32Array(n),         // etiquettes, premiere passe
+    surv: new Int32Array(1 << 14), nsurv: 0,    // survivants de l'erosion
+    etiq: new Int32Array(1 << 14),              // pixels etiquetes, en ordre de balayage
+    parent: new Int32Array(1024), fin: new Int32Array(1024),
+    sx: new Float64Array(256), sy: new Float64Array(256),
+    nb: new Int32Array(256), ya: new Int32Array(256), yb: new Int32Array(256),
+  };
+}
+
+// agrandit un tableau type en conservant son contenu (x2, comme `parent` au lot 12)
+function agrandir(t, mini) {
+  let L = t.length; while (L < mini) L *= 2;
+  const p = new t.constructor(L); p.set(t); return p;
+}
+
+// Rejet precoce du lot 14 : un pixel n'est retenu que si le maximum des trois canaux
+// est le ROUGE. Ce n'est pas une approximation, c'est une equivalence.
+//   si le max est le vert : h = 120 + 60*(b-r)/d avec |b-r| <= d, donc h dans [60,180],
+//                           hh = round(h/2) dans [30,90] — jamais >= 158 ni <= 8 ;
+//   si le max est le bleu : h = 240 + 60*(r-g)/d, donc h dans [180,300],
+//                           hh dans [90,150] — jamais retenu non plus.
+// En cas d'egalite, la cascade du lot 12 prend deja la branche rouge la premiere, donc
+// `r >= g && r >= b` reproduit exactement `mx === r`. Verifie par enumeration des
+// 16 777 216 triplets RGB dans t-prealloc.mjs : zero desaccord. Le gain vient de ce que
+// la division, l'arrondi et le calcul de teinte ne sont plus atteints que par une
+// fraction des pixels au lieu de tous.
+function masqueRose(data, W, H, stride, etat) {
+  const n = W * H;
+  const m = etat ? etat.m : new Uint8Array(n);
+  for (let i = 0, p = 0; i < n; i++, p += stride) {
+    const r = data[p], g = data[p + 1], b = data[p + 2];
+    let v = 0;
+    if (r >= g && r >= b && r >= 70) {            // max = rouge, et V >= 70
+      const mn = g < b ? g : b, d = r - mn;
+      if (d !== 0 && Math.round((255 * d) / r) >= 60) {   // S > 0 et S >= 60
+        let h = (60 * (g - b)) / d;
+        if (h < 0) h += 360;
+        let hh = Math.round(h / 2);
+        if (hh >= 180) hh -= 180;
+        if (hh >= 158 || hh <= 8) v = 1;          // rouge/rose
+      }
+    }
+    m[i] = v;                                     // ecrit toujours : rien a effacer
+  }
+  return m;
+}
+
+// --- ouverture 3x3 creuse, bords comme cv2.morphologyEx(MORPH_OPEN) --------
+// Semantique identique a la version pleine du lot 12, bit pour bit :
+//   erosion    : exterieur considere a 1, donc er[i] = ET des voisins DANS l'image ;
+//                le centre etant un voisin, m[i] === 0 implique er[i] === 0 — d'ou le
+//                court-circuit, qui n'est pas une approximation.
+//   dilatation : exterieur a 0, donc di[p] = OU des voisins de p. Le voisinage 3x3
+//                etant symetrique, balayer les survivants et peindre leur voisinage
+//                (dispersion) donne exactement le meme masque que balayer tous les
+//                pixels et lire leur voisinage (collecte).
+// Lot 14 : `er` supprime (ecrit, jamais relu) ; `di` efface par le voisinage des
+// survivants de l'image precedente, soit quelques dizaines de milliers d'ecritures au
+// lieu de 2 088 960.
+function ouverture(m, W, H, etat) {
+  const n = W * H;
+  let di, surv;
+  if (etat) {
+    di = etat.di; surv = etat.surv;
+    for (let s = 0; s < etat.nsurv; s++) {
+      const i = surv[s], y = (i / W) | 0, x = i - y * W;
+      const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+      for (let dy = dy0; dy <= dy1; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 0;
+      }
+    }
+  } else { di = new Uint8Array(n); surv = new Int32Array(1 << 14); }
+  let ns = 0;
+  for (let y = 0; y < H; y++) {
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (!m[i]) continue;                        // court-circuit : centre a 0
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+      let ok = 1;
+      for (let dy = dy0; dy <= dy1 && ok; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) if (!m[b + dx]) { ok = 0; break; }
+      }
+      if (ok) {
+        if (ns >= surv.length) { surv = agrandir(surv, ns + 1); if (etat) etat.surv = surv; }
+        surv[ns++] = i;
+      }
+    }
+  }
+  for (let s = 0; s < ns; s++) {
+    const i = surv[s], y = (i / W) | 0, x = i - y * W;
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+    const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+    for (let dy = dy0; dy <= dy1; dy++) {
+      const b = i + dy * W;
+      for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 1;
+    }
+  }
+  if (etat) etat.nsurv = ns;
+  return di;
+}
+
+// --- composantes connexes 8-connexite, equivalent de connectedComponentsWithStats
+// Lot 14 : le quadruplet de voisins, qui allouait quatre tableaux et un iterateur par
+// pixel allume, est deroule — l'ordre de lecture est conserve tel quel. La premiere
+// passe note les pixels etiquetes dans `etiq`, EN ORDRE DE BALAYAGE ; la seconde
+// parcourt cette liste au lieu de rebalayer les 2 088 960 pixels. L'ordre d'apparition
+// etant le meme, la renumerotation « comme OpenCV » est la meme, donc la sortie aussi.
+// Au passage la seconde passe remet `lab` a zero sur ces seuls pixels.
+function composantes(m, W, H, etat) {
+  const n = W * H;
+  let lab, parent, etiq, sx, sy, nb, ya, yb, fin;
+  if (etat) { lab = etat.lab; parent = etat.parent; etiq = etat.etiq; }
+  else { lab = new Int32Array(n); parent = new Int32Array(1024); etiq = new Int32Array(1 << 14); }
+  let nl = 1, ne = 0;
+  const trouver = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  const unir = (a, b) => { a = trouver(a); b = trouver(b); if (a !== b) parent[a < b ? b : a] = a < b ? a : b; };
+  const neuf = () => {
+    if (nl >= parent.length) { parent = agrandir(parent, nl + 1); if (etat) etat.parent = parent; }
+    parent[nl] = nl; return nl++;
+  };
+  for (let y = 0; y < H; y++) {
+    const h = y * W, hp = h - W;
+    for (let x = 0; x < W; x++) {
+      const i = h + x;
+      if (!m[i]) continue;
+      let l = 0, v;
+      if (y > 0) {
+        if (x > 0) { v = lab[hp + x - 1]; if (v) l = v; }
+        v = lab[hp + x]; if (v) { if (!l) l = v; else unir(l, v); }
+        if (x < W - 1) { v = lab[hp + x + 1]; if (v) { if (!l) l = v; else unir(l, v); } }
+      }
+      if (x > 0) { v = lab[i - 1]; if (v) { if (!l) l = v; else unir(l, v); } }
+      lab[i] = l || neuf();
+      if (ne >= etiq.length) { etiq = agrandir(etiq, ne + 1); if (etat) etat.etiq = etiq; }
+      etiq[ne++] = i;
+    }
+  }
+  // seconde passe : renumerotation dans l'ordre d'apparition (comme OpenCV)
+  if (etat) {
+    if (etat.fin.length < nl) etat.fin = new Int32Array(Math.max(nl, etat.fin.length * 2));
+    fin = etat.fin; fin.fill(0, 0, nl);
+    sx = etat.sx; sy = etat.sy; nb = etat.nb; ya = etat.ya; yb = etat.yb;
+  } else {
+    fin = new Int32Array(nl);
+    sx = new Float64Array(256); sy = new Float64Array(256);
+    nb = new Int32Array(256); ya = new Int32Array(256); yb = new Int32Array(256);
+  }
+  let k = 0;
+  for (let p = 0; p < ne; p++) {
+    const i = etiq[p], y = (i / W) | 0, x = i - y * W;
+    const r = trouver(lab[i]);
+    if (!fin[r]) {
+      if (k >= nb.length) {
+        sx = agrandir(sx, k + 1); sy = agrandir(sy, k + 1);
+        nb = agrandir(nb, k + 1); ya = agrandir(ya, k + 1); yb = agrandir(yb, k + 1);
+        if (etat) { etat.sx = sx; etat.sy = sy; etat.nb = nb; etat.ya = ya; etat.yb = yb; }
+      }
+      fin[r] = ++k;
+      const j = k - 1;
+      sx[j] = 0; sy[j] = 0; nb[j] = 0; ya[j] = y; yb[j] = y;
+    }
+    const j = fin[r] - 1;
+    sx[j] += x; sy[j] += y; nb[j]++;
+    if (y < ya[j]) ya[j] = y;
+    if (y > yb[j]) yb[j] = y;
+    lab[i] = 0;                                   // remise a zero ciblee
+  }
+  const out = [];
+  for (let j = 0; j < k; j++) out.push({ x: sx[j] / nb[j], y: sy[j] / nb[j], h: yb[j] - ya[j] + 1, aire: nb[j] });
+  return out;
+}
+
+// --- taches d'une image ----------------------------------------------------
+// OPTION B : plus de parametre k, plus de multiplication. Les taches sortent dans
+// L'UNITE DE L'IMAGE RECUE. Si l'image est reduite d'un facteur k, l'appelant
+// remultiplie : x, y, h par k ; aire par k*k.
+// `aireMin` est deja mis a l'echelle par l'appelant (SEUILS.AIRE_MIN / (k*k), sans
+// arrondi). Sa valeur par defaut ne vaut donc que pour k = 1.
+function marques(data, W, H, stride, etat, aireMin = SEUILS.AIRE_MIN) {
+  const m = ouverture(masqueRose(data, W, H, stride, etat), W, H, etat);
+  const bl = composantes(m, W, H, etat);
+  return bl.filter((b) => b.aire >= aireMin);
+}
+
+// --- marques fixes ----------------------------------------------------------
+// Seuils divises par k : TOL et VOISIN sont des longueurs. Les taches recues et les
+// marques rendues sont dans l'unite de l'image reduite.
+function marquesFixes(tout, k = 1) {
+  const tol = SEUILS.TOL / k, voisin = SEUILS.VOISIN / k, presence = SEUILS.PRESENCE;
+  let ref = tout[0];
+  for (const bl of tout) if (bl.length > ref.length) ref = bl;
+  const fixes = [];
+  for (const b of ref) {
+    const vus = [];
+    for (const bl of tout) {
+      let best = null;
+      for (const q of bl) {
+        if (Math.abs(q.y - b.y) < voisin && Math.abs(q.x - b.x) < voisin) {
+          if (!best || Math.abs(q.y - b.y) < Math.abs(best.y - b.y)) best = q;
+        }
+      }
+      if (best) vus.push(best);
+    }
+    if (vus.length < presence * tout.length) continue;
+    const moy = (f) => vus.reduce((s, q) => s + f(q), 0) / vus.length;
+    const my = moy((q) => q.y);
+    const ec = Math.sqrt(vus.reduce((s, q) => s + (q.y - my) ** 2, 0) / vus.length);
+    if (ec < tol) fixes.push({ y: my, x: moy((q) => q.x), h: moy((q) => q.h), aire: moy((q) => q.aire) });
+  }
+  return fixes.sort((a, b) => a.y - b.y);
+}
+
+// --- echelle par le fil -----------------------------------------------------
+// Rend { pxcm, d } — un OBJET, plus un tableau (lot 15). Les deux valeurs sont dans
+// l'unite de l'image reduite : l'appelant multiplie pxcm et d par k.
+// AIRE_GROSSE est une aire (/k*k), DX_MAX et DY_MIN des longueurs (/k).
+function echelleFil(fixes, longueurCm, k = 1) {
+  if (!longueurCm) return { pxcm: null, d: null };
+  const aireGrosse = SEUILS.AIRE_GROSSE / (k * k);
+  const dxMax = SEUILS.DX_MAX / k, dyMin = SEUILS.DY_MIN / k;
+  const gros = fixes.filter((f) => f.aire >= aireGrosse);
+  let best = null;
+  for (let i = 0; i < gros.length; i++) {
+    for (let j = i + 1; j < gros.length; j++) {
+      const a = gros[i], b = gros[j];
+      const haut = a.y < b.y ? a : b, bas = a.y < b.y ? b : a;
+      if (Math.abs(haut.x - bas.x) > dxMax || bas.y - haut.y < dyMin) continue;
+      const note = Math.min(haut.aire, bas.aire);
+      if (!best || note > best[0]) best = [note, haut, bas];
+    }
+  }
+  if (!best) return { pxcm: null, d: null };
+  const d = best[2].y - best[1].y;
+  return { pxcm: d / longueurCm, d };
+}
+
+// --- suivi de la marque de ceinture ----------------------------------------
+// NE LEVE PLUS (lot 15) : en cas d'echec, rend un objet dont le champ `erreur` porte
+// le message. L'appelant teste `suivi.erreur` avant de lire `y`.
+//
+// Le score de selection melange une longueur et une aire :
+//     note = |dy| - PRIME_AIRE * aire
+// En pleine resolution c'est |dy_p| - 0.02*aire_p. Dans l'image reduite, dy_p = dy*k
+// et aire_p = aire*k*k ; diviser toute la note par k (ce qui ne change aucun
+// classement) donne |dy| - 0.02*k*aire. D'ou le facteur k sur la prime, et lui seul.
+function suivreMarque(tout, fixes, k = 1) {
+  const hMax = SEUILS.H_MAX / k, dFixe = SEUILS.FIXE / k;
+  const sautMax = SEUILS.SAUT_MAX / k, prime = SEUILS.PRIME_AIRE * k;
+  const rate = (msg) => ({ erreur: msg, y: null, vus: null, taux: 0, aire: 0, trou: 0, trouMax: 0, trous: 0 });
+
+  const mobile = (bl) => bl.filter((b) => b.h <= hMax &&
+    !fixes.some((f) => Math.abs(b.y - f.y) < dFixe && Math.abs(b.x - f.x) < dFixe));
+  let depart = -1;
+  for (let i = 0; i < tout.length; i++) if (mobile(tout[i]).length) { depart = i; break; }
+  if (depart < 0) return rate("aucune marque mobile detectee");
+
+  const piste = (graine) => {
+    let cur = graine, aire = graine.aire;
+    const y = new Array(tout.length).fill(NaN);
+    y[depart] = cur.y;
+    for (let i = depart + 1; i < tout.length; i++) {
+      const cands = mobile(tout[i]).filter((b) =>
+        Math.abs(b.y - cur.y) < sautMax && 0.4 * aire < b.aire && b.aire < 2.5 * aire);
+      if (!cands.length) continue;
+      let meilleur = cands[0], note = Math.abs(cands[0].y - cur.y) - prime * cands[0].aire;
+      for (const b of cands) {
+        const n = Math.abs(b.y - cur.y) - prime * b.aire;
+        if (n < note) { note = n; meilleur = b; }
+      }
+      cur = meilleur;
+      aire = 0.9 * aire + 0.1 * cur.aire;
+      y[i] = cur.y;
+    }
+    const vus = y.map((v) => !Number.isNaN(v));
+    const dispo = y.filter((v) => !Number.isNaN(v));
+    const amp = dispo.length > 5 ? Math.max(...dispo) - Math.min(...dispo) : 0;
+    return { y, vus, amp, taux: vus.filter(Boolean).length / y.length };
+  };
+
+  const graines = mobile(tout[depart]).sort((a, b) => b.aire - a.aire).slice(0, 8);
+  const essais = graines.map((g) => { const p = piste(g); return { ...p, ok90: p.taux >= 0.9, aire: g.aire }; });
+  // tri Python : (ok90, amplitude) croissant, on garde le dernier
+  essais.sort((a, b) => (a.ok90 === b.ok90 ? a.amp - b.amp : (a.ok90 ? 1 : -1)));
+  const e = essais[essais.length - 1];
+  // plus long trou de detection consecutif ET nombre de trous, avant interpolation.
+  // `trouMax` et `trous` sont les noms du lot 15 ; `trou` reste comme alias du lot 14.
+  let trouMax = 0, cour = 0, trous = 0;
+  for (const v of e.vus) {
+    if (v) { cour = 0; continue; }
+    if (++cour === 1) trous++;
+    if (cour > trouMax) trouMax = cour;
+  }
+  const nvus = e.vus.filter(Boolean).length;
+  if (nvus < SEUILS.TAUX_MIN * e.y.length) return rate("marque perdue sur plus de la moitie de la video");
+  // interpolation lineaire des trous, comme np.interp
+  const y = e.y.slice();
+  const idx = [];
+  for (let i = 0; i < y.length; i++) if (e.vus[i]) idx.push(i);
+  for (let i = 0; i < y.length; i++) {
+    if (e.vus[i]) continue;
+    if (i < idx[0]) { y[i] = y[idx[0]]; continue; }
+    if (i > idx[idx.length - 1]) { y[i] = y[idx[idx.length - 1]]; continue; }
+    let j = 0; while (idx[j + 1] < i) j++;
+    const a = idx[j], b = idx[j + 1];
+    y[i] = y[a] + ((y[b] - y[a]) * (i - a)) / (b - a);
+  }
+  // `vus` : detection reelle image par image, avant interpolation. Necessaire au
+  // controle des trous en temps ecoule (lot 13) et a l'export de trajectoire.
+  return { erreur: null, y, vus: e.vus, taux: e.taux, aire: e.aire, trou: trouMax, trouMax, trous };
+}
+// <<< BLOC PARTAGE - FIN >>>
+</script>
+
+<script>
+/* ==================== démultiplexeur MP4 maison ==================== */
+const T = (dv, p) => String.fromCharCode(dv.getUint8(p), dv.getUint8(p+1), dv.getUint8(p+2), dv.getUint8(p+3));
+
+function* boites(dv, debut, fin) {
+  let p = debut;
+  while (p + 8 <= fin) {
+    let taille = dv.getUint32(p), type = T(dv, p + 4), corps = p + 8;
+    if (taille === 1) { taille = Number(dv.getBigUint64(p + 8)); corps = p + 16; }
+    else if (taille === 0) taille = fin - p;
+    if (taille < 8 || p + taille > fin) break;
+    yield { type, corps, bout: p + taille };
+    p += taille;
+  }
+}
+function chercher(dv, debut, fin, chemin) {
+  for (const b of boites(dv, debut, fin)) {
+    if (b.type !== chemin[0]) continue;
+    if (chemin.length === 1) return b;
+    const d = chemin[0] === 'stsd' ? b.corps + 8 : b.corps;
+    const r = chercher(dv, d, b.bout, chemin.slice(1));
+    if (r) return r;
+  }
+  return null;
+}
+function tousLes(dv, debut, fin, type) {
+  const out = []; for (const b of boites(dv, debut, fin)) if (b.type === type) out.push(b); return out;
+}
+
+function demuxerMaison(buf) {
+  const dv = new DataView(buf);
+  const moov = chercher(dv, 0, buf.byteLength, ['moov']);
+  if (!moov) throw new Error("boite moov introuvable (fichier fragmente ou non MP4 ?)");
+  let trak = null, hdlrType = '';
+  for (const t of tousLes(dv, moov.corps, moov.bout, 'trak')) {
+    const h = chercher(dv, t.corps, t.bout, ['mdia', 'hdlr']);
+    if (h && T(dv, h.corps + 8) === 'vide') { trak = t; hdlrType = 'vide'; break; }
+  }
+  if (!trak) throw new Error("aucune piste video dans moov");
+
+  // rotation + dimensions d'affichage depuis tkhd
+  const tkhd = chercher(dv, trak.corps, trak.bout, ['tkhd']);
+  const v = dv.getUint8(tkhd.corps);
+  let q = tkhd.corps + 4 + (v === 1 ? 32 : 20) + 16;
+  const a = dv.getInt32(q) / 65536, b = dv.getInt32(q + 4) / 65536;
+  let rot = Math.round(Math.atan2(b, a) * 180 / Math.PI / 90) * 90;
+  rot = ((rot % 360) + 360) % 360;
+
+  const mdhd = chercher(dv, trak.corps, trak.bout, ['mdia', 'mdhd']);
+  const mv = dv.getUint8(mdhd.corps);
+  const echelleTemps = mv === 1 ? dv.getUint32(mdhd.corps + 20) : dv.getUint32(mdhd.corps + 12);
+
+  const stbl = chercher(dv, trak.corps, trak.bout, ['mdia', 'minf', 'stbl']);
+  if (!stbl) throw new Error("table d'echantillons (stbl) introuvable");
+  const stsd = chercher(dv, stbl.corps, stbl.bout, ['stsd']);
+  const ent = [...boites(dv, stsd.corps + 8, stsd.bout)][0];
+  const nomEnt = ent.type;
+  const largeur = dv.getUint16(ent.corps + 24), hauteur = dv.getUint16(ent.corps + 26);
+  let desc = null, codec = null;
+  for (const c of boites(dv, ent.corps + 78, ent.bout)) {
+    if (c.type === 'avcC') {
+      desc = new Uint8Array(buf.slice(c.corps, c.bout));
+      codec = 'avc1.' + [...desc.slice(1, 4)].map(x => x.toString(16).padStart(2, '0')).join('');
+    } else if (c.type === 'hvcC') {
+      desc = new Uint8Array(buf.slice(c.corps, c.bout));
+      codec = 'hvc1.1.6.L93.B0';
+    }
+  }
+  if (!desc) throw new Error("parametres du codec (avcC/hvcC) introuvables dans " + nomEnt);
+
+  const lire = (nom) => { const x = chercher(dv, stbl.corps, stbl.bout, [nom]); return x; };
+  const stts = lire('stts'), stsz = lire('stsz'), stsc = lire('stsc'),
+        stco = lire('stco') || lire('co64'), stss = lire('stss'), ctts = lire('ctts');
+  if (!stts || !stsz || !stsc || !stco) throw new Error("table d'echantillons incomplete");
+
+  // tailles
+  const tailleUnique = dv.getUint32(stsz.corps + 4), nEch = dv.getUint32(stsz.corps + 8);
+  const tailles = new Uint32Array(nEch);
+  if (tailleUnique) tailles.fill(tailleUnique);
+  else for (let i = 0; i < nEch; i++) tailles[i] = dv.getUint32(stsz.corps + 12 + 4 * i);
+
+  // durees (dts)
+  const dts = new Float64Array(nEch);
+  { let n = dv.getUint32(stts.corps + 4), i = 0, t = 0;
+    for (let k = 0; k < n; k++) {
+      const cnt = dv.getUint32(stts.corps + 8 + 8 * k), dur = dv.getUint32(stts.corps + 12 + 8 * k);
+      for (let j = 0; j < cnt && i < nEch; j++, i++) { dts[i] = t; t += dur; }
+    } }
+  // decalage de presentation eventuel
+  const pts = Float64Array.from(dts);
+  if (ctts) { let n = dv.getUint32(ctts.corps + 4), i = 0;
+    for (let k = 0; k < n; k++) {
+      const cnt = dv.getUint32(ctts.corps + 8 + 8 * k), off = dv.getInt32(ctts.corps + 12 + 8 * k);
+      for (let j = 0; j < cnt && i < nEch; j++, i++) pts[i] = dts[i] + off;
+    } }
+
+  // offsets
+  const c64 = T(dv, stco.corps - 4) === 'co64';
+  const nChunk = dv.getUint32(stco.corps + 4), offs = new Float64Array(nChunk);
+  for (let i = 0; i < nChunk; i++)
+    offs[i] = c64 ? Number(dv.getBigUint64(stco.corps + 8 + 8 * i)) : dv.getUint32(stco.corps + 8 + 4 * i);
+
+  // chunk -> echantillons
+  const nSc = dv.getUint32(stsc.corps + 4), sc = [];
+  for (let i = 0; i < nSc; i++) sc.push({
+    premier: dv.getUint32(stsc.corps + 8 + 12 * i),
+    parChunk: dv.getUint32(stsc.corps + 12 + 12 * i) });
+  const pos = new Float64Array(nEch);
+  { let ech = 0;
+    for (let i = 0; i < nSc && ech < nEch; i++) {
+      const dernier = (i + 1 < nSc ? sc[i + 1].premier - 1 : nChunk);
+      for (let ch = sc[i].premier; ch <= dernier && ech < nEch; ch++) {
+        let o = offs[ch - 1];
+        for (let j = 0; j < sc[i].parChunk && ech < nEch; j++, ech++) { pos[ech] = o; o += tailles[ech]; }
+      } } }
+
+  const cles = new Set();
+  if (stss) { const n = dv.getUint32(stss.corps + 4);
+    for (let i = 0; i < n; i++) cles.add(dv.getUint32(stss.corps + 8 + 4 * i) - 1); }
+
+  const ech = [];
+  for (let i = 0; i < nEch; i++) ech.push({
+    debut: pos[i], taille: tailles[i],
+    ts: Math.round(pts[i] * 1e6 / echelleTemps),
+    cle: stss ? cles.has(i) : true });
+  ech.sort((x, y) => x.ts - y.ts);
+  return { voie: 'maison', codec, desc, largeur, hauteur, rot, echelleTemps, ech, nomEnt };
+}
+
+/* ==================== page de mesure (lot 29) ==================== */
+(function () {
+'use strict';
+const PAGE = {"version":"lot 29","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977"};
+// Fenetres de pixels (canevas tourne), propres a la video du 27/09 : voir
+// outils-lot29/fenetres-lot29.mjs pour le choix des images et du centre.
+const FENETRES = [{"image":0,"x":293,"y":1018,"l":96,"h":96},{"image":29,"x":386,"y":1022,"l":96,"h":96},{"image":150,"x":248,"y":874,"l":96,"h":96},{"image":159,"x":398,"y":842,"l":96,"h":96},{"image":169,"x":377,"y":776,"l":96,"h":96},{"image":482,"x":264,"y":951,"l":96,"h":96},{"image":509,"x":368,"y":781,"l":96,"h":96},{"image":958,"x":402,"y":789,"l":96,"h":96},{"image":1029,"x":585,"y":984,"l":96,"h":96}];
+const K = 1;                                  // definitif depuis le lot 15
+const $ = (i) => document.getElementById(i);
+const pause = () => new Promise((r) => setTimeout(r, 0));
+let fichier = null, blobUrl = null, nomSortie = '', masquee = 0, enCours = false;
+
+class Echec extends Error { constructor(titre, quoi, faire, tech) { super(titre); this.titre = titre; this.quoi = quoi; this.faire = faire; this.tech = tech || ''; } }
+
+function etat(t) { $('etat').textContent = t; }
+function barre(p) { document.querySelector('.barre>div').style.width = (100 * p).toFixed(1) + '%'; }
+function montrerErreur(e) {
+  const x = e instanceof Echec ? e : new Echec('Erreur imprévue', "La mesure s'est arrêtée sur une erreur que la page ne prévoyait pas.",
+    "Faites une capture d'écran de ce cadre et joignez-la à la conversation.", String(e && (e.stack || e.message) || e));
+  $('err-titre').textContent = x.titre; $('err-quoi').textContent = x.quoi; $('err-faire').textContent = x.faire;
+  $('err-tech').textContent = x.tech ? 'Détail technique : ' + x.tech : '';
+  $('erreur').style.display = 'grid';
+  etat('Arrêté : voir le cadre rouge ci-dessous.');
+}
+
+document.addEventListener('visibilitychange', () => { if (enCours && document.hidden) masquee++; });
+$('fichier').addEventListener('change', (e) => {
+  fichier = e.target.files[0] || null;
+  $('go').disabled = !fichier;
+  $('erreur').style.display = 'none'; $('fin').style.display = 'none';
+  etat(fichier ? 'Prêt : ' + fichier.name + ' (' + (fichier.size / 1048576).toFixed(1) + ' Mo).' : 'En attente de la vidéo.');
+});
+$('go').addEventListener('click', async () => {
+  $('go').disabled = true; $('fichier').disabled = true;
+  $('erreur').style.display = 'none'; $('fin').style.display = 'none'; barre(0);
+  let verrou = null;
+  try { if (navigator.wakeLock) verrou = await navigator.wakeLock.request('screen'); } catch (e) { verrou = null; }
+  enCours = true; masquee = 0;
+  try { await mesurer(); }
+  catch (e) { montrerErreur(e); }
+  enCours = false;
+  try { if (verrou) await verrou.release(); } catch (e) {}
+  $('go').disabled = false; $('fichier').disabled = false;
+});
+$('dl').addEventListener('click', () => {
+  const a = document.createElement('a'); a.href = blobUrl; a.download = nomSortie;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+function base64(octets) {
+  let s = '';
+  for (let i = 0; i < octets.length; i += 0x8000) s += String.fromCharCode.apply(null, octets.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// RGB brut (sans alpha) d'un rectangle du canevas, lu dans le RGBA de getImageData.
+function fenetre(px, cw, ch, f) {
+  const x0 = Math.max(0, f.x), y0 = Math.max(0, f.y), x1 = Math.min(cw, f.x + f.l), y1 = Math.min(ch, f.y + f.h);
+  if (x1 <= x0 || y1 <= y0) return { image: f.image, x: f.x, y: f.y, l: 0, h: 0, rgb: '' };
+  const out = new Uint8Array((x1 - x0) * (y1 - y0) * 3); let o = 0;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const p = 4 * (y * cw + x); out[o++] = px[p]; out[o++] = px[p + 1]; out[o++] = px[p + 2]; }
+  return { image: f.image, x: x0, y: y0, l: x1 - x0, h: y1 - y0, rgb: base64(out) };
+}
+function infoImage(f) {
+  const cs = f.colorSpace ? (f.colorSpace.toJSON ? f.colorSpace.toJSON() : { primaries: f.colorSpace.primaries, transfer: f.colorSpace.transfer, matrix: f.colorSpace.matrix, fullRange: f.colorSpace.fullRange }) : null;
+  return { format: f.format, codedWidth: f.codedWidth, codedHeight: f.codedHeight, displayWidth: f.displayWidth, displayHeight: f.displayHeight,
+    visibleRect: f.visibleRect ? { x: f.visibleRect.x, y: f.visibleRect.y, width: f.visibleRect.width, height: f.visibleRect.height } : null, colorSpace: cs };
+}
+
+async function mesurer() {
+  const t0 = performance.now();
+  if (!window.isSecureContext) throw new Echec('Page ouverte sans https', "Le décodeur vidéo du navigateur n'est disponible que sur une adresse sécurisée.",
+    "Ouvrez la page par son adresse https://…github.io/… (celle donnée dans la passation).");
+  if (!('VideoDecoder' in window)) throw new Echec('Navigateur sans décodeur vidéo (WebCodecs)', "Ce navigateur ne propose pas VideoDecoder.",
+    "Ouvrez la page dans Chrome pour Android, à jour (Play Store → Chrome → Mettre à jour).");
+
+  etat('Lecture du fichier…');
+  let buf, m;
+  try { buf = await fichier.arrayBuffer(); }
+  catch (e) { throw new Echec('Fichier illisible', "Le téléphone n'a pas pu lire le fichier choisi.", 'Choisissez-le à nouveau, depuis la galerie ou le dossier DCIM.', e.message); }
+  try { m = demuxerMaison(buf); }
+  catch (e) { throw new Echec("Ce fichier n'a pas pu être lu comme une vidéo MP4", 'La page lit les MP4 tels que les produit l\'appareil photo.',
+    "Choisissez la vidéo d'origine (VID_…mp4), pas une copie convertie ou envoyée par une messagerie.", e.message); }
+
+  const rot = m.rot;
+  const dispoW = (rot === 90 || rot === 270) ? m.hauteur : m.largeur;
+  const dispoH = (rot === 90 || rot === 270) ? m.largeur : m.hauteur;
+  const n = m.ech.length;
+  const dureeS = n > 1 ? (m.ech[n - 1].ts - m.ech[0].ts) / 1e6 : 0;
+  const fpsPage = dureeS > 0 ? (n - 1) / dureeS : 0;
+  const cfg = { codec: m.codec, codedWidth: m.largeur, codedHeight: m.hauteur };
+  if (m.desc) cfg.description = m.desc;
+  let soutien;
+  try { soutien = (await VideoDecoder.isConfigSupported(cfg)).supported; }
+  catch (e) { throw new Echec('Configuration du décodeur refusée', 'Le navigateur a rejeté les paramètres de la vidéo.', "Faites une capture d'écran de ce cadre.", e.message); }
+  if (!soutien) throw new Echec('Ce navigateur ne sait pas décoder cette vidéo', 'Codec ' + m.codec + ' (' + m.nomEnt + '), ' + m.largeur + ' × ' + m.hauteur + ' : refusé par WebCodecs.',
+    'Ouvrez la page dans Chrome pour Android à jour. Un navigateur sans codecs H.264 (Chromium « libre ») ne peut pas faire cette mesure.');
+
+  // --- canevas de travail (k = 1) et etat de mesure prealloue, comme le prototype
+  const cw = Math.max(1, Math.round(dispoW / K)), ch = Math.max(1, Math.round(dispoH / K));
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+  const cx = cv.getContext('2d', { willReadFrequently: true, alpha: false });
+  const poser = (ctx, ech) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(1 / ech, 1 / ech);
+    if (rot === 90) { ctx.translate(dispoW, 0); ctx.rotate(Math.PI / 2); }
+    else if (rot === 180) { ctx.translate(dispoW, dispoH); ctx.rotate(Math.PI); }
+    else if (rot === 270) { ctx.translate(0, dispoH); ctx.rotate(-Math.PI / 2); }
+  };
+  const etatM = nouvelEtat(cw, ch);
+  const aireMin = SEUILS.AIRE_MIN / (K * K);
+  const parImage = new Map(FENETRES.map((f) => [f.image, f]));
+
+  const tout = [], tus = [], fen = [];
+  let image0 = null, attente = [], fini = false, erreurDec = null, apresBoucle = 0;
+  const dec = new VideoDecoder({ output: (f) => attente.push(f), error: (e) => { erreurDec = e; } });
+  dec.configure(cfg);
+  const t1 = performance.now();
+  let i = 0;
+  etat('Décodage : 0 / ' + n + ' images');
+  // Boucle du prototype (lot 15) : « !fini » indispensable, flush des que le tampon
+  // descend a 2 images (sinon 6 a 13 images perdues en silence en fin de video).
+  while (i < n || attente.length || !fini) {
+    if (erreurDec) throw new Echec('Le décodage a échoué en cours de route', "Le décodeur du téléphone s'est arrêté à l'image " + tout.length + ' sur ' + n + '.',
+      "Fermez les autres applications, rechargez la page et relancez. Si ça recommence, faites une capture d'écran.", erreurDec.message);
+    while (i < n && attente.length < 8 && dec.decodeQueueSize < 12) {
+      const s = m.ech[i];
+      dec.decode(new EncodedVideoChunk({ type: s.cle ? 'key' : 'delta', timestamp: s.ts, data: new Uint8Array(buf, s.debut, s.taille) }));
+      i++;
+    }
+    if (i >= n && !fini && attente.length <= 2) { fini = true; try { await dec.flush(); } catch (e) { if (!erreurDec) erreurDec = e; } }
+    if (!attente.length) { if (fini) break; await pause(); continue; }
+    const f = attente.shift();
+    if (!image0) image0 = infoImage(f);
+    poser(cx, K);
+    cx.drawImage(f, 0, 0);
+    tus.push(f.timestamp);
+    f.close();
+    const px = cx.getImageData(0, 0, cw, ch).data;
+    const fw = parImage.get(tout.length);
+    if (fw) fen.push(fenetre(px, cw, ch, fw));
+    tout.push(marques(px, cw, ch, 4, etatM, aireMin).map((b) => [b.x, b.y, b.h, b.aire]));
+    if (tout.length % 5 === 0) {
+      const ms = (performance.now() - t1) / tout.length, reste = Math.max(0, (n - tout.length) * ms / 1000);
+      barre(tout.length / n);
+      etat('Décodage : ' + tout.length + ' / ' + n + ' images — encore ~' + (reste >= 60 ? Math.floor(reste / 60) + ' min ' : '') + Math.round(reste % 60) + ' s');
+      await pause();
+    }
+  }
+  if (erreurDec) throw new Echec('Le décodage a échoué en fin de vidéo', 'Le décodeur a signalé une erreur après ' + tout.length + ' images sur ' + n + '.',
+    "Relancez la mesure ; si ça recommence, faites une capture d'écran.", erreurDec.message);
+  try { dec.close(); } catch (e) {}
+  if (attente.length) { apresBoucle = attente.length; for (const f of attente) f.close(); attente = []; }
+  barre(1);
+
+  const tDecode = (performance.now() - t1) / 1000;
+  const sortie = {
+    format: 'taches-telephone, lot 29',
+    video: fichier.name, taille_octets: fichier.size,
+    fps: fpsPage,
+    fps_note: "(n - 1) / duree des horodatages, comme le prototype ; PAS le fps de cap.get d'OpenCV",
+    images_annoncees: n, images_mesurees: tout.length, images_rendues_apres_la_boucle: apresBoucle,
+    tout, t_us: tus,
+    rotation: { tkhd: m.rot, appliquee: rot, sens: rot === 90 ? 'horaire' : rot === 270 ? 'antihoraire' : rot === 180 ? 'demi-tour' : 'aucune' },
+    canevas: { largeur: cw, hauteur: ch }, codee: { largeur: m.largeur, hauteur: m.hauteur },
+    codec: m.codec, entree: m.nomEnt, demultiplexeur: m.voie,
+    decodeur: { codec: cfg.codec, codedWidth: cfg.codedWidth, codedHeight: cfg.codedHeight, description_octets: m.desc ? m.desc.length : 0 },
+    image0,
+    marques: { k: K, aireMin, stride: 4, source: 'getImageData RGBA, canevas 2d alpha:false willReadFrequently' },
+    fenetres: fen,
+    navigateur: navigator.userAgent,
+    page: PAGE,
+    duree_s: Math.round(tDecode * 10) / 10, page_masquee_pendant_la_mesure: masquee,
+    date: new Date().toISOString(),
+  };
+  const texte = JSON.stringify(sortie);
+  if (blobUrl) URL.revokeObjectURL(blobUrl);
+  blobUrl = URL.createObjectURL(new Blob([texte], { type: 'application/json' }));
+  nomSortie = fichier.name.replace(/\.[^.]*$/, '') + '.taches.json';
+  const manque = n - tout.length;
+  $('fin-resume').innerHTML = (manque === 0 ? '<span class="ok">Mesure terminée.</span> ' : '<b>Attention : ' + manque + ' image(s) manquante(s).</b> Le fichier reste utile, téléchargez-le quand même. ')
+    + tout.length + ' images en ' + Math.round(tDecode) + ' s · fichier <b>' + nomSortie.replace(/[<>&]/g, '') + '</b> (' + (texte.length / 1048576).toFixed(2) + ' Mo).';
+  $('fin').style.display = 'grid';
+  etat('Terminé : ' + tout.length + ' / ' + n + ' images.');
+  return sortie;
+}
+})();
+</script>
+</body>
+</html>
