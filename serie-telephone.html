@@ -49,7 +49,7 @@ th:first-child,td:first-child{text-align:left}
 <body>
 <main>
 <header><h1>Analyse d'une série</h1>
-<p class="sous">Outil v34 · lot 31 · tout se calcule sur ce téléphone, sans réseau. Rien n'est enregistré.</p></header>
+<p class="sous">Outil v34 · lot 33 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
 
 <section class="carte"><h2>1. La vidéo</h2>
 <input type="file" id="fichier" accept="video/mp4,video/*" aria-label="Vidéo de la série">
@@ -83,6 +83,11 @@ th:first-child,td:first-child{text-align:left}
 <ul id="alertes"></ul>
 <table><thead><tr><th>Rep</th><th>Hauteur<br>cm</th><th>Vitesse<br>moy. m/s</th><th>Vitesse<br>pointe m/s</th></tr></thead><tbody id="r-reps"></tbody></table>
 <p class="petit" id="r-note"></p></section>
+
+<section class="carte" id="fseance" style="display:none"><h2>Fichier de séance</h2>
+<button id="dls" type="button">Télécharger le fichier de séance</button>
+<p class="petit" id="fseance-nom"></p>
+<p class="petit">C'est le fichier que le script Python aurait écrit. Il arrive dans <b>Téléchargements</b>. Pour le lire dans l'outil : onglet <b>Vitesse</b> → <b>Importer</b> → choisissez ce fichier.</p></section>
 
 <section class="carte" id="controle" style="display:none"><h2>Fichier de contrôle</h2>
 <button id="dl" class="second" type="button">Télécharger le fichier de contrôle</button>
@@ -3851,22 +3856,61 @@ function demuxerMaison(buf) {
 // <<< BLOC SERIE31 - FIN >>>
 </script>
 <script>
+// <<< BLOC SERIE33 - DEBUT >>>
+// Lot 33 — le fichier de seance que Python ecrirait (analyse_serie.py l. 940-944), fait
+// par la page serie-telephone.html a partir de la sortie de SE.seanceComplete. Greffe tel
+// quel dans la page par outils-lot33/faire-page.mjs, APRES le bloc S31 ; la recette Node
+// (t-lot33.mjs) l'execute en le lisant DANS LA PAGE. N'expose qu'un nom global : S33.
+// Rien n'est recalcule : la sortie de SE est deja le dict de Python (schema, date,
+// mouvement, poids_corps_kg, semaine, seance, script, series), dans l'ordre de Python, et
+// r.nom est deja « seance-<date>.json ». Le texte est JSON.stringify : apres lecture il est
+// identique au fichier de Python ; a l'octet il differe (Python ecrit 45.0 et -0.0, JS 45
+// et 0 : journal-lot33 § 2), ce que l'application ne voit pas (elle lit par JSON.parse).
+(function () {
+  "use strict";
+
+  // Python ecrirait NaN ou Infinity (json.dump, allow_nan par defaut), que JSON.parse
+  // refuse ; JSON.stringify ecrirait null. Les deux trahiraient la mesure : on refuse.
+  function nonFinis(x, chemin, out) {
+    if (typeof x === "number") { if (!Number.isFinite(x)) out.push(chemin); return out; }
+    if (Array.isArray(x)) { x.forEach(function (v, i) { nonFinis(v, chemin + "[" + i + "]", out); }); return out; }
+    if (x && typeof x === "object") { Object.keys(x).forEach(function (k) { nonFinis(x[k], chemin + "." + k, out); }); }
+    return out;
+  }
+
+  // sortie, nom = rendu de S31.analyserSerie (donc de SE.seanceComplete). Rend
+  // { nom, texte } ; leve une Error lisible si le fichier ne peut pas etre ecrit.
+  function fichierSeance(sortie, nom) {
+    if (!sortie || sortie.schema !== "velocite-seance/v1" || !Array.isArray(sortie.series))
+      throw new Error("fichier de seance : sortie de SE inattendue");
+    if (!/^seance-(\d{4}-\d{2}-\d{2}|sans-date)\.json$/.test(String(nom)))
+      throw new Error("fichier de seance : nom inattendu « " + nom + " »");
+    const nf = nonFinis(sortie, "sortie", []);
+    if (nf.length) throw new Error("fichier de seance : valeur non finie en " + nf.slice(0, 3).join(", "));
+    return { nom: nom, texte: JSON.stringify(sortie) };
+  }
+
+  globalThis.S33 = { fichierSeance: fichierSeance, nonFinis: nonFinis };
+})();
+// <<< BLOC SERIE33 - FIN >>>
+</script>
+<script>
 /* ==================== page : decodage, affichage (lot 31) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 31","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977","SG_sha256":"b7cc72eb89132dabc840f8facac2cb62bacce549dca49c38b2ab676b86c188c8","FP_sha256":"7cd8ef3b2b5b83b6cb88132573246d8118f4db7d1bf8dbca020d9a64962b103c","MS_sha256":"76246a98364cfe889aa365b38698a63cc48a75d4d4521cf1b3e6be9e9944bbec","RS_sha256":"06a0edc09ef36f896c15a8d330550aead277a9eb6c20d24e0d0fa159f6839383","RD_sha256":"b1439ef827260c168a31a861d24c6a21c9acf0d9de8946f74da8f6b2e32668e7","SE_sha256":"82a74ce373e0280baddef7caffa3b181c9e87a88d7b23023dcb45084e518bedf","S31_sha256":"ad332d5ea6d41a4dca929b685b8fccd4bd3b578802e6a732e2caeae650df7e6d"};
+const PAGE = {"version":"lot 33","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977","SG_sha256":"b7cc72eb89132dabc840f8facac2cb62bacce549dca49c38b2ab676b86c188c8","FP_sha256":"7cd8ef3b2b5b83b6cb88132573246d8118f4db7d1bf8dbca020d9a64962b103c","MS_sha256":"76246a98364cfe889aa365b38698a63cc48a75d4d4521cf1b3e6be9e9944bbec","RS_sha256":"06a0edc09ef36f896c15a8d330550aead277a9eb6c20d24e0d0fa159f6839383","RD_sha256":"b1439ef827260c168a31a861d24c6a21c9acf0d9de8946f74da8f6b2e32668e7","SE_sha256":"82a74ce373e0280baddef7caffa3b181c9e87a88d7b23023dcb45084e518bedf","S31_sha256":"ad332d5ea6d41a4dca929b685b8fccd4bd3b578802e6a732e2caeae650df7e6d"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const CHAMPS = ['mouvement', 'type_serie', 'lest_kg', 'reps_annoncees', 'semaine', 'seance', 'date', 'pdc'];
 const $ = (i) => document.getElementById(i);
 const pause = () => new Promise((r) => setTimeout(r, 0));
-let fichier = null, blobUrl = null, nomControle = '', masquee = 0, enCours = false;
+let fichier = null, blobUrl = null, nomControle = '', masquee = 0, enCours = false, blobSeance = null, nomSeance = '';
 
 class Echec extends Error { constructor(titre, quoi, faire, tech) { super(titre); this.titre = titre; this.quoi = quoi; this.faire = faire; this.tech = tech || ''; } }
 
 function etat(t) { $('etat').textContent = t; }
 function barre(p) { document.querySelector('.barre>div').style.width = (100 * p).toFixed(1) + '%'; }
-function cacher() { for (const i of ['erreur', 'non', 'res', 'controle']) $(i).style.display = 'none'; for (const c of CHAMPS) $(c).classList.remove('faux'); }
+function cacher() { for (const i of ['erreur', 'non', 'res', 'controle', 'fseance']) $(i).style.display = 'none'; for (const c of CHAMPS) $(c).classList.remove('faux'); }
 function montrerErreur(e) {
   const x = e instanceof Echec ? e : new Echec('Erreur imprévue', "L'analyse s'est arrêtée sur une erreur que la page ne prévoyait pas.",
     "Faites une capture d'écran de ce cadre et joignez-la à la conversation.", String(e && (e.stack || e.message) || e));
@@ -3908,6 +3952,11 @@ $('go').addEventListener('click', async () => {
 });
 $('dl').addEventListener('click', () => {
   const a = document.createElement('a'); a.href = blobUrl; a.download = nomControle;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+$('dls').addEventListener('click', () => {
+  const a = document.createElement('a'); a.href = blobSeance; a.download = nomSeance;
   document.body.appendChild(a); a.click(); a.remove();
 });
 
@@ -4019,6 +4068,18 @@ async function analyser(entrees, analyseLe, saisie) {
   blobUrl = URL.createObjectURL(new Blob([texte], { type: 'application/json' }));
   nomControle = fichier.name.replace(/\.[^.]*$/, '') + '.serie31.json';
   $('controle').style.display = 'grid';
+  // lot 33 : le fichier de seance, seulement si la serie a ete analysee
+  if (v.analysee) {
+    let f;
+    try { f = S33.fichierSeance(r.sortie, r.nom); }
+    catch (e) { throw new Echec('Fichier de séance impossible', "Le résultat s'affiche, mais le fichier de séance n'a pas pu être fabriqué.",
+      "Faites une capture d'écran de ce cadre et téléchargez le fichier de contrôle.", e.message); }
+    if (blobSeance) URL.revokeObjectURL(blobSeance);
+    const blob = new Blob([f.texte], { type: 'application/json' });
+    blobSeance = URL.createObjectURL(blob); nomSeance = f.nom;
+    $('fseance-nom').textContent = f.nom + ' · ' + (blob.size / 1024).toFixed(1).replace('.', ',') + ' Ko';
+    $('fseance').style.display = 'grid';
+  }
   etat('Terminé : ' + d.tout.length + ' images en ' + Math.round(d.duree_s) + ' s.');
 }
 
