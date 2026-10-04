@@ -49,8 +49,10 @@ th:first-child,td:first-child{text-align:left}
 /* lot 34 : liste des videos et resultats par serie */
 .video{border:2px solid var(--line);border-radius:8px;padding:.75rem;display:grid;gap:.6rem}
 .video h3{font-size:1.05rem;margin:0;word-break:break-all}
-.trois{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:.5rem}
+.trois{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.trois label:first-child{grid-column:1/-1}
 .trois label{font-size:.95rem}
+.video label.variante{display:grid;gap:.2rem;font-size:.95rem}
 .serie{border-top:3px solid var(--line);padding-top:.75rem;display:grid;gap:.6rem}
 .serie h3{font-size:1.15rem;margin:0}
 .serie.ko h3{color:var(--ko)}
@@ -59,6 +61,9 @@ th:first-child,td:first-child{text-align:left}
 .serie ul.av{background:var(--av-bg);border:2px solid var(--av);color:#000}
 .serie ul.av li::before{content:"⚠ ";color:var(--av);font-weight:700}
 .serie ul.ko{background:var(--ko-bg);border:2px solid var(--ko);color:#000}
+.video h3 .heure{display:inline-block;background:#000;color:#fff;border-radius:6px;padding:.05rem .45rem;margin-right:.35rem;font-size:1.2rem}
+#echange{display:none;border:3px solid var(--av);background:var(--av-bg);color:#000}
+#echange .paire{display:grid;gap:.5rem;border-top:2px solid var(--av);padding-top:.6rem}
 #res{display:none}
 #bilan td,#bilan th{font-size:1rem}
 </style>
@@ -66,11 +71,12 @@ th:first-child,td:first-child{text-align:left}
 <body>
 <main>
 <header><h1>Analyse d'une séance</h1>
-<p class="sous">Outil v34 · lot 34 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
+<p class="sous">Outil · lot 36 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
 
 <section class="carte"><h2>1. Les vidéos de la séance</h2>
 <input type="file" id="fichiers" multiple accept="video/mp4,video/*" aria-label="Vidéos de la séance">
 <p class="petit">Choisissez toutes les vidéos de la séance d'un coup (appui long sur la première, puis touchez les autres). Les vidéos d'origine (VID_…), pas des copies envoyées par une messagerie.</p>
+<p class="petit"><b>Les lignes ci-dessous sont rangées par heure de prise de vue</b> (la plus ancienne en haut), quel que soit l'ordre dans lequel vous avez touché les vidéos. Vérifiez l'heure avant de taper chaque légende.</p>
 <div id="liste" style="display:grid;gap:.75rem"></div></section>
 
 <section class="carte" id="formulaire"><h2>2. La séance (une seule fois)</h2>
@@ -80,8 +86,9 @@ th:first-child,td:first-child{text-align:left}
 <label>Semaine<input id="semaine" inputmode="numeric" autocomplete="off" placeholder="3"></label>
 <label>Séance<input id="seance" inputmode="numeric" autocomplete="off" placeholder="1"></label>
 <label>Date de la séance<input id="date" type="date"></label>
+<label>Type de séance<select id="typeseance"><option value="principale">Principale</option><option value="secondaire">Secondaire</option></select></label>
 </div>
-<p class="petit">Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la première vidéo.</p></section>
+<p class="petit">Type de séance « Secondaire » (séance secondaire ou légère) met toutes les lignes en « Secondaire » (modifiable ligne par ligne). Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la vidéo la plus ancienne.</p></section>
 
 <section class="carte"><h2>3. Analyser</h2>
 <button id="go" type="button" disabled>Analyser la séance</button>
@@ -90,6 +97,10 @@ th:first-child,td:first-child{text-align:left}
 <p class="petit">Environ une demi-minute à quelques minutes par vidéo. Laissez l'écran allumé et restez sur cette page jusqu'au bout.</p></section>
 
 <section class="carte" id="erreur" role="alert"><h2 id="err-titre">Échec</h2><p id="err-quoi"></p><p id="err-faire"></p><p><code id="err-tech"></code></p></section>
+
+<section class="carte" id="echange" role="alert"><h2>Légendes peut-être inversées</h2>
+<p id="ech-quoi"></p><div id="ech-paires" style="display:grid;gap:.75rem"></div>
+<p class="petit">Le recalcul part de ce qui a déjà été mesuré sur chaque vidéo : rien n'est redécodé, cela prend quelques secondes. Le fichier de séance proposé plus bas est alors remplacé.</p></section>
 
 <section class="carte" id="res"><h2 id="res-titre">Résultat</h2>
 <table id="bilan"><thead><tr><th>N°</th><th>Série</th><th>Reps</th><th>Perte</th><th>Alertes</th></tr></thead><tbody id="r-bilan"></tbody></table>
@@ -4023,25 +4034,149 @@ function demuxerMaison(buf) {
 // <<< BLOC SEANCE34 - FIN >>>
 </script>
 <script>
-/* ==================== page : plusieurs videos, un fichier de seance (lot 34) ==================== */
+// <<< BLOC SEANCE36 - DEBUT >>>
+// Lot 36 — eviter l'inversion des legendes dans la page seance-telephone.html, SANS le DOM.
+// Greffe tel quel dans la page par outils-lot36/faire-page-lot36.mjs, APRES S34 ; la recette
+// Node (t-lot36.mjs) l'execute en le lisant DANS LA PAGE. N'expose qu'un nom global : S36.
+// Depend : SE (trierPython : le tri des noms de Python, celui du fichier de seance), S34
+// (lireSaisieSeance, analyserSeance, vues, PAR_VIDEO). Ne recalcule rien que S34 ne fasse :
+// un echange de legendes = la MEME analyse (SE.seanceComplete) sur les MEMES taches, avec
+// la saisie echangee. Les videos ne sont pas redecodees. Ne lit jamais l'horloge.
+(function () {
+  "use strict";
+
+  function copie(x) { return JSON.parse(JSON.stringify(x)); }
+
+  // Demande de Luka (04/10, 14:20) : un type « secondaire » (seances secondaires et legeres)
+  // et une variante au choix. S31 ne connait que top set / back-off / echauffement : la ligne
+  // « secondaire » passe a S34 SANS type (memes controles du lest et des reps), puis le type est
+  // remis dans la legende AVANT SE, qui le recopie tel quel (comme un type lu par l'OCR) : il
+  // n'est donc ni deduit de la charge, ni pris pour un top set. La variante va dans
+  // leg.variante, comme « haut et vite » / « profonde » chez Python ; SE la recopie dans la
+  // serie et l'app l'affiche apres le titre (« … · stato »). Sans secondaire ni variante, rien
+  // ne change : meme objet que S34.lireSaisieSeance, fichier au bit.
+  const SECONDAIRE = "secondaire";
+  const VARIANTES = ["hautes", "bloquées", "stato"];
+  const PAR_VIDEO = S34.PAR_VIDEO.concat(["variante"]);
+  function lireSaisieSeance(s) {
+    const vids = (s && s.videos) || [];
+    vids.forEach(function (v, i) {
+      const va = String(v.variante || "");
+      if (va !== "" && VARIANTES.indexOf(va) < 0) {
+        const e = new Error("Vidéo " + (i + 1) + " (" + v.nom + ") — Variante inconnue : " + va);
+        e.champ = "v" + i + "-variante"; e.saisie = true; throw e;
+      }
+    });
+    const pour34 = { commun: s.commun, videos: vids.map(function (v) {
+      const w = {}; w.nom = v.nom;
+      for (const k of S34.PAR_VIDEO) w[k] = v[k];
+      if (String(v.type_serie || "") === SECONDAIRE) w.type_serie = "";
+      return w;
+    }) };
+    const e = S34.lireSaisieSeance(pour34);
+    vids.forEach(function (v) {
+      const sec = String(v.type_serie || "") === SECONDAIRE, va = String(v.variante || "");
+      if (!sec && va === "") return;
+      const l = e.legendes[v.nom].leg, leg = {};
+      leg.type_serie = sec ? SECONDAIRE : l.type_serie;
+      if (leg.type_serie === undefined) delete leg.type_serie;
+      for (const k of Object.keys(l)) if (k !== "type_serie") leg[k] = l[k];
+      if (va !== "") leg.variante = va;
+      e.legendes[v.nom].leg = leg;
+    });
+    return e;
+  }
+
+  // (1) l'ordre des lignes de saisie : celui du fichier de seance (sorted() de Python sur
+  // les noms), quel que soit l'ordre de choix. Rend les fichiers tries (meme objets).
+  function ordreChrono(fichiers, nomDe) {
+    const nom = nomDe || function (f) { return f.name; };
+    const noms = fichiers.map(nom);
+    const tries = SE.trierPython(noms.slice());
+    const pris = noms.map(function () { return false; });
+    return tries.map(function (n) {
+      for (let i = 0; i < noms.length; i++) if (!pris[i] && noms[i] === n) { pris[i] = true; return fichiers[i]; }
+      throw new Error("ordreChrono : " + n);
+    });
+  }
+
+  // l'heure de prise de vue lue dans le nom (VID_20260927_135804 -> « 13:58 »), ou « » si le
+  // nom ne la porte pas. Meme motif que S31.dateDuNom (date sur 8 chiffres, « _ », 6 chiffres).
+  function heureDuNom(nom) {
+    const m = /(?:^|[^0-9])20\d{6}_(\d{2})(\d{2})(\d{2})/.exec(String(nom || ""));
+    if (!m || +m[1] > 23 || +m[2] > 59) return "";
+    return m[1] + ":" + m[2];
+  }
+
+  // (2) apres l'analyse : les paires de series dont les reps detectees different des reps
+  // annoncees ET que l'echange de leurs legendes rendrait coherentes toutes les deux
+  // (detectees de l'une = annoncees de l'autre, dans les deux sens). Ne regarde que les
+  // series analysees avec des reps annoncees. Rend [{ a, b, na, nb, ... }] (a, b = noms de
+  // fichiers video, dans l'ordre du fichier) ; ambigu = une meme serie figure dans plusieurs
+  // paires (aucun echange n'est alors propose : la page le dit).
+  function echangesPossibles(sortie) {
+    const vs = S34.vues(sortie).filter(function (v) {
+      return v.analysee && v.reps_annoncees !== null && v.reps_annoncees !== undefined && v.nb_reps !== v.reps_annoncees;
+    });
+    const paires = [];
+    for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) {
+      const p = vs[i], q = vs[j];
+      if (p.nb_reps === q.reps_annoncees && q.nb_reps === p.reps_annoncees)
+        paires.push({ a: p.fichier, b: q.fichier, na: p.n, nb: q.n, detectees_a: p.nb_reps, annoncees_a: p.reps_annoncees,
+          detectees_b: q.nb_reps, annoncees_b: q.reps_annoncees });
+    }
+    const compte = {};
+    for (const x of paires) { compte[x.a] = (compte[x.a] || 0) + 1; compte[x.b] = (compte[x.b] || 0) + 1; }
+    for (const x of paires) x.ambigu = compte[x.a] > 1 || compte[x.b] > 1;
+    return paires;
+  }
+
+  // la saisie avec les lignes (type, lest, reps annoncees) des videos nomA et nomB echangees ;
+  // le reste (commun, ordre des lignes) ne bouge pas. Ne modifie pas la saisie recue.
+  function echangerSaisie(saisie, nomA, nomB) {
+    const s = copie(saisie);
+    const ia = s.videos.findIndex(function (v) { return v.nom === nomA; });
+    const ib = s.videos.findIndex(function (v) { return v.nom === nomB; });
+    if (ia < 0 || ib < 0 || ia === ib) throw new Error("echange : videos introuvables");
+    for (const k of PAR_VIDEO) { const t = s.videos[ia][k]; s.videos[ia][k] = s.videos[ib][k]; s.videos[ib][k] = t; }
+    return s;
+  }
+
+  // refaire la seance avec les legendes echangees, a partir des taches deja mesurees
+  // (videos = [{ nom, tout, fps } | { nom, erreur }], celles de la premiere analyse).
+  function refaireAvecEchange(o) {
+    const saisie = echangerSaisie(o.saisie, o.a, o.b);
+    const entrees = lireSaisieSeance(saisie);
+    const r = S34.analyserSeance({ videos: o.videos, entrees: entrees, analyseLe: o.analyseLe, cal: o.cal });
+    return { saisie: saisie, entrees: entrees, sortie: r.sortie, nom: r.nom, lectures: r.lectures };
+  }
+
+  globalThis.S36 = { ordreChrono: ordreChrono, heureDuNom: heureDuNom, echangesPossibles: echangesPossibles,
+    echangerSaisie: echangerSaisie, refaireAvecEchange: refaireAvecEchange,
+    lireSaisieSeance: lireSaisieSeance, SECONDAIRE: SECONDAIRE, VARIANTES: VARIANTES, PAR_VIDEO: PAR_VIDEO };
+})();
+// <<< BLOC SEANCE36 - FIN >>>
+</script>
+<script>
+/* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 34","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5"};
+const PAGE = {"version":"lot 36","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
-const COMMUNS = S34.COMMUNS, PAR_VIDEO = S34.PAR_VIDEO;
+const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
 // echecs qui viennent du navigateur, pas d'une video : ils arretent toute la seance
 const FATALS = ['Page ouverte sans https', 'Navigateur sans décodeur vidéo (WebCodecs)', 'Ce navigateur ne sait pas décoder cette vidéo', 'Configuration du décodeur refusée'];
 const $ = (i) => document.getElementById(i);
 const pause = () => new Promise((r) => setTimeout(r, 0));
-let fichiers = [], blobUrl = null, nomControle = '', masquee = 0, enCours = false, blobSeance = null, nomSeance = '', prefixe = '';
+let fichiers = [], memo = null, blobUrl = null, nomControle = '', masquee = 0, enCours = false, blobSeance = null, nomSeance = '', prefixe = '';
 
 class Echec extends Error { constructor(titre, quoi, faire, tech) { super(titre); this.titre = titre; this.quoi = quoi; this.faire = faire; this.tech = tech || ''; } }
 
 function etat(t) { $('etat').textContent = prefixe + t; }
 function barre(p) { document.querySelector('.barre>div').style.width = (100 * p).toFixed(1) + '%'; }
 function champs() { const c = COMMUNS.slice(); fichiers.forEach((f, i) => { for (const k of PAR_VIDEO) c.push('v' + i + '-' + k); }); return c; }
-function cacher() { for (const i of ['erreur', 'res', 'controle', 'fseance']) $(i).style.display = 'none'; for (const c of champs().concat(['fichiers'])) $(c).classList.remove('faux'); }
+function cacher() { for (const i of ['erreur', 'echange', 'res', 'controle', 'fseance']) $(i).style.display = 'none'; for (const c of champs().concat(['fichiers'])) $(c).classList.remove('faux'); }
 function montrerErreur(e) {
   const x = e instanceof Echec ? e : new Echec('Erreur imprévue', "L'analyse s'est arrêtée sur une erreur que la page ne prévoyait pas.",
     "Faites une capture d'écran de ce cadre et joignez-la à la conversation.", String(e && (e.stack || e.message) || e));
@@ -4056,20 +4191,31 @@ const kg = (v) => v === null || v === undefined ? '?' : String(v).replace('.', '
 function el(tag, attrs, texte) { const e = document.createElement(tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (texte !== undefined) e.textContent = texte; return e; }
 function ligneVideo(f, i) {
   const d = el('div', { class: 'video' });
-  d.appendChild(el('h3', {}, 'Vidéo ' + (i + 1) + ' · ' + f.name + ' (' + (f.size / 1048576).toFixed(1).replace('.', ',') + ' Mo)'));
+  const h3 = el('h3'); const hh = S36.heureDuNom(f.name);
+  h3.appendChild(el('span', { class: 'heure' }, hh ? hh : 'heure ?'));
+  h3.appendChild(document.createTextNode('Vidéo ' + (i + 1) + ' · ' + f.name + ' (' + (f.size / 1048576).toFixed(1).replace('.', ',') + ' Mo)'));
+  d.appendChild(h3);
   const g = el('div', { class: 'trois' });
   const lt = el('label', {}, 'Type'); const s = el('select', { id: 'v' + i + '-type_serie' });
-  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['echauffement', 'Échauffement'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
-  s.value = i === 0 ? 'top set' : 'back-off'; lt.appendChild(s); g.appendChild(lt);
+  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
+  s.value = $('typeseance').value === 'secondaire' ? 'secondaire' : (i === 0 ? 'top set' : 'back-off'); lt.appendChild(s); g.appendChild(lt);
   const ll = el('label', {}, 'Lest (kg)'); ll.appendChild(el('input', { id: 'v' + i + '-lest_kg', inputmode: 'decimal', autocomplete: 'off', placeholder: '25' })); g.appendChild(ll);
   const lr = el('label', {}, 'Reps ann.'); lr.appendChild(el('input', { id: 'v' + i + '-reps_annoncees', inputmode: 'numeric', autocomplete: 'off', placeholder: '7' })); g.appendChild(lr);
   d.appendChild(g);
+  const lv = el('label', { class: 'variante' }, 'Variante'); const sv = el('select', { id: 'v' + i + '-variante' });
+  for (const [v, t] of [['', 'Aucune (normale)'], ['hautes', 'Hautes'], ['bloquées', 'Bloquées'], ['stato', 'Stato']]) sv.appendChild(el('option', { value: v }, t));
+  lv.appendChild(sv); d.appendChild(lv);
   return d;
 }
 
+$('typeseance').addEventListener('change', () => {
+  const sec = $('typeseance').value === 'secondaire';
+  fichiers.forEach((f, i) => { $('v' + i + '-type_serie').value = sec ? 'secondaire' : (i === 0 ? 'top set' : 'back-off'); });
+});
 document.addEventListener('visibilitychange', () => { if (enCours && document.hidden) masquee++; });
 $('fichiers').addEventListener('change', (e) => {
-  fichiers = Array.from(e.target.files || []);
+  fichiers = S36.ordreChrono(Array.from(e.target.files || []));   // ordre du fichier de seance, pas du choix
+  memo = null;
   const liste = $('liste'); liste.textContent = '';
   fichiers.forEach((f, i) => liste.appendChild(ligneVideo(f, i)));
   $('go').disabled = !fichiers.length;
@@ -4084,7 +4230,7 @@ $('go').addEventListener('click', async () => {
   for (const c of COMMUNS) saisie.commun[c] = $(c).value;
   fichiers.forEach((f, i) => { const v = { nom: f.name }; for (const k of PAR_VIDEO) v[k] = $('v' + i + '-' + k).value; saisie.videos.push(v); });
   let entrees;
-  try { entrees = S34.lireSaisieSeance(saisie); }
+  try { entrees = S36.lireSaisieSeance(saisie); }
   catch (e) {
     if (e && e.saisie) { $(e.champ).classList.add('faux'); $(e.champ).focus(); montrerErreur(new Echec('Saisie à corriger', e.message, 'Corrigez le champ encadré en rouge, puis relancez.')); return; }
     montrerErreur(e); return;
@@ -4223,6 +4369,14 @@ async function analyser(entrees, analyseLe, saisie) {
   }
   prefixe = '';
   etat('Calcul des séries…'); await pause();
+  memo = { videos, controles, analyseLe, saisie };
+  finir(entrees, saisie, null);
+}
+
+// le calcul des series et tout ce qui suit le decodage ; echange = null (calcul du lot 34)
+// ou { a, b } (legendes des videos a et b echangees, a partir des memes taches)
+function finir(entrees, saisie, echange) {
+  const videos = memo.videos, controles = memo.controles, analyseLe = memo.analyseLe;
   const r = S34.analyserSeance({ videos, entrees, analyseLe, cal: CAL });
   const vs = S34.vues(r.sortie);
   afficher(vs, r.sortie);
@@ -4232,7 +4386,7 @@ async function analyser(entrees, analyseLe, saisie) {
   catch (e) { throw new Echec('Fichier de séance impossible', "Le résultat s'affiche, mais le fichier de séance n'a pas pu être fabriqué.",
     "Faites une capture d'écran de ce cadre et téléchargez le fichier de contrôle.", e.message); }
   finally {
-    const controle = { format: 'seance-telephone, lot 34', saisie, entrees, analyseLe, marques: { k: K, aireMin: SEUILS.AIRE_MIN / (K * K), stride: 4 },
+    const controle = { format: 'seance-telephone, lot 36', saisie, saisie_choisie: memo.saisie, echange, entrees, analyseLe, marques: { k: K, aireMin: SEUILS.AIRE_MIN / (K * K), stride: 4 },
       videos: controles, vues: vs, sortie: r.sortie, nom_seance: r.nom, lectures: r.lectures,
       navigateur: navigator.userAgent, page: PAGE, page_masquee_pendant_la_mesure: masquee };
     if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -4247,8 +4401,45 @@ async function analyser(entrees, analyseLe, saisie) {
     $('fseance-nom').textContent = fs.nom + ' · ' + r.sortie.series.length + ' série' + (r.sortie.series.length > 1 ? 's' : '') + ' · ' + (blob.size / 1024).toFixed(1).replace('.', ',') + ' Ko';
     $('fseance').style.display = 'grid';
   }
+  proposerEchanges(r.sortie, saisie, echange);
   const non = vs.filter((v) => !v.analysee).length;
-  etat('Terminé : ' + vs.length + ' série' + (vs.length > 1 ? 's' : '') + (non ? ', dont ' + non + ' non analysée' + (non > 1 ? 's' : '') : '') + '.');
+  etat((echange ? 'Refait avec les légendes échangées. ' : '') + 'Terminé : ' + vs.length + ' série' + (vs.length > 1 ? 's' : '') + (non ? ', dont ' + non + ' non analysée' + (non > 1 ? 's' : '') : '') + '.');
+}
+
+function nomLeg(l) { return (l.type_serie || 'type ?') + ' ' + (l.lest_kg === '' ? '?' : String(l.lest_kg).replace('.', ',')) + ' kg × ' + (l.reps_annoncees || '?') + (l.variante ? ' · ' + l.variante : ''); }
+function proposerEchanges(sortie, saisie, echange) {
+  const z = $('ech-paires'); z.textContent = '';
+  const ps = S36.echangesPossibles(sortie);
+  if (!ps.length) { $('echange').style.display = 'none'; return; }
+  const ligne = (n) => saisie.videos.find((v) => v.nom === n);
+  const ambigu = ps.some((p) => p.ambigu);
+  $('ech-quoi').textContent = ambigu
+    ? "Plusieurs séries n'ont pas le nombre de reps annoncé, et plusieurs échanges les rendraient cohérentes : la page ne peut pas deviner lequel. Vérifiez l'heure de chaque vidéo, corrigez les légendes en haut, puis relancez l'analyse."
+    : (echange ? "Même après l'échange, " : '') + "Deux séries n'ont pas le nombre de reps annoncé, et l'échange de leurs légendes rendrait les deux cohérentes. Les légendes ont sans doute été tapées sur la mauvaise ligne.";
+  for (const p of ps) {
+    const d = el('div', { class: 'paire' });
+    const la = ligne(p.a), lb = ligne(p.b);
+    d.appendChild(el('p', {}, 'Série ' + p.na + ' (' + (S36.heureDuNom(p.a) || p.a) + ') : ' + p.detectees_a + ' reps détectées pour ' + p.annoncees_a + ' annoncées (« ' + nomLeg(la) + ' »).'));
+    d.appendChild(el('p', {}, 'Série ' + p.nb + ' (' + (S36.heureDuNom(p.b) || p.b) + ') : ' + p.detectees_b + ' reps détectées pour ' + p.annoncees_b + ' annoncées (« ' + nomLeg(lb) + ' »).'));
+    if (!ambigu) {
+      d.appendChild(el('p', {}, 'Échangées : série ' + p.na + ' = « ' + nomLeg(lb) + ' », série ' + p.nb + ' = « ' + nomLeg(la) + ' ».'));
+      const b = el('button', { type: 'button', class: 'echanger' }, 'Refaire le fichier avec ces deux légendes échangées');
+      b.addEventListener('click', () => echanger(p.a, p.b));
+      d.appendChild(b);
+    }
+    z.appendChild(d);
+  }
+  $('echange').style.display = 'grid';
+}
+function echanger(a, b) {
+  if (!memo) return;
+  const saisie = S36.echangerSaisie(memo.saisieCourante || memo.saisie, a, b);
+  let entrees;
+  try { entrees = S36.lireSaisieSeance(saisie); } catch (e) { montrerErreur(e); return; }
+  // le formulaire suit : les deux lignes montrent les legendes echangees
+  fichiers.forEach((f, i) => { if (f.name === a || f.name === b) { const v = saisie.videos.find((x) => x.nom === f.name); for (const k of PAR_VIDEO) $('v' + i + '-' + k).value = v[k]; } });
+  cacher();
+  try { memo.saisieCourante = saisie; finir(entrees, saisie, { a, b }); } catch (e) { montrerErreur(e); }
 }
 
 function afficher(vs, sortie) {
@@ -4256,8 +4447,9 @@ function afficher(vs, sortie) {
     (sortie.semaine ? ' · semaine ' + sortie.semaine : '') + (sortie.seance ? ' · séance ' + sortie.seance : '');
   const tb = $('r-bilan'); tb.textContent = '';
   const zone = $('r-series'); zone.textContent = '';
-  for (const v of vs) {
-    const nom = (v.type_serie || 'type ?') + ' ' + kg(v.lest_kg) + ' kg × ' + (v.reps_annoncees || '?');
+  vs.forEach((v, iv) => {
+    const va = sortie.series[iv] && sortie.series[iv].variante;
+    const nom = (v.type_serie || 'type ?') + ' ' + kg(v.lest_kg) + ' kg × ' + (v.reps_annoncees || '?') + (va ? ' · ' + va : '');
     const tr = document.createElement('tr');
     for (const t of [String(v.n), nom, v.analysee ? v.nb_reps + ' / ' + (v.reps_annoncees || '?') : 'non analysée',
       v.analysee && v.perte_v_moy_pct !== null ? virgule(v.perte_v_moy_pct, 1) + ' %' : '—', v.analysee ? String(v.alertes.length) : '—']) tr.appendChild(el('td', {}, t));
@@ -4280,7 +4472,7 @@ function afficher(vs, sortie) {
       d.appendChild(el('p', { class: 'petit' }, 'Charge système ' + virgule(v.charge_systeme_kg, 1) + ' kg · échelle ' + virgule(v.px_par_cm, 3) + ' px/cm · marque suivie sur ' + Math.round(100 * v.taux_detection) + ' % des images.'));
     }
     zone.appendChild(d);
-  }
+  });
   $('r-note').textContent = 'Séries dans l\'ordre des noms de fichiers (comme le script Python). Hauteurs depuis la suspension de départ quand elle est stable. Analysé le ' + (vs.find((v) => v.analyse_le) || {}).analyse_le + '.';
   $('res').style.display = 'grid'; $('res').scrollIntoView({ block: 'start' });
 }
