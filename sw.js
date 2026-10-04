@@ -1,6 +1,6 @@
 /* Incrémentez CACHE à chaque mise en ligne d'une nouvelle version. */
-const CACHE = 'charges-v34';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'charges-v35';
+const FILES = ['./', './index.html', './manifest.webmanifest', './logo.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   /* cache:'reload' : on va chercher les fichiers sur le serveur, pas dans le cache HTTP du
