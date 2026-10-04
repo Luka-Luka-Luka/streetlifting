@@ -1,0 +1,4051 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Analyse d'une série</title>
+<style>
+/* Clair et très contrasté, volontairement sans mode sombre : lisible au soleil. */
+:root{--bg:#ffffff;--fg:#000000;--mute:#333333;--line:#000000;--carte:#ffffff;--accent:#003d99;--accent-fg:#ffffff;--ok:#005c1f;--ko:#b00000;--ko-bg:#fff0f0;--av:#7a4b00;--av-bg:#fff6dd}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:1.1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px 16px 48px}
+main{max-width:36rem;margin:0 auto;display:grid;gap:1rem}
+h1{font-size:1.5rem;line-height:1.2;margin:0}
+.sous{color:var(--mute);margin:.2rem 0 0;font-size:.95rem}
+.carte{background:var(--carte);border:2px solid var(--line);border-radius:10px;padding:1rem;display:grid;gap:.75rem}
+h2{font-size:1.2rem;margin:0}
+label{display:grid;gap:.25rem;font-weight:600}
+.grille{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+input,select{font:1.15rem system-ui,sans-serif;padding:.6rem;border:2px solid var(--line);border-radius:8px;background:#fff;color:#000;width:100%;min-width:0}
+input[type=file]{padding:.4rem;font-size:1rem}
+.faux{outline:4px solid var(--ko);outline-offset:1px}
+button{font:700 1.2rem system-ui,sans-serif;background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:1rem 1.2rem;width:100%}
+button:disabled{opacity:.4}
+button.second{background:#fff;color:var(--accent);border:2px solid var(--accent);font-size:1.05rem;padding:.8rem}
+.barre{height:16px;border-radius:8px;background:#ddd;border:1px solid #000;overflow:hidden}
+.barre>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+#etat{font-variant-numeric:tabular-nums;font-weight:600;margin:0}
+.petit{color:var(--mute);font-size:.95rem;margin:0}
+#erreur{display:none;background:var(--ko-bg);border:3px solid var(--ko)}
+#erreur h2,#non h2{color:var(--ko)}
+#erreur p,#non p{margin:0}
+#erreur code{font-size:.85rem;word-break:break-word}
+#res,#non{display:none}
+#non{background:var(--ko-bg);border:3px solid var(--ko)}
+.gros{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;align-items:baseline}
+.gros b{font-size:2.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.gros span{font-size:1.05rem}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:1.2rem}
+th,td{border-bottom:2px solid #000;padding:.45rem .3rem;text-align:right}
+th{font-size:.95rem;vertical-align:bottom}
+th:first-child,td:first-child{text-align:left}
+#alertes{margin:0;padding:.7rem 1rem;border-radius:8px;list-style:none;display:grid;gap:.4rem}
+#alertes.aucune{background:#eefbee;border:2px solid var(--ok);color:var(--ok);font-weight:700}
+#alertes.av{background:var(--av-bg);border:2px solid var(--av);color:#000}
+#alertes.av li::before{content:"⚠ ";color:var(--av);font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Analyse d'une série</h1>
+<p class="sous">Outil v34 · lot 31 · tout se calcule sur ce téléphone, sans réseau. Rien n'est enregistré.</p></header>
+
+<section class="carte"><h2>1. La vidéo</h2>
+<input type="file" id="fichier" accept="video/mp4,video/*" aria-label="Vidéo de la série">
+<p class="petit">La vidéo d'origine (VID_…), pas une copie envoyée par une messagerie.</p></section>
+
+<section class="carte" id="formulaire"><h2>2. La légende et le poids de corps</h2>
+<div class="grille">
+<label>Mouvement<select id="mouvement"><option value="tractions">Tractions</option><option value="dips">Dips</option></select></label>
+<label>Type de série<select id="type_serie"><option value="top set">Top set</option><option value="back-off">Back-off</option><option value="echauffement">Échauffement</option><option value="">Non lu</option></select></label>
+<label>Lest (kg)<input id="lest_kg" inputmode="decimal" autocomplete="off" placeholder="37,5"></label>
+<label>Reps annoncées<input id="reps_annoncees" inputmode="numeric" autocomplete="off" placeholder="5"></label>
+<label>Semaine<input id="semaine" inputmode="numeric" autocomplete="off" placeholder="3"></label>
+<label>Séance<input id="seance" inputmode="numeric" autocomplete="off" placeholder="1"></label>
+<label>Date de la séance<input id="date" type="date"></label>
+<label>Poids de corps (kg)<input id="pdc" inputmode="decimal" autocomplete="off" placeholder="88,1"></label>
+</div>
+<p class="petit">Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la vidéo.</p></section>
+
+<section class="carte"><h2>3. Analyser</h2>
+<button id="go" type="button" disabled>Analyser la série</button>
+<div class="barre" aria-hidden="true"><div></div></div>
+<p id="etat" role="status">En attente de la vidéo.</p>
+<p class="petit">Quelques minutes. Laissez l'écran allumé et restez sur cette page jusqu'au bout.</p></section>
+
+<section class="carte" id="erreur" role="alert"><h2 id="err-titre">Échec</h2><p id="err-quoi"></p><p id="err-faire"></p><p><code id="err-tech"></code></p></section>
+
+<section class="carte" id="non" role="alert"><h2>Série non analysée</h2><p id="non-raison"></p><p id="non-faire"></p></section>
+
+<section class="carte" id="res"><h2 id="res-titre">Résultat</h2>
+<div class="gros"><div><b id="r-nb">–</b> <span id="r-nb-sur"></span></div><div><b id="r-perte">–</b> <span>perte de vitesse</span></div></div>
+<ul id="alertes"></ul>
+<table><thead><tr><th>Rep</th><th>Hauteur<br>cm</th><th>Vitesse<br>moy. m/s</th><th>Vitesse<br>pointe m/s</th></tr></thead><tbody id="r-reps"></tbody></table>
+<p class="petit" id="r-note"></p></section>
+
+<section class="carte" id="controle" style="display:none"><h2>Fichier de contrôle</h2>
+<button id="dl" class="second" type="button">Télécharger le fichier de contrôle</button>
+<p class="petit">Facultatif : il sert seulement à vérifier le calcul (ce n'est pas le fichier de séance). Il arrive dans <b>Téléchargements</b>.</p></section>
+</main>
+
+<script>
+// <<< BLOC PARTAGE - DEBUT >>>
+// Ce bloc est le NOYAU DE MESURE. Il est porte a l'identique par trois fichiers :
+//   proto-video.html (premier bloc <script>), outils-lot12/mesure.mjs (module Node),
+//   et proto-lot13.html pour sa partie non figee.
+// Il est greffe par outils-lot15/greffer-bloc.mjs depuis outils-lot15/bloc-lot15.txt.
+// Les sentinelles ci-dessus et ci-dessous delimitent la greffe : ne pas les deplacer,
+// ne rien ecrire entre elles a la main. Le texte qui SUIT la sentinelle de fin n'est
+// pas le meme dans les deux fichiers (d'ou les sentinelles, et non plus un commentaire
+// de section comme au lot 14).
+//
+// Portage JS de analyse_serie.py v7.1 — fonctions de mesure uniquement.
+// Aucune dependance : le meme texte tourne dans Node, dans un vm, et dans le navigateur.
+// Entree pixels : tableau d'octets, canaux R,G,B aux offsets 0,1,2, `stride` octets par
+// pixel (4 pour RGBA du canvas, 3 pour rgb24 de ffmpeg).
+//
+// LOT 15, OPTION B — le noyau travaille ENTIEREMENT DANS L'IMAGE REDUITE.
+// Au lot 14, marques() remultipliait ses sorties par k et tous les seuils en aval
+// restaient ceux du Python (pleine resolution). Desormais :
+//   - marques() ne connait plus k du tout et rend des taches en pixels REDUITS ;
+//   - marquesFixes, echelleFil et suivreMarque recoivent k et DIVISENT leurs seuils ;
+//   - c'est L'APPELANT qui remultiplie les sorties par k avant de les afficher ou de
+//     les exporter (y, x, h, d en xk ; aire en xk²; px/cm en xk).
+// Consequence pratique : un seuil de longueur devient seuil/k, un seuil d'aire
+// devient seuil/(k*k), et le terme d'aire du score de suivi devient 0.02*k (il melange
+// une longueur et une aire, voir suivreMarque).
+//
+// aireMin est mis a l'echelle PAR L'APPELANT, SANS ARRONDI : SEUILS.AIRE_MIN / (k*k).
+// Arrondir ferait basculer des taches entieres — Math.round(40/9) = 4 accepterait les
+// taches d'aire 4 que le lot 14 rejetait, puisque le lot 14 testait aire*9 >= 40, soit
+// aire >= 4.444.
+//
+// A k = 1 la chaine complete est IDENTIQUE BIT POUR BIT au lot 14 : tous les seuils
+// divises par 1 valent eux-memes. C'est la recette outils-lot15/t-optionb.mjs qui
+// l'exige, pas ce commentaire qui le promet.
+
+// Seuils du noyau, en pixels PLEINE RESOLUTION. Les fonctions qui recoivent k les
+// divisent elles-memes ; aucune n'est a modifier ici pour changer de resolution.
+const SEUILS = {
+  AIRE_MIN: 40,       // aire minimale d'une tache retenue                (aire, /k²)
+  TOL: 6.0,           // ecart-type de y max pour une marque dite fixe    (longueur, /k)
+  PRESENCE: 0.5,      // fraction d'images ou la marque doit apparaitre   (sans unite)
+  VOISIN: 12,         // fenetre d'appariement d'une tache d'une image a l'autre  (/k)
+  H_MAX: 65,          // hauteur max d'une tache mobile                   (longueur, /k)
+  FIXE: 14,           // distance a une marque fixe pour l'ecarter du mobile      (/k)
+  SAUT_MAX: 60.0,     // deplacement max de la ceinture d'une image a l'autre     (/k)
+  AIRE_GROSSE: 150,   // aire minimale d'une marque du fil                (aire, /k²)
+  DX_MAX: 120,        // ecart horizontal max entre les deux marques du fil       (/k)
+  DY_MIN: 600,        // ecart vertical min entre les deux marques du fil         (/k)
+  PRIME_AIRE: 0.02,   // prime d'aire du score de suivi                   (voir ci-dessus)
+  TAUX_MIN: 0.5,      // en dessous, la marque est declaree perdue        (sans unite)
+};
+const FIL_CM = 229.75;          // longueur du fil entre centres, calibration.json
+const FACTEUR_PROFONDEUR = 0.90; // fil -> plan de la ceinture, calibration.json
+
+// --- HSV facon OpenCV 8 bits : H dans 0..179, S et V dans 0..255 -------------
+// Lot 14. Ces fonctions acceptent un dernier argument `etat` facultatif, obtenu par
+// nouvelEtat(W, H) et reutilise d'une image a l'autre. Sans `etat` elles allouent
+// comme au lot 13. Avec ou sans, la sortie est la MEME, bit pour bit : c'est la
+// recette outils-lot14/t-prealloc.mjs qui l'exige, pas ce commentaire qui le promet.
+//
+// Ce que `etat` supprime, par image, en 1088x1920 : masque rose 2,09 Mo, masque ouvert
+// 2,09 Mo, etiquettes 8,36 Mo, plus le tableau `er` du lot 13 (2,09 Mo) qui etait ecrit
+// et jamais relu — supprime, pas remplace. Aucun de ces tableaux n'est remis a zero en
+// bloc : masqueRose ecrit tous les pixels, `di` est efface par le voisinage des
+// survivants de l'image precedente, `lab` par la liste des pixels etiquetes.
+function nouvelEtat(W, H) {
+  const n = W * H;
+  return {
+    W, H, n,
+    m: new Uint8Array(n),           // masque rose
+    di: new Uint8Array(n),          // masque apres ouverture
+    lab: new Int32Array(n),         // etiquettes, premiere passe
+    surv: new Int32Array(1 << 14), nsurv: 0,    // survivants de l'erosion
+    etiq: new Int32Array(1 << 14),              // pixels etiquetes, en ordre de balayage
+    parent: new Int32Array(1024), fin: new Int32Array(1024),
+    sx: new Float64Array(256), sy: new Float64Array(256),
+    nb: new Int32Array(256), ya: new Int32Array(256), yb: new Int32Array(256),
+  };
+}
+
+// agrandit un tableau type en conservant son contenu (x2, comme `parent` au lot 12)
+function agrandir(t, mini) {
+  let L = t.length; while (L < mini) L *= 2;
+  const p = new t.constructor(L); p.set(t); return p;
+}
+
+// Rejet precoce du lot 14 : un pixel n'est retenu que si le maximum des trois canaux
+// est le ROUGE. Ce n'est pas une approximation, c'est une equivalence.
+//   si le max est le vert : h = 120 + 60*(b-r)/d avec |b-r| <= d, donc h dans [60,180],
+//                           hh = round(h/2) dans [30,90] — jamais >= 158 ni <= 8 ;
+//   si le max est le bleu : h = 240 + 60*(r-g)/d, donc h dans [180,300],
+//                           hh dans [90,150] — jamais retenu non plus.
+// En cas d'egalite, la cascade du lot 12 prend deja la branche rouge la premiere, donc
+// `r >= g && r >= b` reproduit exactement `mx === r`. Verifie par enumeration des
+// 16 777 216 triplets RGB dans t-prealloc.mjs : zero desaccord. Le gain vient de ce que
+// la division, l'arrondi et le calcul de teinte ne sont plus atteints que par une
+// fraction des pixels au lieu de tous.
+function masqueRose(data, W, H, stride, etat) {
+  const n = W * H;
+  const m = etat ? etat.m : new Uint8Array(n);
+  for (let i = 0, p = 0; i < n; i++, p += stride) {
+    const r = data[p], g = data[p + 1], b = data[p + 2];
+    let v = 0;
+    if (r >= g && r >= b && r >= 70) {            // max = rouge, et V >= 70
+      const mn = g < b ? g : b, d = r - mn;
+      if (d !== 0 && Math.round((255 * d) / r) >= 60) {   // S > 0 et S >= 60
+        let h = (60 * (g - b)) / d;
+        if (h < 0) h += 360;
+        let hh = Math.round(h / 2);
+        if (hh >= 180) hh -= 180;
+        if (hh >= 158 || hh <= 8) v = 1;          // rouge/rose
+      }
+    }
+    m[i] = v;                                     // ecrit toujours : rien a effacer
+  }
+  return m;
+}
+
+// --- ouverture 3x3 creuse, bords comme cv2.morphologyEx(MORPH_OPEN) --------
+// Semantique identique a la version pleine du lot 12, bit pour bit :
+//   erosion    : exterieur considere a 1, donc er[i] = ET des voisins DANS l'image ;
+//                le centre etant un voisin, m[i] === 0 implique er[i] === 0 — d'ou le
+//                court-circuit, qui n'est pas une approximation.
+//   dilatation : exterieur a 0, donc di[p] = OU des voisins de p. Le voisinage 3x3
+//                etant symetrique, balayer les survivants et peindre leur voisinage
+//                (dispersion) donne exactement le meme masque que balayer tous les
+//                pixels et lire leur voisinage (collecte).
+// Lot 14 : `er` supprime (ecrit, jamais relu) ; `di` efface par le voisinage des
+// survivants de l'image precedente, soit quelques dizaines de milliers d'ecritures au
+// lieu de 2 088 960.
+function ouverture(m, W, H, etat) {
+  const n = W * H;
+  let di, surv;
+  if (etat) {
+    di = etat.di; surv = etat.surv;
+    for (let s = 0; s < etat.nsurv; s++) {
+      const i = surv[s], y = (i / W) | 0, x = i - y * W;
+      const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+      for (let dy = dy0; dy <= dy1; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 0;
+      }
+    }
+  } else { di = new Uint8Array(n); surv = new Int32Array(1 << 14); }
+  let ns = 0;
+  for (let y = 0; y < H; y++) {
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (!m[i]) continue;                        // court-circuit : centre a 0
+      const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+      let ok = 1;
+      for (let dy = dy0; dy <= dy1 && ok; dy++) {
+        const b = i + dy * W;
+        for (let dx = dx0; dx <= dx1; dx++) if (!m[b + dx]) { ok = 0; break; }
+      }
+      if (ok) {
+        if (ns >= surv.length) { surv = agrandir(surv, ns + 1); if (etat) etat.surv = surv; }
+        surv[ns++] = i;
+      }
+    }
+  }
+  for (let s = 0; s < ns; s++) {
+    const i = surv[s], y = (i / W) | 0, x = i - y * W;
+    const dy0 = y > 0 ? -1 : 0, dy1 = y < H - 1 ? 1 : 0;
+    const dx0 = x > 0 ? -1 : 0, dx1 = x < W - 1 ? 1 : 0;
+    for (let dy = dy0; dy <= dy1; dy++) {
+      const b = i + dy * W;
+      for (let dx = dx0; dx <= dx1; dx++) di[b + dx] = 1;
+    }
+  }
+  if (etat) etat.nsurv = ns;
+  return di;
+}
+
+// --- composantes connexes 8-connexite, equivalent de connectedComponentsWithStats
+// Lot 14 : le quadruplet de voisins, qui allouait quatre tableaux et un iterateur par
+// pixel allume, est deroule — l'ordre de lecture est conserve tel quel. La premiere
+// passe note les pixels etiquetes dans `etiq`, EN ORDRE DE BALAYAGE ; la seconde
+// parcourt cette liste au lieu de rebalayer les 2 088 960 pixels. L'ordre d'apparition
+// etant le meme, la renumerotation « comme OpenCV » est la meme, donc la sortie aussi.
+// Au passage la seconde passe remet `lab` a zero sur ces seuls pixels.
+function composantes(m, W, H, etat) {
+  const n = W * H;
+  let lab, parent, etiq, sx, sy, nb, ya, yb, fin;
+  if (etat) { lab = etat.lab; parent = etat.parent; etiq = etat.etiq; }
+  else { lab = new Int32Array(n); parent = new Int32Array(1024); etiq = new Int32Array(1 << 14); }
+  let nl = 1, ne = 0;
+  const trouver = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  const unir = (a, b) => { a = trouver(a); b = trouver(b); if (a !== b) parent[a < b ? b : a] = a < b ? a : b; };
+  const neuf = () => {
+    if (nl >= parent.length) { parent = agrandir(parent, nl + 1); if (etat) etat.parent = parent; }
+    parent[nl] = nl; return nl++;
+  };
+  for (let y = 0; y < H; y++) {
+    const h = y * W, hp = h - W;
+    for (let x = 0; x < W; x++) {
+      const i = h + x;
+      if (!m[i]) continue;
+      let l = 0, v;
+      if (y > 0) {
+        if (x > 0) { v = lab[hp + x - 1]; if (v) l = v; }
+        v = lab[hp + x]; if (v) { if (!l) l = v; else unir(l, v); }
+        if (x < W - 1) { v = lab[hp + x + 1]; if (v) { if (!l) l = v; else unir(l, v); } }
+      }
+      if (x > 0) { v = lab[i - 1]; if (v) { if (!l) l = v; else unir(l, v); } }
+      lab[i] = l || neuf();
+      if (ne >= etiq.length) { etiq = agrandir(etiq, ne + 1); if (etat) etat.etiq = etiq; }
+      etiq[ne++] = i;
+    }
+  }
+  // seconde passe : renumerotation dans l'ordre d'apparition (comme OpenCV)
+  if (etat) {
+    if (etat.fin.length < nl) etat.fin = new Int32Array(Math.max(nl, etat.fin.length * 2));
+    fin = etat.fin; fin.fill(0, 0, nl);
+    sx = etat.sx; sy = etat.sy; nb = etat.nb; ya = etat.ya; yb = etat.yb;
+  } else {
+    fin = new Int32Array(nl);
+    sx = new Float64Array(256); sy = new Float64Array(256);
+    nb = new Int32Array(256); ya = new Int32Array(256); yb = new Int32Array(256);
+  }
+  let k = 0;
+  for (let p = 0; p < ne; p++) {
+    const i = etiq[p], y = (i / W) | 0, x = i - y * W;
+    const r = trouver(lab[i]);
+    if (!fin[r]) {
+      if (k >= nb.length) {
+        sx = agrandir(sx, k + 1); sy = agrandir(sy, k + 1);
+        nb = agrandir(nb, k + 1); ya = agrandir(ya, k + 1); yb = agrandir(yb, k + 1);
+        if (etat) { etat.sx = sx; etat.sy = sy; etat.nb = nb; etat.ya = ya; etat.yb = yb; }
+      }
+      fin[r] = ++k;
+      const j = k - 1;
+      sx[j] = 0; sy[j] = 0; nb[j] = 0; ya[j] = y; yb[j] = y;
+    }
+    const j = fin[r] - 1;
+    sx[j] += x; sy[j] += y; nb[j]++;
+    if (y < ya[j]) ya[j] = y;
+    if (y > yb[j]) yb[j] = y;
+    lab[i] = 0;                                   // remise a zero ciblee
+  }
+  const out = [];
+  for (let j = 0; j < k; j++) out.push({ x: sx[j] / nb[j], y: sy[j] / nb[j], h: yb[j] - ya[j] + 1, aire: nb[j] });
+  return out;
+}
+
+// --- taches d'une image ----------------------------------------------------
+// OPTION B : plus de parametre k, plus de multiplication. Les taches sortent dans
+// L'UNITE DE L'IMAGE RECUE. Si l'image est reduite d'un facteur k, l'appelant
+// remultiplie : x, y, h par k ; aire par k*k.
+// `aireMin` est deja mis a l'echelle par l'appelant (SEUILS.AIRE_MIN / (k*k), sans
+// arrondi). Sa valeur par defaut ne vaut donc que pour k = 1.
+function marques(data, W, H, stride, etat, aireMin = SEUILS.AIRE_MIN) {
+  const m = ouverture(masqueRose(data, W, H, stride, etat), W, H, etat);
+  const bl = composantes(m, W, H, etat);
+  return bl.filter((b) => b.aire >= aireMin);
+}
+
+// --- marques fixes ----------------------------------------------------------
+// Seuils divises par k : TOL et VOISIN sont des longueurs. Les taches recues et les
+// marques rendues sont dans l'unite de l'image reduite.
+function marquesFixes(tout, k = 1) {
+  const tol = SEUILS.TOL / k, voisin = SEUILS.VOISIN / k, presence = SEUILS.PRESENCE;
+  let ref = tout[0];
+  for (const bl of tout) if (bl.length > ref.length) ref = bl;
+  const fixes = [];
+  for (const b of ref) {
+    const vus = [];
+    for (const bl of tout) {
+      let best = null;
+      for (const q of bl) {
+        if (Math.abs(q.y - b.y) < voisin && Math.abs(q.x - b.x) < voisin) {
+          if (!best || Math.abs(q.y - b.y) < Math.abs(best.y - b.y)) best = q;
+        }
+      }
+      if (best) vus.push(best);
+    }
+    if (vus.length < presence * tout.length) continue;
+    const moy = (f) => vus.reduce((s, q) => s + f(q), 0) / vus.length;
+    const my = moy((q) => q.y);
+    const ec = Math.sqrt(vus.reduce((s, q) => s + (q.y - my) ** 2, 0) / vus.length);
+    if (ec < tol) fixes.push({ y: my, x: moy((q) => q.x), h: moy((q) => q.h), aire: moy((q) => q.aire) });
+  }
+  return fixes.sort((a, b) => a.y - b.y);
+}
+
+// --- echelle par le fil -----------------------------------------------------
+// Rend { pxcm, d } — un OBJET, plus un tableau (lot 15). Les deux valeurs sont dans
+// l'unite de l'image reduite : l'appelant multiplie pxcm et d par k.
+// AIRE_GROSSE est une aire (/k*k), DX_MAX et DY_MIN des longueurs (/k).
+function echelleFil(fixes, longueurCm, k = 1) {
+  if (!longueurCm) return { pxcm: null, d: null };
+  const aireGrosse = SEUILS.AIRE_GROSSE / (k * k);
+  const dxMax = SEUILS.DX_MAX / k, dyMin = SEUILS.DY_MIN / k;
+  const gros = fixes.filter((f) => f.aire >= aireGrosse);
+  let best = null;
+  for (let i = 0; i < gros.length; i++) {
+    for (let j = i + 1; j < gros.length; j++) {
+      const a = gros[i], b = gros[j];
+      const haut = a.y < b.y ? a : b, bas = a.y < b.y ? b : a;
+      if (Math.abs(haut.x - bas.x) > dxMax || bas.y - haut.y < dyMin) continue;
+      const note = Math.min(haut.aire, bas.aire);
+      if (!best || note > best[0]) best = [note, haut, bas];
+    }
+  }
+  if (!best) return { pxcm: null, d: null };
+  const d = best[2].y - best[1].y;
+  return { pxcm: d / longueurCm, d };
+}
+
+// --- suivi de la marque de ceinture ----------------------------------------
+// NE LEVE PLUS (lot 15) : en cas d'echec, rend un objet dont le champ `erreur` porte
+// le message. L'appelant teste `suivi.erreur` avant de lire `y`.
+//
+// Le score de selection melange une longueur et une aire :
+//     note = |dy| - PRIME_AIRE * aire
+// En pleine resolution c'est |dy_p| - 0.02*aire_p. Dans l'image reduite, dy_p = dy*k
+// et aire_p = aire*k*k ; diviser toute la note par k (ce qui ne change aucun
+// classement) donne |dy| - 0.02*k*aire. D'ou le facteur k sur la prime, et lui seul.
+function suivreMarque(tout, fixes, k = 1) {
+  const hMax = SEUILS.H_MAX / k, dFixe = SEUILS.FIXE / k;
+  const sautMax = SEUILS.SAUT_MAX / k, prime = SEUILS.PRIME_AIRE * k;
+  const rate = (msg) => ({ erreur: msg, y: null, vus: null, taux: 0, aire: 0, trou: 0, trouMax: 0, trous: 0 });
+
+  const mobile = (bl) => bl.filter((b) => b.h <= hMax &&
+    !fixes.some((f) => Math.abs(b.y - f.y) < dFixe && Math.abs(b.x - f.x) < dFixe));
+  let depart = -1;
+  for (let i = 0; i < tout.length; i++) if (mobile(tout[i]).length) { depart = i; break; }
+  if (depart < 0) return rate("aucune marque mobile detectee");
+
+  const piste = (graine) => {
+    let cur = graine, aire = graine.aire;
+    const y = new Array(tout.length).fill(NaN);
+    y[depart] = cur.y;
+    for (let i = depart + 1; i < tout.length; i++) {
+      const cands = mobile(tout[i]).filter((b) =>
+        Math.abs(b.y - cur.y) < sautMax && 0.4 * aire < b.aire && b.aire < 2.5 * aire);
+      if (!cands.length) continue;
+      let meilleur = cands[0], note = Math.abs(cands[0].y - cur.y) - prime * cands[0].aire;
+      for (const b of cands) {
+        const n = Math.abs(b.y - cur.y) - prime * b.aire;
+        if (n < note) { note = n; meilleur = b; }
+      }
+      cur = meilleur;
+      aire = 0.9 * aire + 0.1 * cur.aire;
+      y[i] = cur.y;
+    }
+    const vus = y.map((v) => !Number.isNaN(v));
+    const dispo = y.filter((v) => !Number.isNaN(v));
+    const amp = dispo.length > 5 ? Math.max(...dispo) - Math.min(...dispo) : 0;
+    return { y, vus, amp, taux: vus.filter(Boolean).length / y.length };
+  };
+
+  const graines = mobile(tout[depart]).sort((a, b) => b.aire - a.aire).slice(0, 8);
+  const essais = graines.map((g) => { const p = piste(g); return { ...p, ok90: p.taux >= 0.9, aire: g.aire }; });
+  // tri Python : (ok90, amplitude) croissant, on garde le dernier
+  essais.sort((a, b) => (a.ok90 === b.ok90 ? a.amp - b.amp : (a.ok90 ? 1 : -1)));
+  const e = essais[essais.length - 1];
+  // plus long trou de detection consecutif ET nombre de trous, avant interpolation.
+  // `trouMax` et `trous` sont les noms du lot 15 ; `trou` reste comme alias du lot 14.
+  let trouMax = 0, cour = 0, trous = 0;
+  for (const v of e.vus) {
+    if (v) { cour = 0; continue; }
+    if (++cour === 1) trous++;
+    if (cour > trouMax) trouMax = cour;
+  }
+  const nvus = e.vus.filter(Boolean).length;
+  if (nvus < SEUILS.TAUX_MIN * e.y.length) return rate("marque perdue sur plus de la moitie de la video");
+  // interpolation lineaire des trous, comme np.interp
+  const y = e.y.slice();
+  const idx = [];
+  for (let i = 0; i < y.length; i++) if (e.vus[i]) idx.push(i);
+  for (let i = 0; i < y.length; i++) {
+    if (e.vus[i]) continue;
+    if (i < idx[0]) { y[i] = y[idx[0]]; continue; }
+    if (i > idx[idx.length - 1]) { y[i] = y[idx[idx.length - 1]]; continue; }
+    let j = 0; while (idx[j + 1] < i) j++;
+    const a = idx[j], b = idx[j + 1];
+    y[i] = y[a] + ((y[b] - y[a]) * (i - a)) / (b - a);
+  }
+  // `vus` : detection reelle image par image, avant interpolation. Necessaire au
+  // controle des trous en temps ecoule (lot 13) et a l'export de trajectoire.
+  return { erreur: null, y, vus: e.vus, taux: e.taux, aire: e.aire, trou: trouMax, trouMax, trous };
+}
+// <<< BLOC PARTAGE - FIN >>>
+</script>
+<script>
+/* ==================== démultiplexeur MP4 maison ==================== */
+const T = (dv, p) => String.fromCharCode(dv.getUint8(p), dv.getUint8(p+1), dv.getUint8(p+2), dv.getUint8(p+3));
+
+function* boites(dv, debut, fin) {
+  let p = debut;
+  while (p + 8 <= fin) {
+    let taille = dv.getUint32(p), type = T(dv, p + 4), corps = p + 8;
+    if (taille === 1) { taille = Number(dv.getBigUint64(p + 8)); corps = p + 16; }
+    else if (taille === 0) taille = fin - p;
+    if (taille < 8 || p + taille > fin) break;
+    yield { type, corps, bout: p + taille };
+    p += taille;
+  }
+}
+function chercher(dv, debut, fin, chemin) {
+  for (const b of boites(dv, debut, fin)) {
+    if (b.type !== chemin[0]) continue;
+    if (chemin.length === 1) return b;
+    const d = chemin[0] === 'stsd' ? b.corps + 8 : b.corps;
+    const r = chercher(dv, d, b.bout, chemin.slice(1));
+    if (r) return r;
+  }
+  return null;
+}
+function tousLes(dv, debut, fin, type) {
+  const out = []; for (const b of boites(dv, debut, fin)) if (b.type === type) out.push(b); return out;
+}
+
+function demuxerMaison(buf) {
+  const dv = new DataView(buf);
+  const moov = chercher(dv, 0, buf.byteLength, ['moov']);
+  if (!moov) throw new Error("boite moov introuvable (fichier fragmente ou non MP4 ?)");
+  let trak = null, hdlrType = '';
+  for (const t of tousLes(dv, moov.corps, moov.bout, 'trak')) {
+    const h = chercher(dv, t.corps, t.bout, ['mdia', 'hdlr']);
+    if (h && T(dv, h.corps + 8) === 'vide') { trak = t; hdlrType = 'vide'; break; }
+  }
+  if (!trak) throw new Error("aucune piste video dans moov");
+
+  // rotation + dimensions d'affichage depuis tkhd
+  const tkhd = chercher(dv, trak.corps, trak.bout, ['tkhd']);
+  const v = dv.getUint8(tkhd.corps);
+  let q = tkhd.corps + 4 + (v === 1 ? 32 : 20) + 16;
+  const a = dv.getInt32(q) / 65536, b = dv.getInt32(q + 4) / 65536;
+  let rot = Math.round(Math.atan2(b, a) * 180 / Math.PI / 90) * 90;
+  rot = ((rot % 360) + 360) % 360;
+
+  const mdhd = chercher(dv, trak.corps, trak.bout, ['mdia', 'mdhd']);
+  const mv = dv.getUint8(mdhd.corps);
+  const echelleTemps = mv === 1 ? dv.getUint32(mdhd.corps + 20) : dv.getUint32(mdhd.corps + 12);
+
+  const stbl = chercher(dv, trak.corps, trak.bout, ['mdia', 'minf', 'stbl']);
+  if (!stbl) throw new Error("table d'echantillons (stbl) introuvable");
+  const stsd = chercher(dv, stbl.corps, stbl.bout, ['stsd']);
+  const ent = [...boites(dv, stsd.corps + 8, stsd.bout)][0];
+  const nomEnt = ent.type;
+  const largeur = dv.getUint16(ent.corps + 24), hauteur = dv.getUint16(ent.corps + 26);
+  let desc = null, codec = null;
+  for (const c of boites(dv, ent.corps + 78, ent.bout)) {
+    if (c.type === 'avcC') {
+      desc = new Uint8Array(buf.slice(c.corps, c.bout));
+      codec = 'avc1.' + [...desc.slice(1, 4)].map(x => x.toString(16).padStart(2, '0')).join('');
+    } else if (c.type === 'hvcC') {
+      desc = new Uint8Array(buf.slice(c.corps, c.bout));
+      codec = 'hvc1.1.6.L93.B0';
+    }
+  }
+  if (!desc) throw new Error("parametres du codec (avcC/hvcC) introuvables dans " + nomEnt);
+
+  const lire = (nom) => { const x = chercher(dv, stbl.corps, stbl.bout, [nom]); return x; };
+  const stts = lire('stts'), stsz = lire('stsz'), stsc = lire('stsc'),
+        stco = lire('stco') || lire('co64'), stss = lire('stss'), ctts = lire('ctts');
+  if (!stts || !stsz || !stsc || !stco) throw new Error("table d'echantillons incomplete");
+
+  // tailles
+  const tailleUnique = dv.getUint32(stsz.corps + 4), nEch = dv.getUint32(stsz.corps + 8);
+  const tailles = new Uint32Array(nEch);
+  if (tailleUnique) tailles.fill(tailleUnique);
+  else for (let i = 0; i < nEch; i++) tailles[i] = dv.getUint32(stsz.corps + 12 + 4 * i);
+
+  // durees (dts)
+  const dts = new Float64Array(nEch);
+  { let n = dv.getUint32(stts.corps + 4), i = 0, t = 0;
+    for (let k = 0; k < n; k++) {
+      const cnt = dv.getUint32(stts.corps + 8 + 8 * k), dur = dv.getUint32(stts.corps + 12 + 8 * k);
+      for (let j = 0; j < cnt && i < nEch; j++, i++) { dts[i] = t; t += dur; }
+    } }
+  // decalage de presentation eventuel
+  const pts = Float64Array.from(dts);
+  if (ctts) { let n = dv.getUint32(ctts.corps + 4), i = 0;
+    for (let k = 0; k < n; k++) {
+      const cnt = dv.getUint32(ctts.corps + 8 + 8 * k), off = dv.getInt32(ctts.corps + 12 + 8 * k);
+      for (let j = 0; j < cnt && i < nEch; j++, i++) pts[i] = dts[i] + off;
+    } }
+
+  // offsets
+  const c64 = T(dv, stco.corps - 4) === 'co64';
+  const nChunk = dv.getUint32(stco.corps + 4), offs = new Float64Array(nChunk);
+  for (let i = 0; i < nChunk; i++)
+    offs[i] = c64 ? Number(dv.getBigUint64(stco.corps + 8 + 8 * i)) : dv.getUint32(stco.corps + 8 + 4 * i);
+
+  // chunk -> echantillons
+  const nSc = dv.getUint32(stsc.corps + 4), sc = [];
+  for (let i = 0; i < nSc; i++) sc.push({
+    premier: dv.getUint32(stsc.corps + 8 + 12 * i),
+    parChunk: dv.getUint32(stsc.corps + 12 + 12 * i) });
+  const pos = new Float64Array(nEch);
+  { let ech = 0;
+    for (let i = 0; i < nSc && ech < nEch; i++) {
+      const dernier = (i + 1 < nSc ? sc[i + 1].premier - 1 : nChunk);
+      for (let ch = sc[i].premier; ch <= dernier && ech < nEch; ch++) {
+        let o = offs[ch - 1];
+        for (let j = 0; j < sc[i].parChunk && ech < nEch; j++, ech++) { pos[ech] = o; o += tailles[ech]; }
+      } } }
+
+  const cles = new Set();
+  if (stss) { const n = dv.getUint32(stss.corps + 4);
+    for (let i = 0; i < n; i++) cles.add(dv.getUint32(stss.corps + 8 + 4 * i) - 1); }
+
+  const ech = [];
+  for (let i = 0; i < nEch; i++) ech.push({
+    debut: pos[i], taille: tailles[i],
+    ts: Math.round(pts[i] * 1e6 / echelleTemps),
+    cle: stss ? cles.has(i) : true });
+  ech.sort((x, y) => x.ts - y.ts);
+  return { voie: 'maison', codec, desc, largeur, hauteur, rot, echelleTemps, ech, nomEnt };
+}
+</script>
+<script>
+// <<< BLOC SAVGOL - DEBUT >>>
+// Portage JS de scipy.signal.savgol_filter, mode='interp' (le defaut de scipy).
+//
+// CE BLOC EST LA SOURCE. Il est greffe dans outils-lot16/savgol.mjs par
+// outils-lot16/greffer-savgol.mjs, et il est pret a etre greffe tel quel comme
+// troisieme bloc <script> de proto-video.html le jour ou `mesurer` arrivera.
+// Ne jamais editer le .mjs a la main.
+//
+// Il n'expose qu'UN SEUL nom global, `SG`, parce que les blocs <script> d'une meme
+// page partagent la portee globale : y redeclarer un nom leve une SyntaxError au
+// chargement, avant toute execution. Le noyau de mesure expose `PV`, ce bloc expose
+// `SG`, et rien d'autre ne sort de la fermeture.
+//
+// Ce que couvre le portage, et rien de plus : signal 1-D de flottants, polyorder
+// quelconque (2 en pratique), deriv quelconque (0 et 1 en pratique), delta
+// quelconque (1.0 en pratique), mode 'interp' uniquement.
+//
+// LE PIEGE DU PORTAGE, c'est mode='interp'. Ce n'est PAS un remplissage des bords.
+// scipy applique le filtre par convolution la ou la fenetre tient entiere, puis
+// REMPLACE les `fenetre >> 1` premieres et dernieres valeurs par un ajustement
+// polynomial de degre `ordre` fait sur les `fenetre` premiers (resp. derniers)
+// points, derive `deriv` fois et evalue aux positions voulues. Un portage qui se
+// contente de refleter ou de prolonger les bords donne des bords faux — et les
+// bords, ici, ce sont le debut et la fin de la serie, la ou se trouvent la premiere
+// et la derniere rep.
+//
+// Conventions reprises de scipy, a ne pas « simplifier » :
+//   - les coefficients sortent sous forme de CONVOLUTION (grille d'abscisses
+//     renversee), et s'appliquent par  y[i] = somme_m c[m] * x[i + h - m], h = L >> 1.
+//     Cette formule vaut pour L pair comme impair (scipy decale l'origine de -1 pour
+//     les longueurs paires, ce qui revient exactement a la meme chose).
+//   - deriv > ordre rend des coefficients tous nuls, pas une erreur.
+//   - la solution de NORME MINIMALE du systeme sous-determine, pas n'importe quelle
+//     solution : c'est ce que rend le lstsq de scipy.
+//   - l'ajustement de bord reprend la mise a l'echelle des colonnes de np.polyfit.
+(function () {
+  "use strict";
+
+  function factorielle(n) {
+    let r = 1;
+    for (let i = 2; i <= n; i++) r *= i;
+    return r;
+  }
+
+  // ---------------------------------------------------------------- algebre
+  // Matrices rangees a plat, ligne par ligne (m lignes, n colonnes).
+
+  // Decomposition QR de Householder d'une matrice M (m x n), m >= n.
+  // Transforme M sur place en R (triangle superieur) et rend la liste des
+  // reflecteurs, de quoi appliquer Q ou Q^T ensuite sans jamais former Q.
+  function householder(M, m, n) {
+    const reflecteurs = [];
+    for (let k = 0; k < n; k++) {
+      let norme = 0;
+      for (let i = k; i < m; i++) norme += M[i * n + k] * M[i * n + k];
+      norme = Math.sqrt(norme);
+      if (norme === 0) { reflecteurs.push(null); continue; }
+      // Signe choisi pour eviter l'annihilation catastrophique sur v[0].
+      const alpha = M[k * n + k] >= 0 ? -norme : norme;
+      const v = new Float64Array(m - k);
+      for (let i = k; i < m; i++) v[i - k] = M[i * n + k];
+      v[0] -= alpha;
+      let vv = 0;
+      for (let i = 0; i < v.length; i++) vv += v[i] * v[i];
+      if (vv === 0) { reflecteurs.push(null); continue; }
+      for (let j = k; j < n; j++) {
+        let s = 0;
+        for (let i = k; i < m; i++) s += v[i - k] * M[i * n + j];
+        s = (2 * s) / vv;
+        for (let i = k; i < m; i++) M[i * n + j] -= s * v[i - k];
+      }
+      reflecteurs.push({ k: k, v: v, vv: vv });
+    }
+    return reflecteurs;
+  }
+
+  // Applique Q^T a un vecteur b de longueur m (reflecteurs dans l'ordre).
+  function appliquerQt(reflecteurs, b, m) {
+    for (const h of reflecteurs) {
+      if (!h) continue;
+      let s = 0;
+      for (let i = h.k; i < m; i++) s += h.v[i - h.k] * b[i];
+      s = (2 * s) / h.vv;
+      for (let i = h.k; i < m; i++) b[i] -= s * h.v[i - h.k];
+    }
+  }
+
+  // Applique Q a un vecteur b de longueur m (reflecteurs dans l'ordre inverse).
+  function appliquerQ(reflecteurs, b, m) {
+    for (let t = reflecteurs.length - 1; t >= 0; t--) {
+      const h = reflecteurs[t];
+      if (!h) continue;
+      let s = 0;
+      for (let i = h.k; i < m; i++) s += h.v[i - h.k] * b[i];
+      s = (2 * s) / h.vv;
+      for (let i = h.k; i < m; i++) b[i] -= s * h.v[i - h.k];
+    }
+  }
+
+  // Resout R z = b, R (n x n) triangle superieur loge dans M (m x n).
+  function remonter(M, m, n, b) {
+    const z = new Float64Array(n);
+    for (let i = n - 1; i >= 0; i--) {
+      let s = b[i];
+      for (let j = i + 1; j < n; j++) s -= M[i * n + j] * z[j];
+      z[i] = M[i * n + i] === 0 ? 0 : s / M[i * n + i];
+    }
+    return z;
+  }
+
+  // Resout R^T z = b, R (n x n) triangle superieur loge dans M (m x n).
+  function descendre(M, m, n, b) {
+    const z = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let s = b[i];
+      for (let j = 0; j < i; j++) s -= M[j * n + i] * z[j];
+      z[i] = M[i * n + i] === 0 ? 0 : s / M[i * n + i];
+    }
+    return z;
+  }
+
+  // Moindres carres surdetermine : min ||M w - b||, M (m x n) de rang n, m >= n.
+  function moindresCarres(M, m, n, b) {
+    const A = Float64Array.from(M);
+    const c = Float64Array.from(b);
+    const refl = householder(A, m, n);
+    appliquerQt(refl, c, m);
+    return remonter(A, m, n, c);
+  }
+
+  // Solution de NORME MINIMALE du systeme sous-determine A c = y,
+  // A (p x L) de rang p, L >= p. C'est ce que rend lstsq(A, y) dans scipy.
+  // On decompose M = A^T = Q R, d'ou R^T (Q^T c) = y, puis c = Q z.
+  function normeMinimale(A, p, L, y) {
+    const M = new Float64Array(L * p);
+    for (let i = 0; i < L; i++) for (let j = 0; j < p; j++) M[i * p + j] = A[j * L + i];
+    const refl = householder(M, L, p);
+    const z = descendre(M, L, p, y);
+    const c = new Float64Array(L);
+    for (let j = 0; j < p; j++) c[j] = z[j];
+    appliquerQ(refl, c, L);
+    return c;
+  }
+
+  // ---------------------------------------------------------------- coefficients
+
+  // Equivalent de scipy.signal.savgol_coeffs.
+  // usage : 'conv' (defaut, grille renversee, prete pour la convolution) ou 'dot'.
+  function savgolCoeffs(fenetre, ordre, options) {
+    const o = options || {};
+    const deriv = o.deriv === undefined ? 0 : o.deriv;
+    const delta = o.delta === undefined ? 1.0 : o.delta;
+    const usage = o.usage === undefined ? "conv" : o.usage;
+
+    if (!Number.isInteger(fenetre) || fenetre < 1) {
+      throw new Error("savgol : fenetre doit etre un entier positif");
+    }
+    if (!Number.isInteger(ordre) || ordre < 0) {
+      throw new Error("savgol : ordre doit etre un entier positif ou nul");
+    }
+    if (ordre >= fenetre) {
+      throw new Error("savgol : ordre doit etre strictement inferieur a fenetre");
+    }
+    if (usage !== "conv" && usage !== "dot") {
+      throw new Error("savgol : usage doit valoir 'conv' ou 'dot'");
+    }
+
+    const moitie = Math.floor(fenetre / 2);
+    const reste = fenetre % 2;
+    let pos = o.pos;
+    if (pos === undefined || pos === null) pos = reste === 0 ? moitie - 0.5 : moitie;
+    if (!(pos >= 0 && pos < fenetre)) {
+      throw new Error("savgol : pos doit etre dans [0, fenetre[");
+    }
+
+    // deriv au-dela de l'ordre : scipy rend des zeros, pas une erreur.
+    if (deriv > ordre) return new Float64Array(fenetre);
+
+    // Matrice de Vandermonde A (ordre+1 lignes, fenetre colonnes) : A[o][j] = x_j^o.
+    const x = new Float64Array(fenetre);
+    for (let j = 0; j < fenetre; j++) x[j] = -pos + j;
+    if (usage === "conv") x.reverse();
+
+    const p = ordre + 1;
+    const A = new Float64Array(p * fenetre);
+    for (let j = 0; j < fenetre; j++) {
+      let v = 1;
+      for (let r = 0; r < p; r++) { A[r * fenetre + j] = v; v *= x[j]; }
+    }
+
+    const y = new Float64Array(p);
+    y[deriv] = factorielle(deriv) / Math.pow(delta, deriv);
+
+    return normeMinimale(A, p, fenetre, y);
+  }
+
+  // ---------------------------------------------------------------- bords
+
+  // Derive `m` fois un polynome donne par ses coefficients, PUISSANCE LA PLUS HAUTE
+  // EN TETE (convention de numpy). Reprise fidele de scipy._polyder.
+  function deriverPoly(c, m) {
+    if (m === 0) return Float64Array.from(c);
+    const n = c.length;
+    if (n <= m) return new Float64Array(1);
+    const dp = Float64Array.from(c.subarray(0, n - m));
+    for (let k = 0; k < m; k++) {
+      // rng = n-k-1, n-k-2, ... jusqu'a m-k (exclu m-k-1), soit n-m valeurs
+      for (let i = 0; i < n - m; i++) dp[i] *= n - k - 1 - i;
+    }
+    return dp;
+  }
+
+  function horner(c, t) {
+    let v = 0;
+    for (let i = 0; i < c.length; i++) v = v * t + c[i];
+    return v;
+  }
+
+  // Ajustement polynomial d'un bord, a l'identique de scipy._fit_edge.
+  // Ajuste un polynome de degre `ordre` aux points x[debutF .. finF[ places en
+  // abscisses 0, 1, 2, ..., le derive `deriv` fois, et ecrit le resultat dans
+  // y[debutI .. finI[.
+  function ajusterBord(x, debutF, finF, debutI, finI, ordre, deriv, delta, y) {
+    const L = finF - debutF;
+    const p = ordre + 1;
+
+    // Vandermonde facon np.vander : colonne j = t^(ordre-j), puissance haute en tete.
+    const V = new Float64Array(L * p);
+    for (let i = 0; i < L; i++) {
+      let v = 1;
+      for (let j = p - 1; j >= 0; j--) { V[i * p + j] = v; v *= i; }
+    }
+    // Mise a l'echelle des colonnes, exactement comme np.polyfit.
+    const echelle = new Float64Array(p);
+    for (let j = 0; j < p; j++) {
+      let s = 0;
+      for (let i = 0; i < L; i++) s += V[i * p + j] * V[i * p + j];
+      echelle[j] = Math.sqrt(s);
+      if (echelle[j] === 0) echelle[j] = 1;
+      for (let i = 0; i < L; i++) V[i * p + j] /= echelle[j];
+    }
+
+    const b = new Float64Array(L);
+    for (let i = 0; i < L; i++) b[i] = x[debutF + i];
+
+    const w = moindresCarres(V, L, p, b);
+    for (let j = 0; j < p; j++) w[j] /= echelle[j];
+
+    const d = deriverPoly(w, deriv);
+    const facteur = Math.pow(delta, deriv);
+    for (let i = debutI; i < finI; i++) {
+      y[i] = horner(d, i - debutF) / facteur;
+    }
+  }
+
+  // ---------------------------------------------------------------- filtre
+
+  // Equivalent de scipy.signal.savgol_filter(x, fenetre, ordre, deriv=, delta=,
+  // mode='interp'). Rend un Float64Array de meme longueur que x.
+  function savgolFilter(x, fenetre, ordre, options) {
+    const o = options || {};
+    const deriv = o.deriv === undefined ? 0 : o.deriv;
+    const delta = o.delta === undefined ? 1.0 : o.delta;
+    const mode = o.mode === undefined ? "interp" : o.mode;
+
+    if (mode !== "interp") {
+      throw new Error("savgol : seul mode='interp' est porte (recu '" + mode + "')");
+    }
+
+    const s = x instanceof Float64Array ? x : Float64Array.from(x);
+    const n = s.length;
+
+    const c = savgolCoeffs(fenetre, ordre, { deriv: deriv, delta: delta, usage: "conv" });
+
+    if (fenetre > n) {
+      throw new Error(
+        "savgol : en mode 'interp', fenetre (" + fenetre +
+        ") doit etre inferieure ou egale a la longueur du signal (" + n + ")"
+      );
+    }
+
+    const moitie = fenetre >> 1;
+    const y = new Float64Array(n);
+
+    // Convolution la ou la fenetre tient entiere. Les `moitie` valeurs de chaque
+    // bord seront de toute facon reecrites par l'ajustement polynomial ; scipy les
+    // calcule quand meme (convolve1d en mode 'constant'), nous les sautons — le
+    // resultat est le meme et c'est autant de multiplications en moins.
+    for (let i = moitie; i < n - moitie; i++) {
+      let acc = 0;
+      for (let m = 0; m < fenetre; m++) acc += c[m] * s[i + moitie - m];
+      y[i] = acc;
+    }
+
+    // Bords : ajustement polynomial, jamais de remplissage.
+    ajusterBord(s, 0, fenetre, 0, moitie, ordre, deriv, delta, y);
+    ajusterBord(s, n - fenetre, n, n - moitie, n, ordre, deriv, delta, y);
+
+    return y;
+  }
+
+  globalThis.SG = {
+    VERSION_SAVGOL: "lot 16",
+    savgolFilter: savgolFilter,
+    savgolCoeffs: savgolCoeffs,
+  };
+})();
+// <<< BLOC SAVGOL - FIN >>>
+</script>
+<script>
+// <<< BLOC FINDPEAKS - DEBUT >>>
+// Portage JS de scipy.signal.find_peaks, restreint aux arguments que
+// analyse_serie.py utilise reellement : `prominence` (scalaire) et `distance`.
+//
+// CE BLOC EST LA SOURCE. Il est greffe dans outils-lot17/findpeaks.mjs par
+// outils-lot17/greffer-findpeaks.mjs, et il est pret a etre greffe tel quel comme
+// bloc <script> supplementaire de proto-video.html le jour ou `mesurer` arrivera.
+// Ne jamais editer le .mjs a la main.
+//
+// Il n'expose qu'UN SEUL nom global, `FP`. Le noyau de mesure expose `PV`, le bloc
+// savgol du lot 16 expose `SG`, celui-ci expose `FP` : les blocs <script> d'une meme
+// page partagent la portee globale, et y redeclarer un nom leve une SyntaxError au
+// chargement, avant toute execution. Ce bloc ne depend PAS de `SG` : il prend un
+// tableau deja lisse, il ne lisse rien lui-meme.
+//
+// ---------------------------------------------------------------------------
+// LE PIEGE DU PORTAGE : L'ORDRE DES FILTRES N'EST PAS L'ORDRE DES ARGUMENTS.
+// ---------------------------------------------------------------------------
+// find_peaks applique ses filtres dans un ordre fixe, qui n'a rien a voir avec
+// l'ordre dans lequel on ecrit les arguments a l'appel :
+//
+//     1. maxima locaux            (toujours)
+//     2. plateau_size
+//     3. height
+//     4. threshold
+//     5. distance          <-- ici
+//     6. calcul des proeminences
+//     7. prominence        <-- et seulement ici
+//     8. width
+//
+// Consequence, et c'est la seule qui compte ici : DISTANCE PASSE AVANT
+// PROMINENCE, et le filtre de distance arbitre a la HAUTEUR du sommet, x[sommet],
+// pas a sa proeminence. Un sommet haut mais plat peut donc eliminer un voisin plus
+// proeminent que lui, puis se faire eliminer a son tour par le filtre de
+// proeminence : les deux disparaissent. L'ordre inverse, plus « naturel » (filtrer
+// d'abord ce qui est peu proeminent, puis espacer ce qui reste), garderait le
+// voisin. Sur une trajectoire de tractions, cela revient a perdre une rep.
+//
+// C'est l'equivalent, pour ce lot, de ce que mode='interp' etait pour savgol au
+// lot 16 : un detail de scipy invisible dans la signature de la fonction, et qui
+// change le resultat.
+//
+// ---------------------------------------------------------------------------
+// LA DEFINITION EXACTE D'UN SOMMET CHEZ SCIPY, PLATEAUX COMPRIS
+// ---------------------------------------------------------------------------
+// Un sommet est un plateau de valeurs EXACTEMENT egales, strictement superieur a
+// son voisin de gauche et a son voisin de droite :
+//
+//     x[g-1] < x[g] == x[g+1] == ... == x[d] > x[d+1]
+//
+// L'indice rendu est le MILIEU du plateau, arrondi vers le bas : (g + d) >> 1.
+//   - plateau de 2 points [0,1,1,0]   -> g=1, d=2, indice 1  (le premier)
+//   - plateau de 3 points [0,1,1,1,0] -> g=1, d=3, indice 2  (le milieu)
+//   - plateau de 4 points             -> g=1, d=4, indice 2
+// La comparaison d'egalite est une egalite BINAIRE de flottants, pas une egalite
+// a epsilon pres.
+//
+// Ni la premiere ni la derniere image ne peuvent etre un sommet : il faut un
+// voisin strictement inferieur des deux cotes. Un plateau qui touche la derniere
+// image n'est pas un sommet non plus (il lui manque la descente). Un signal
+// constant, un signal monotone, un signal de moins de 3 points n'ont aucun sommet.
+//
+// ---------------------------------------------------------------------------
+// PROEMINENCE : la definition de scipy, sans wlen
+// ---------------------------------------------------------------------------
+// Depuis le sommet on descend a gauche tant que x <= x[sommet], en retenant le
+// minimum rencontre ; idem a droite. La proeminence est
+//     x[sommet] - max(minimum_gauche, minimum_droit).
+// Le parcours s'arrete au premier point STRICTEMENT plus haut que le sommet, ou au
+// bord du tableau. Sans `wlen`, la fenetre est le tableau entier — c'est le cas
+// des deux appels de analyse_serie.py, qui ne passent pas wlen.
+//
+// ---------------------------------------------------------------------------
+// FILTRE DE DISTANCE : algorithme, et le point ou scipy n'est pas reproductible
+// ---------------------------------------------------------------------------
+// scipy traite les sommets du plus HAUT au plus BAS. Chaque sommet retenu elimine
+// tous ceux qui sont a moins de ceil(distance) images de lui, des deux cotes. Un
+// sommet deja elimine n'elimine personne.
+//
+// L'ordre de traitement vient de np.argsort(x[sommets]). Pour deux sommets de
+// hauteur EXACTEMENT egale, cet ordre est celui du tri introsort de numpy : il
+// n'est ni stable, ni documente, ni garanti d'une version de numpy a l'autre.
+// Mesure faite (lot 17) : sur des configurations ou deux sommets exactement egaux
+// se disputent la meme fenetre de distance, un tri stable diverge de scipy dans
+// environ 22 % des cas. Reproduire l'ordre de numpy voudrait dire porter son
+// introsort en JS — du code non verifiable, attache a un detail d'implementation
+// de numpy, pour departager un cas qui n'arrive pas sur un vrai signal.
+//
+// CHOIX RETENU, ASSUME : ordre total explicite — hauteur croissante, et a hauteur
+// egale, indice croissant. Le sommet d'indice le plus grand est donc traite le
+// premier parmi des ex aequo. Quand cet arbitrage tranche vraiment (deux sommets
+// exactement egaux a moins de ceil(distance) l'un de l'autre, dont l'un elimine
+// l'autre), le compteur `egalitesArbitrees` de la sortie est incremente. Il vaut 0
+// sur les deux vraies trajectoires du depot, pour toutes les fenetres de savgol et
+// tous les jeux de parametres de analyse_serie.py : la chaine reelle ne passe
+// jamais par cet arbitrage.
+//
+// ---------------------------------------------------------------------------
+// CE QUI EST PORTE, ET RIEN DE PLUS
+// ---------------------------------------------------------------------------
+// Releve par grep dans analyse_serie.py — deux appels, et eux seuls :
+//   ligne 151  find_peaks(ys.max() - ys, prominence=max(60.0, amp*0.4),
+//                         distance=max(3, int(fps*1.2/pas)))
+//   ligne 325  find_peaks(h, prominence=25, distance=int(fps*1.2))
+// Donc : `prominence` scalaire (borne basse seule) et `distance`. Pas de height,
+// pas de threshold, pas de width, pas de wlen, pas de plateau_size, pas de
+// rel_height, et pas de borne haute. Les passer leve.
+// Les deux appels ecrivent `sommets, _` : analyse_serie.py n'utilise AUCUNE des
+// grandeurs du dictionnaire de proprietes. La sortie les rend quand meme —
+// proeminences et bases — parce qu'elles sont calculees de toute facon et que les
+// comparer a scipy renforce la recette pour rien.
+(function () {
+  "use strict";
+
+  var VERSION_FINDPEAKS = "lot 17";
+
+  // ---------------------------------------------------------------- outils
+
+  function enTableau(x) {
+    if (x instanceof Float64Array) return x;
+    if (!Array.isArray(x) && !ArrayBuffer.isView(x)) {
+      throw new TypeError("findPeaks : le signal doit etre un tableau 1-D de nombres");
+    }
+    var n = x.length;
+    var out = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      var v = x[i];
+      if (typeof v !== "number") {
+        if (Array.isArray(v) || ArrayBuffer.isView(v)) {
+          throw new TypeError("findPeaks : le signal doit etre 1-D, pas un tableau de tableaux");
+        }
+        v = Number(v);
+      }
+      out[i] = v;
+    }
+    return out;
+  }
+
+  // ------------------------------------------------- 1. maxima locaux
+  // Equivalent de scipy.signal._peak_finding_utils._local_maxima_1d.
+  // Rend les milieux de plateau et les deux bords de chaque plateau.
+
+  function maximaLocaux(signal) {
+    var x = enTableau(signal);
+    var n = x.length;
+    var sommets = [];
+    var bordsG = [];
+    var bordsD = [];
+    if (n < 3) return { sommets: sommets, bordsG: bordsG, bordsD: bordsD };
+
+    var iMax = n - 1;          // la derniere image ne peut pas etre un sommet
+    var i = 1;                 // ni la premiere
+    while (i < iMax) {
+      if (x[i - 1] < x[i]) {
+        // avance tant que le plateau se poursuit, sans jamais atteindre iMax :
+        // un plateau qui touche la fin n'a pas de descente, donc pas de sommet
+        var j = i + 1;
+        while (j < iMax && x[j] === x[i]) j++;
+        if (x[j] < x[i]) {
+          var g = i;
+          var d = j - 1;
+          bordsG.push(g);
+          bordsD.push(d);
+          sommets.push(Math.floor((g + d) / 2));
+          i = j;               // repart apres le plateau
+        }
+      }
+      i++;
+    }
+    return { sommets: sommets, bordsG: bordsG, bordsD: bordsD };
+  }
+
+  // ------------------------------------------------- 2. proeminences
+  // Equivalent de _peak_prominences, sans wlen (fenetre = tableau entier).
+
+  function proeminences(signal, sommets) {
+    var x = enTableau(signal);
+    var n = x.length;
+    var m = sommets.length;
+    var prom = new Float64Array(m);
+    var basesG = new Int32Array(m);
+    var basesD = new Int32Array(m);
+
+    for (var p = 0; p < m; p++) {
+      var s = sommets[p] | 0;
+      if (s < 0 || s >= n) throw new RangeError("proeminences : indice de sommet hors du signal");
+      var hauteur = x[s];
+
+      var i = s;
+      var minG = hauteur;
+      basesG[p] = s;
+      while (i >= 0 && x[i] <= hauteur) {
+        if (x[i] < minG) { minG = x[i]; basesG[p] = i; }
+        i--;
+      }
+
+      i = s;
+      var minD = hauteur;
+      basesD[p] = s;
+      while (i < n && x[i] <= hauteur) {
+        if (x[i] < minD) { minD = x[i]; basesD[p] = i; }
+        i++;
+      }
+
+      prom[p] = hauteur - (minG > minD ? minG : minD);
+    }
+    return { proeminences: prom, basesG: basesG, basesD: basesD };
+  }
+
+  // ------------------------------------------------- 3. filtre de distance
+  // Equivalent de _select_by_peak_distance. `priorite` est la HAUTEUR des
+  // sommets, x[sommets], jamais leur proeminence. Voir l'en-tete pour l'ordre
+  // retenu entre ex aequo et pour le compteur d'arbitrages.
+
+  function filtrerParDistance(sommets, priorite, distance) {
+    var n = sommets.length;
+    var d = Math.ceil(distance);
+    var garde = new Array(n);
+    for (var i = 0; i < n; i++) garde[i] = true;
+    var arbitrages = 0;
+
+    var ordre = new Array(n);
+    for (i = 0; i < n; i++) ordre[i] = i;
+    ordre.sort(function (a, b) {
+      if (priorite[a] < priorite[b]) return -1;
+      if (priorite[a] > priorite[b]) return 1;
+      return a - b;                      // ex aequo : indice croissant, explicite
+    });
+
+    for (i = n - 1; i >= 0; i--) {       // du plus haut au plus bas
+      var j = ordre[i];
+      if (!garde[j]) continue;
+
+      var k = j - 1;
+      while (k >= 0 && sommets[j] - sommets[k] < d) {
+        if (garde[k]) {
+          if (priorite[k] === priorite[j]) arbitrages++;
+          garde[k] = false;
+        }
+        k--;
+      }
+      k = j + 1;
+      while (k < n && sommets[k] - sommets[j] < d) {
+        if (garde[k]) {
+          if (priorite[k] === priorite[j]) arbitrages++;
+          garde[k] = false;
+        }
+        k++;
+      }
+    }
+    return { garde: garde, arbitrages: arbitrages };
+  }
+
+  // ------------------------------------------------- 4. find_peaks
+
+  function findPeaks(signal, options) {
+    var opt = options || {};
+    for (var cle in opt) {
+      if (!Object.prototype.hasOwnProperty.call(opt, cle)) continue;
+      if (cle !== "prominence" && cle !== "distance") {
+        throw new Error("findPeaks : argument non porte : " + cle +
+          " (seuls prominence et distance le sont, ce sont les seuls que analyse_serie.py utilise)");
+      }
+    }
+    var prominence = opt.prominence;
+    var distance = opt.distance;
+
+    if (distance !== undefined && distance !== null) {
+      if (typeof distance !== "number" || !isFinite(distance)) {
+        throw new TypeError("findPeaks : distance doit etre un nombre fini");
+      }
+      if (distance < 1) throw new RangeError("`distance` must be greater or equal to 1");
+    }
+    if (prominence !== undefined && prominence !== null) {
+      if (typeof prominence !== "number" || isNaN(prominence)) {
+        throw new TypeError("findPeaks : prominence doit etre un nombre (borne basse scalaire ; " +
+          "la forme (min, max) de scipy n'est pas portee, analyse_serie.py ne l'utilise pas)");
+      }
+    }
+
+    var x = enTableau(signal);
+
+    // 1. maxima locaux
+    var lm = maximaLocaux(x);
+    var sommets = lm.sommets;
+    var egalitesArbitrees = 0;
+
+    // (2. plateau_size, 3. height, 4. threshold : non portes, jamais utilises)
+
+    // 5. distance — AVANT la proeminence, et arbitre a la hauteur du sommet
+    if (distance !== undefined && distance !== null) {
+      var prio = new Float64Array(sommets.length);
+      for (var i = 0; i < sommets.length; i++) prio[i] = x[sommets[i]];
+      var fd = filtrerParDistance(sommets, prio, distance);
+      egalitesArbitrees = fd.arbitrages;
+      var restants = [];
+      for (i = 0; i < sommets.length; i++) if (fd.garde[i]) restants.push(sommets[i]);
+      sommets = restants;
+    }
+
+    // 6. calcul des proeminences
+    var pr = proeminences(x, sommets);
+    var prom = pr.proeminences, basesG = pr.basesG, basesD = pr.basesD;
+
+    // 7. prominence — borne basse seule
+    if (prominence !== undefined && prominence !== null) {
+      var gardes = [], gp = [], gg = [], gd = [];
+      for (i = 0; i < sommets.length; i++) {
+        if (prominence <= prom[i]) {
+          gardes.push(sommets[i]); gp.push(prom[i]); gg.push(basesG[i]); gd.push(basesD[i]);
+        }
+      }
+      sommets = gardes;
+      prom = Float64Array.from(gp);
+      basesG = Int32Array.from(gg);
+      basesD = Int32Array.from(gd);
+    }
+
+    // (8. width : non porte)
+
+    return {
+      indices: sommets,                   // ordre croissant, par construction
+      proeminences: prom,
+      basesG: basesG,
+      basesD: basesD,
+      egalitesArbitrees: egalitesArbitrees,
+    };
+  }
+
+  globalThis.FP = {
+    VERSION_FINDPEAKS: VERSION_FINDPEAKS,
+    findPeaks: findPeaks,
+    maximaLocaux: maximaLocaux,
+    proeminences: proeminences,
+    filtrerParDistance: filtrerParDistance,
+  };
+})();
+// <<< BLOC FINDPEAKS - FIN >>>
+</script>
+<script>
+// <<< BLOC MESURER - DEBUT >>>
+// Portage JS de la fonction `mesurer` de analyse_serie.py (lignes 319 a 381).
+//
+// CE BLOC EST LA SOURCE. Il est greffe dans outils-lot18/mesurer.mjs par
+// outils-lot18/greffer-mesurer.mjs. Ne jamais editer le .mjs a la main.
+//
+// Il n'expose qu'UN SEUL nom global, `MS`. Le noyau de mesure expose `PV`, savgol
+// (lot 16) expose `SG`, find_peaks (lot 17) expose `FP`, celui-ci expose `MS` : les
+// blocs <script> d'une meme page ne se marchent pas dessus.
+//
+// Il DEPEND de `SG` et de `FP` : dans une page, poser les blocs dans l'ordre
+// SG, FP, MS. La dependance est verifiee a l'appel, avec un message explicite.
+//
+// ---------------------------------------------------------------------------
+// LES QUATRE PIEGES DE CE PORTAGE (detail dans journal-lot18.md)
+//
+// 1. round() de Python n'est pas toFixed() de JS. Python arrondit au plus proche
+//    et tranche les egalites AU PAIR, sur la valeur binaire EXACTE du double ;
+//    toFixed tranche a l'ecart de zero. round(0.125, 2) vaut 0.12 en Python et
+//    0.13 via toFixed. Et l'arrondi ne porte pas sur l'ecriture courte du nombre :
+//    round(2.675, 2) vaut 2.67 parce que le double vaut 2.674999999999999822...
+//    Porte ici par `arrondir`, exact, via BigInt sur les bits du double.
+// 2. argmin/argmax de numpy rendent la PREMIERE occurrence en cas d'egalite, et
+//    l'indice est RELATIF a la tranche : le code Python rajoute partout l'origine
+//    de la tranche a la main (`bas + argmax(v[bas:t+1])`). Les bornes sont
+//    exclusives a droite SAUF la ou le Python ecrit `+1` explicitement.
+// 3. `e = pe + 3` peut depasser le dernier indice. numpy tronque silencieusement
+//    la tranche `v[pe:e+1]`, mais `descente_s` et `image_fin_descente` gardent le
+//    `e` NON borne. Les deux comportements sont reproduits tels quels.
+// 4. L'ordre des operations flottantes est reproduit a l'identique
+//    (`((-d * fps) / px_cm) / 100`, `(course / 100) / duree`). Regrouper
+//    autrement change le dernier bit et peut faire basculer un arrondi.
+// ---------------------------------------------------------------------------
+
+(function () {
+  "use strict";
+
+  const VERSION_MESURER = "lot 18";
+
+  // ------------------------------------------------------------ arrondi exact
+
+  const vue = new DataView(new ArrayBuffer(8));
+
+  // Decompose un double fini en { negatif, mantisse (BigInt), exposant } tel que
+  // |x| = mantisse * 2^exposant, exactement. Tout double fini s'ecrit ainsi.
+  function bitsDouble(x) {
+    vue.setFloat64(0, x);
+    const hi = vue.getUint32(0);
+    const lo = vue.getUint32(4);
+    const negatif = (hi >>> 31) === 1;
+    let e = (hi >>> 20) & 0x7ff;
+    let m = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+    if (e === 0) {
+      e = 1;                       // denormalise : pas de bit implicite
+    } else {
+      m |= 1n << 52n;              // bit implicite
+    }
+    return { negatif: negatif, mantisse: m, exposant: e - 1075 };
+  }
+
+  // Equivalent EXACT de round(x, n) de Python (n >= 0), et de round(x) quand
+  // n vaut null (rend alors un entier, comme Python 3).
+  //
+  // Methode : |x| * 10^n est une fraction exacte d'entiers ; on la divise, on
+  // compare le reste a la moitie du diviseur, et on tranche les egalites au pair.
+  // Le quotient est ensuite rendu au double par une chaine decimale, seul chemin
+  // correctement arrondi (CPython fait la meme chose : il formate, puis relit).
+  function arrondir(x, n) {
+    if (!Number.isFinite(x)) {
+      if (n === null) throw new Error("mesurer : round() sur " + x);
+      return x;                    // round(inf, n) rend inf en Python
+    }
+    if (x === 0) return n === null ? 0 : x;   // preserve -0.0 comme Python
+
+    const b = bitsDouble(x);
+    const chiffres = n === null ? 0 : n;
+
+    // num / den = |x| * 10^chiffres, exactement.
+    let num = b.mantisse * 10n ** BigInt(chiffres);
+    let den = 1n;
+    if (b.exposant >= 0) num <<= BigInt(b.exposant);
+    else den = 1n << BigInt(-b.exposant);
+
+    let q = num / den;
+    const r = num - q * den;
+    const deuxR = r * 2n;
+    if (deuxR > den) q += 1n;
+    else if (deuxR === den && (q & 1n) === 1n) q += 1n;   // egalite : au pair
+
+    if (n === null) return b.negatif ? -Number(q) : Number(q);
+
+    // q / 10^n, par la chaine decimale.
+    let s = q.toString();
+    if (chiffres > 0) {
+      while (s.length <= chiffres) s = "0" + s;
+      s = s.slice(0, s.length - chiffres) + "." + s.slice(s.length - chiffres);
+    }
+    const val = Number(s);
+    return b.negatif ? -val : val;
+  }
+
+  // ------------------------------------------------------- tranches de tableau
+
+  // numpy : premiere occurrence en cas d'egalite. Bornes [a, b), comme Python.
+  function argmax(x, a, b) {
+    if (b <= a) throw new Error("mesurer : argmax sur une tranche vide [" + a + "," + b + ")");
+    let k = a;
+    let best = x[a];
+    for (let i = a + 1; i < b; i++) if (x[i] > best) { best = x[i]; k = i; }
+    return k - a;                  // RELATIF a la tranche, comme numpy
+  }
+
+  function argmin(x, a, b) {
+    if (b <= a) throw new Error("mesurer : argmin sur une tranche vide [" + a + "," + b + ")");
+    let k = a;
+    let best = x[a];
+    for (let i = a + 1; i < b; i++) if (x[i] < best) { best = x[i]; k = i; }
+    return k - a;
+  }
+
+  // min sur [a, b), borne a droite par la longueur : c'est ce que fait numpy
+  // quand la tranche deborde (v[pe:e+1] avec e au-dela du dernier indice).
+  function minTranche(x, a, b) {
+    const fin = Math.min(b, x.length);
+    if (fin <= a) throw new Error("mesurer : min sur une tranche vide [" + a + "," + b + ")");
+    let best = x[a];
+    for (let i = a + 1; i < fin; i++) if (x[i] < best) best = x[i];
+    return best;
+  }
+
+  // ------------------------------------------------------------------ mesurer
+
+  // Equivalent de mesurer(y_px, fps, px_cm, masse) de analyse_serie.py.
+  // Rend { reps, ys } la ou Python rend le couple (reps, ys).
+  function mesurer(yPx, fps, pxCm, masse) {
+    if (typeof globalThis.SG === "undefined") {
+      throw new Error("mesurer : le bloc savgol (lot 16, global SG) doit etre charge avant");
+    }
+    if (typeof globalThis.FP === "undefined") {
+      throw new Error("mesurer : le bloc find_peaks (lot 17, global FP) doit etre charge avant");
+    }
+
+    const y = yPx instanceof Float64Array ? yPx : Float64Array.from(yPx);
+    const n = y.length;
+
+    const k = fps < 45 ? 7 : 13;
+    const ys = globalThis.SG.savgolFilter(y, k, 2);
+    const d = globalThis.SG.savgolFilter(y, k, 2, { deriv: 1 });
+
+    let maxYs = ys[0];
+    for (let i = 1; i < n; i++) if (ys[i] > maxYs) maxYs = ys[i];
+
+    const h = new Float64Array(n);
+    const v = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      h[i] = (maxYs - ys[i]) / pxCm;
+      // ordre des operations identique a numpy : ((-d * fps) / px_cm) / 100
+      v[i] = ((-d[i] * fps) / pxCm) / 100;
+    }
+
+    const sommets = globalThis.FP.findPeaks(h, {
+      prominence: 25,
+      distance: Math.trunc(fps * 1.2),
+    }).indices;
+
+    const reps = [];
+    for (let nn = 0; nn < sommets.length; nn++) {
+      const t = sommets[nn] | 0;
+      const prec = nn ? sommets[nn - 1] | 0 : 0;
+      const bas = prec + argmin(h, prec, t);          // h[prec:t], borne haute exclue
+
+      // Debut du concentrique : on remonte depuis le pic de vitesse tant que ca
+      // monte, en tolerant un arret de moins d'une demi-seconde (point dur).
+      let i = bas + argmax(v, bas, t + 1);            // v[bas:t+1], borne haute INCLUSE
+      const tol = Math.trunc(0.45 * fps);
+      while (i > bas) {
+        if (v[i - 1] > 0.10) { i -= 1; continue; }
+        let j = i - 1;
+        while (j > bas && v[j] > -0.05 && (i - j) <= tol) j -= 1;
+        if (j > bas && v[j] > 0.10 && (i - j) <= tol) i = j;
+        else break;
+      }
+      const s = Math.max(bas, i - 1);
+
+      // Pause volontaire au sommet : vitesse dans la bande de bruit et hauteur a
+      // moins de 2 cm du sommet.
+      let ps = t;
+      while (ps > s + 2 && Math.abs(v[ps - 1]) < 0.06 && (h[t] - h[ps - 1]) < 2) ps -= 1;
+      let pe = t;
+      while (pe < v.length - 2 && Math.abs(v[pe + 1]) < 0.06 && (h[t] - h[pe + 1]) < 2) pe += 1;
+      const pauseHaut = (pe - ps) / fps;
+
+      // e peut depasser le dernier indice : voir le piege 3 de l'en-tete.
+      let e = pe + 3;
+      while (e < v.length - 1 && v[e] < -0.05) e += 1;
+
+      const p1 = s + argmax(v, s, Math.floor((s + ps) / 2) + 1);
+      const pd = p1 + argmin(v, p1, Math.max(p1 + 1, ps - 3));
+      const p2 = ps > pd ? pd + argmax(v, pd, ps) : pd;
+
+      const course = h[t] - h[s];
+      const duree = (ps - s) / fps;
+
+      // temps sous 0,2 m/s : tranche [p1, max(p1, ps-3)), qui peut etre VIDE
+      // (borne basse `max(p1, ...)`, pas `max(p1+1, ...)` comme pour pd).
+      let sous02 = 0;
+      const finSous02 = Math.max(p1, ps - 3);
+      for (let q = p1; q < finSous02; q++) if (v[q] < 0.2) sous02 += 1;
+
+      const profilV = [];
+      const profilH = [];
+      for (let q = s; q <= t; q++) {
+        profilV.push(arrondir(v[q], 2));
+        profilH.push(arrondir(h[q] - h[s], 1));
+      }
+
+      reps.push({
+        rep: nn + 1,
+        image_debut: s,
+        image_sommet: t,
+        image_fin_descente: e,
+        course_cm: arrondir(course, 1),
+        hauteur_sommet_cm: arrondir(h[t], 1),
+        montee_s: arrondir(duree, 2),
+        vitesse_moy_ms: arrondir((course / 100) / duree, 3),
+        vitesse_pic_ms: arrondir(v[p1], 3),
+        hauteur_pic_cm: arrondir(h[p1] - h[s], 1),
+        vitesse_point_dur_ms: arrondir(v[pd], 3),
+        hauteur_point_dur_cm: arrondir(h[pd] - h[s], 1),
+        temps_sous_02_s: arrondir(sous02 / fps, 2),
+        pause_sommet_s: arrondir(pauseHaut, 2),
+        vitesse_pic_haut_ms: arrondir(v[p2], 3),
+        descente_s: arrondir((e - pe) / fps, 2),
+        vitesse_pic_descente_ms: arrondir(-minTranche(v, pe, e + 1), 3),
+        puissance_moy_w: masse ? arrondir((((masse * 9.81) * course) / 100) / duree, null) : null,
+        profil_vitesse_ms: profilV,
+        profil_hauteur_cm: profilH,
+      });
+    }
+
+    for (let q = 0; q + 1 < reps.length; q++) {
+      reps[q].pause_apres_s = arrondir(
+        (reps[q + 1].image_debut - reps[q].image_fin_descente) / fps, 2
+      );
+    }
+
+    return { reps: reps, ys: ys };
+  }
+
+  globalThis.MS = {
+    VERSION_MESURER: VERSION_MESURER,
+    mesurer: mesurer,
+    arrondir: arrondir,
+    argmax: argmax,
+    argmin: argmin,
+    minTranche: minTranche,
+  };
+})();
+// <<< BLOC MESURER - FIN >>>
+</script>
+<script>
+// <<< BLOC RESUME - DEBUT >>>
+// Portage JS des fonctions `resume` (lignes 384 a 395) et `controles`
+// (lignes 757 a 782) de analyse_serie.py.
+//
+// CE BLOC EST LA SOURCE. Il est greffe dans outils-lot19/resume.mjs par
+// outils-lot19/greffer-resume.mjs. Ne jamais editer le .mjs a la main.
+//
+// Il n'expose qu'UN SEUL nom global, `RS`. Le noyau de mesure expose `PV`,
+// savgol (lot 16) expose `SG`, find_peaks (lot 17) expose `FP`, mesurer
+// (lot 18) expose `MS`, celui-ci expose `RS`.
+//
+// Il DEPEND de `SG` (savgol, pour `controles`) et de `MS` (l'arrondi exact,
+// pour les deux). Il ne depend PAS de `FP` directement, mais `MS` en depend :
+// dans une page, poser les blocs dans l'ordre SG, FP, MS, RS. La dependance
+// est verifiee a l'appel, avec un message explicite.
+//
+// ---------------------------------------------------------------------------
+// LES CINQ PIEGES DE CE PORTAGE (detail dans journal-lot19.md)
+//
+// 1. `np.mean` N'EST PAS UNE SOMME NAIVE. numpy somme PAR PAIRES : huit
+//    accumulateurs deroules jusqu'a 128 elements, puis decoupage recursif en
+//    deux moities alignees sur 8. Le resultat differe d'un `reduce((a,b)=>a+b)`
+//    au dernier bit des que n >= 8. Sur les 111 reps du jeu d'essai la
+//    divergence est systematique. Portee ici par `sommePairwise`.
+// 2. `%.1f` et `%.0f` de CPython arrondissent AU PAIR, sur la valeur BINAIRE
+//    exacte du double — exactement comme `round()`. `"%.1f" % 6.25` vaut
+//    "6.2", la ou `(6.25).toFixed(1)` vaut "6.3" ; `"%.0f" % 20.5` vaut "20",
+//    la ou `Math.round(20.5)` vaut 21. Les deux cas sont ATTEINTS par le jeu
+//    d'essai, dans de vraies chaines d'alerte. On reutilise `MS.arrondir`
+//    (lot 18), on n'en refait pas un.
+// 3. `%.1f` de -0.04 rend "-0.0", et de -0.0 rend "-0.0". En JS,
+//    `(-0).toFixed(1)` rend "0.0" : le signe se perd. Il est traite a part.
+// 4. `ys[prec : r.image_debut + 1]` a une borne haute INCLUSIVE (le `+1` est
+//    ecrit a la main), alors que `ys[fin:]` est une tranche ouverte ordinaire.
+//    Et `prec` vient de `image_fin_descente`, qui n'est PAS borne par la
+//    longueur du signal (acquis du lot 18) : la tranche peut deborder, donc
+//    etre vide. Python la rend vide sans broncher, `if len(seg)` la saute.
+//    Les bornes sont normalisees a la maniere de Python, negatifs compris.
+// 5. LES DEUX SEUILS SONT STRICTS : `d > 5.0` et `monte > 20`. Une valeur
+//    exactement egale au seuil NE declenche PAS l'alerte. Le jeu d'essai
+//    contient `d = 5.0` pile et `monte = 20.0` pile, qui doivent rester muets.
+//
+// ASYMETRIE SUR `reps` VIDE, qui n'est pas une etourderie du Python :
+//    `resume([])` rend `{}` — un dictionnaire vide, pas une liste ;
+//    `controles(..., [])` rend une LISTE, et cette liste peut ne pas etre
+//    vide. Avec `reps` vide, `fin` retombe a 0, la queue couvre tout le
+//    signal, et l'alerte 2 peut tomber. C'est voulu : une video ou aucune rep
+//    n'a ete detectee mais ou ca monte franchement doit justement le dire.
+// ---------------------------------------------------------------------------
+
+(function () {
+  "use strict";
+
+  const VERSION_RESUME = "lot 19";
+
+  function exigerSG() {
+    if (typeof globalThis.SG === "undefined") {
+      throw new Error("resume : le bloc savgol (lot 16, global SG) doit etre charge avant");
+    }
+  }
+
+  function exigerMS() {
+    if (typeof globalThis.MS === "undefined") {
+      throw new Error("resume : le bloc mesurer (lot 18, global MS) doit etre charge avant");
+    }
+  }
+
+  // ------------------------------------------------- somme par paires (numpy)
+
+  // Reproduit pairwise_sum_DOUBLE de numpy (loops_utils.h.src), chemin scalaire.
+  // PW_BLOCKSIZE = 128. C'est ce que fait `np.sum` sur un tableau float64
+  // contigu, et `np.mean` en est le quotient par le nombre d'elements.
+  const PW_BLOCKSIZE = 128;
+
+  function sommePairwise(a, i, n) {
+    if (n < 8) {
+      let res = 0;
+      for (let k = 0; k < n; k++) res += a[i + k];
+      return res;
+    }
+    if (n <= PW_BLOCKSIZE) {
+      // huit accumulateurs independants, remplis en tourniquet
+      let r0 = a[i], r1 = a[i + 1], r2 = a[i + 2], r3 = a[i + 3];
+      let r4 = a[i + 4], r5 = a[i + 5], r6 = a[i + 6], r7 = a[i + 7];
+      const lim = n - (n % 8);
+      let j = 8;
+      for (; j < lim; j += 8) {
+        r0 += a[i + j];     r1 += a[i + j + 1]; r2 += a[i + j + 2]; r3 += a[i + j + 3];
+        r4 += a[i + j + 4]; r5 += a[i + j + 5]; r6 += a[i + j + 6]; r7 += a[i + j + 7];
+      }
+      // l'ordre de recombinaison compte : ((r0+r1)+(r2+r3)) + ((r4+r5)+(r6+r7))
+      let res = ((r0 + r1) + (r2 + r3)) + ((r4 + r5) + (r6 + r7));
+      for (; j < n; j++) res += a[i + j];
+      return res;
+    }
+    let n2 = Math.floor(n / 2);
+    n2 -= n2 % 8;                      // la coupure est alignee sur 8
+    return sommePairwise(a, i, n2) + sommePairwise(a, i + n2, n - n2);
+  }
+
+  // Equivalent de float(np.mean(liste)) sur une liste de float64.
+  function moyenne(a) {
+    if (!a.length) throw new Error("resume : moyenne d'une liste vide");
+    return sommePairwise(a, 0, a.length) / a.length;
+  }
+
+  // ------------------------------------------------------ formatage %.<n>f
+
+  // Equivalent EXACT de "%.<n>f" % x de CPython, pour n >= 0.
+  //
+  // CPython formate la valeur BINAIRE exacte du double, au plus proche, et
+  // tranche les egalites AU PAIR — la meme regle que round(). On delegue donc
+  // l'arrondi a MS.arrondir (lot 18, exact par BigInt) et on ne garde ici que
+  // l'habillage : le signe, et le remplissage des decimales.
+  //
+  // Pourquoi `.toFixed(n)` est sur ICI, et SEULEMENT ici. `toFixed` est exact
+  // lui aussi (il travaille sur la valeur binaire), mais il tranche les
+  // egalites vers le haut, pas au pair. On ne peut donc s'en servir que sur
+  // une valeur ou plus AUCUNE egalite n'est possible — c'est-a-dire une valeur
+  // deja arrondie par MS.arrondir, ET assez petite pour que le double porte
+  // reellement n decimales.
+  //
+  // La borne est demontrable, pas empirique. MS.arrondir rend le double `v` le
+  // plus proche du decimal q/10^n, donc |v - q/10^n| <= ulp(v)/2. Pour que
+  // toFixed retrouve q et ne puisse pas tomber sur une egalite, il suffit que
+  // ulp(v) < 10^-n. Sous 1e9 on a v < 2^30, donc ulp(v) <= 2^-23 = 1,2e-7, ce
+  // qui tient pour tout n <= 6 avec quatre ordres de grandeur de marge.
+  //
+  // Au-dela, l'argument tombe pour de bon : mesure faite, `"%.3f" % x` et ce
+  // chemin divergent des 1e12, parce qu'aucun double ne vaut exactement le
+  // decimal vise et que l'arrondi se rejoue une seconde fois. Le garde-fou
+  // LEVE plutot que d'ecrire un chiffre faux en silence. Les grandeurs en jeu
+  // sont des centimetres : la borne n'est jamais approchee.
+  function formater(x, n) {
+    exigerMS();
+    if (typeof x !== "number") throw new Error("formater : " + typeof x + " au lieu d'un nombre");
+    if (!Number.isInteger(n) || n < 0 || n > 6) {
+      throw new Error("formater : n hors du domaine verifie (" + n + ", attendu 0 a 6)");
+    }
+    if (Number.isNaN(x)) return "nan";
+    if (!Number.isFinite(x)) return x > 0 ? "inf" : "-inf";
+    if (Math.abs(x) >= 1e9) {
+      throw new Error("formater : magnitude hors du domaine verifie (" + x + ", borne 1e9)");
+    }
+    const negatif = x < 0 || Object.is(x, -0);   // -0.0 s'ecrit "-0.0" en Python
+    const v = globalThis.MS.arrondir(Math.abs(x), n);
+    return (negatif ? "-" : "") + v.toFixed(n);
+  }
+
+  // ------------------------------------------------------- tranches de Python
+
+  // Normalise les bornes d'une tranche a[deb:fin] comme le fait Python :
+  // un indice negatif compte depuis la fin, puis tout est ramene dans
+  // [0, longueur]. Rend { deb, fin } avec fin >= deb (tranche eventuellement
+  // vide). Le cas negatif n'est pas atteint par la chaine reelle ; il est
+  // porte pour qu'un appelant futur ne trouve pas un silence a la place.
+  function bornes(longueur, deb, fin) {
+    let d = deb, f = fin;
+    if (d < 0) d += longueur;
+    if (f < 0) f += longueur;
+    if (d < 0) d = 0; else if (d > longueur) d = longueur;
+    if (f < 0) f = 0; else if (f > longueur) f = longueur;
+    if (f < d) f = d;
+    return { deb: d, fin: f };
+  }
+
+  // max sur [deb, fin), tranche supposee non vide.
+  function maxTranche(x, deb, fin) {
+    let m = x[deb];
+    for (let i = deb + 1; i < fin; i++) if (x[i] > m) m = x[i];
+    return m;
+  }
+
+  // ------------------------------------------------------------------ resume
+
+  // Equivalent de resume(reps) de analyse_serie.py.
+  // Rend un objet de 8 cles DANS L'ORDRE du dict Python, ou {} si reps est vide.
+  function resume(reps) {
+    exigerMS();
+    const R = globalThis.MS;
+    // Python : `if not reps` — vrai pour [] comme pour None.
+    if (!reps || reps.length === 0) return {};
+
+    const a = reps[0];
+    const z = reps[reps.length - 1];
+    const va = a["vitesse_moy_ms"];
+
+    // Python : 100 * (z - a) / a, evalue de gauche a droite -> (100*(z-a)) / a.
+    // Une vitesse moyenne nulle sur la rep 1 leve ZeroDivisionError en Python
+    // (division de flottants), la ou JS rendrait +-Infinity ou NaN en silence.
+    if (va === 0) {
+      throw new Error("resume : float division by zero (vitesse_moy_ms de la rep 1 vaut 0)");
+    }
+    const perte = R.arrondir((100 * (z["vitesse_moy_ms"] - va)) / va, 1);
+
+    const hauteursPointDur = [];
+    for (let i = 0; i < reps.length; i++) hauteursPointDur.push(reps[i]["hauteur_point_dur_cm"]);
+
+    // L'ordre d'insertion reproduit celui du dict Python : la recette le compare.
+    return {
+      nb_reps: reps.length,
+      v_moy_rep1: va,
+      v_moy_derniere: z["vitesse_moy_ms"],
+      perte_v_moy_pct: perte,
+      v_mini_derniere: z["vitesse_point_dur_ms"],
+      perte_hauteur_sommet_cm: R.arrondir(a["hauteur_sommet_cm"] - z["hauteur_sommet_cm"], 1),
+      hauteur_point_dur_cm: R.arrondir(moyenne(hauteursPointDur), 1),
+      puissance_moy_rep1_w: a["puissance_moy_w"],
+    };
+  }
+
+  // --------------------------------------------------------------- controles
+
+  // Les deux chaines sont assemblees par des fonctions a part, exposees sur RS.
+  // Ce n'est pas de la coquetterie : c'est ce qui rend le formatage TESTABLE
+  // sans passer par savgol. Le residu du lot 16 (~1e-13 en valeur absolue sur
+  // ces grandeurs) suffit a faire basculer un chiffre quand la valeur tombe
+  // pile sur une frontiere d'arrondi ; un test qui passerait par le signal ne
+  // saurait pas distinguer une erreur de formatage d'un dernier bit de savgol.
+  // Ici, la recette appelle ces deux fonctions directement, sur des valeurs
+  // choisies — egalites comprises — et compare a CPython caractere par
+  // caractere. Voir journal-lot19.md, section sur le fil de rasoir.
+
+  function chaineSuspension(d) {
+    return "suspension variable de " + formater(d, 1) +
+      " cm entre les reps (plus que l'ecart epaules " +
+      "relachees/engagees, 3,3 cm) : verifier le cadrage";
+  }
+
+  function chaineCoupure(monte) {
+    return "video coupee pendant une rep (" + formater(monte, 0) +
+      " cm de montee a la derniere image), non comptee";
+  }
+
+  // Equivalent de controles(y_px, px_cm, fps, reps) de analyse_serie.py.
+  // Rend un tableau de 0 a 2 chaines.
+  function controles(yPx, pxCm, fps, reps) {
+    exigerSG();
+    exigerMS();
+    const al = [];
+    // Meme k que `mesurer`, recalcule ici et non repris : `7 if fps < 45 else 13`.
+    const ys = globalThis.SG.savgolFilter(yPx, fps < 45 ? 7 : 13, 2);
+    const n = ys.length;
+
+    // 1. suspension qui derive
+    const bas = [];
+    let prec = 0;
+    const liste = reps || [];
+    for (let i = 0; i < liste.length; i++) {
+      const r = liste[i];
+      const b = bornes(n, prec, r["image_debut"] + 1);
+      if (b.fin > b.deb) bas.push(maxTranche(ys, b.deb, b.fin));
+      prec = r["image_fin_descente"];
+    }
+    if (bas.length >= 2) {
+      let hi = bas[0], lo = bas[0];
+      for (let i = 1; i < bas.length; i++) {
+        if (bas[i] > hi) hi = bas[i];
+        if (bas[i] < lo) lo = bas[i];
+      }
+      const d = diviser(hi - lo, pxCm);
+      if (d > 5.0) al.push(chaineSuspension(d));
+    }
+
+    // 2. video coupee pendant une rep
+    const fin = liste.length ? liste[liste.length - 1]["image_fin_descente"] : 0;
+    const q = bornes(n, fin, n);
+    const longueurQueue = q.fin - q.deb;
+    if (longueurQueue > 5) {
+      // ys[-1] est le dernier element de TOUT le signal, pas de la queue —
+      // ici les deux coincident, la queue finissant avec le signal.
+      const monte = diviser(maxTranche(ys, q.deb, q.fin) - ys[n - 1], pxCm);
+      if (monte > 20) al.push(chaineCoupure(monte));
+    }
+    return al;
+  }
+
+  // Division par px_cm reproduisant les erreurs de Python : un px_cm nul leve
+  // ZeroDivisionError, un px_cm absent leve TypeError. En JS, x/0 rendrait
+  // Infinity et x/null rendrait 0 ou Infinity — deux silences. Ces deux cas
+  // sont exclus par l'appelant de analyse_serie.py (garde `if not px`), mais
+  // un portage qui les avale rendrait une alerte absurde au lieu d'une erreur.
+  function diviser(x, pxCm) {
+    if (pxCm === null || pxCm === undefined || typeof pxCm !== "number") {
+      throw new Error("controles : px_cm absent (TypeError cote Python)");
+    }
+    if (pxCm === 0) {
+      throw new Error("controles : float division by zero (px_cm vaut 0)");
+    }
+    return x / pxCm;
+  }
+
+  globalThis.RS = {
+    resume: resume,
+    controles: controles,
+    moyenne: moyenne,
+    sommePairwise: sommePairwise,
+    formater: formater,
+    chaineSuspension: chaineSuspension,
+    chaineCoupure: chaineCoupure,
+    bornes: bornes,
+    VERSION_RESUME: VERSION_RESUME,
+  };
+})();
+// <<< BLOC RESUME - FIN >>>
+</script>
+<script>
+// <<< BLOC REFERENCE - DEBUT >>>
+// Portage JS de `reference_depart` (analyse_serie.py, lignes 785 a 813), lot 20.
+//
+// CE BLOC EST LA SOURCE. Il est greffe dans outils-lot20/reference.mjs par
+// `node outils-lot20/greffer-reference.mjs`. Ne jamais editer reference.mjs.
+//
+// Il n'expose qu'UN SEUL nom global, `RD`. Il DEPEND de `SG` (savgol, lot 16)
+// et de `RS` (lot 19, pour `RS.sommePairwise`) ; `RS` depend de `MS` et `SG`,
+// `MS` de `FP`. Dans une page : SG, FP, MS, RS, puis RD.
+//
+// Ce que rend la fonction — c'est le `return` qui fait foi, pas la docstring :
+//   null, ou QUATRE valeurs [y_ref, duree_s, ecart_type_cm, ys]
+//   - y_ref        : mediane de la plage calme, en PIXELS (pas en cm), sur ys lisse
+//   - duree_s      : (b0 - a0) / fps
+//   - ecart_type_cm: ecart-type de POPULATION de la plage, en px, PUIS divise par px_cm
+//   - ys           : le signal lisse ENTIER (l'appelant, ligne 903, s'en sert)
+// La docstring annonce un triplet ; l'appelant depaquette quatre valeurs et
+// utilise la quatrieme. Un triplet le ferait lever (ValueError).
+//
+// Trois chemins rendent null : reps vide ; aucune plage calme d'au moins 0,8 s ;
+// garde-fou des 12 cm. Les cas ou Python LEVE levent aussi ici (voir plus bas).
+(function () {
+  "use strict";
+
+  const VERSION_REFERENCE = "lot 20";
+
+  function exigerSG() {
+    if (typeof globalThis.SG === "undefined") {
+      throw new Error("reference_depart : le bloc savgol (lot 16, global SG) doit etre charge avant");
+    }
+  }
+  function exigerRS() {
+    if (typeof globalThis.RS === "undefined") {
+      throw new Error("reference_depart : le bloc resume (lot 19, global RS) doit etre charge avant");
+    }
+  }
+
+  // ------------------------------------------------------------ np.gradient
+
+  // Equivalent de np.gradient(f) sur un tableau 1-D float64, pas d'espacement
+  // donne (dx = 1.0), edge_order = 1 :
+  //   interieur : (f[i+1] - f[i-1]) / 2.0
+  //   bords     : (f[1] - f[0]) / 1.0  et  (f[n-1] - f[n-2]) / 1.0
+  // Diviser par 1.0 est exact ; diviser par 2.0 aussi (sauf sous-normaux, sans
+  // objet ici). L'ordre des soustractions est celui de numpy.
+  function gradient(f) {
+    const n = f.length;
+    if (n < 2) {
+      throw new Error("ValueError: Shape of array too small to calculate a numerical gradient, "
+        + "at least (edge_order + 1) elements are required.");
+    }
+    const out = new Float64Array(n);
+    for (let i = 1; i < n - 1; i++) out[i] = (f[i + 1] - f[i - 1]) / 2.0;
+    out[0] = (f[1] - f[0]) / 1.0;
+    out[n - 1] = (f[n - 1] - f[n - 2]) / 1.0;
+    return out;
+  }
+
+  // -------------------------------------------------------------- np.median
+
+  // Equivalent de float(np.median(a)) sur un tableau 1-D float64.
+  // numpy partitionne, puis prend np.mean de la tranche du milieu : UNE valeur
+  // si la longueur est impaire, les DEUX du milieu si elle est paire. Ce mean
+  // passe par la somme par paires (RS.sommePairwise) puis divise par 1 ou 2.
+  // Un NaN dans la liste -> NaN (_median_nancheck). Liste vide -> NaN (numpy
+  // rend nan avec un avertissement, il ne leve pas).
+  function mediane(a) {
+    exigerRS();
+    const n = a.length;
+    if (n === 0) return NaN;
+    for (let i = 0; i < n; i++) if (a[i] !== a[i]) return NaN;
+    const t = Float64Array.from(a).sort();   // tri numerique des Float64Array
+    const h = n >> 1;
+    if (n % 2 === 1) return globalThis.RS.sommePairwise([t[h]], 0, 1) / 1;
+    return globalThis.RS.sommePairwise([t[h - 1], t[h]], 0, 2) / 2;
+  }
+
+  // --------------------------------------------------------------- .std()
+
+  // Equivalent de a.std() : ecart-type de POPULATION (ddof = 0). numpy (_var) :
+  //   m   = somme_par_paires(a) / n
+  //   d_i = a_i - m ;  q_i = d_i * d_i      (multiply, pas **2)
+  //   var = somme_par_paires(q) / n
+  //   std = sqrt(var)                        (arrondi correct des deux cotes)
+  // Deux sommes par paires, donc deux appels a RS.sommePairwise.
+  function ecartType(a) {
+    exigerRS();
+    const n = a.length;
+    if (n === 0) return NaN;
+    const m = globalThis.RS.sommePairwise(a, 0, n) / n;
+    const q = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const d = a[i] - m;
+      q[i] = d * d;
+    }
+    return Math.sqrt(globalThis.RS.sommePairwise(q, 0, n) / n);
+  }
+
+  // Equivalent de ys.max() : un NaN quelque part -> NaN. Tableau vide -> leve.
+  function maxNumpy(a) {
+    if (a.length === 0) {
+      throw new Error("ValueError: zero-size array to reduction operation maximum which has no identity");
+    }
+    let m = a[0];
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== a[i]) return NaN;
+      if (a[i] > m) m = a[i];
+    }
+    return m;
+  }
+
+  // ------------------------------------------------- plages calmes (boucle)
+
+  // Reproduit la boucle while de Python A L'IDENTIQUE, bornes comprises.
+  //   calme = np.abs(v[:fin]) < 0.05   -> longueur min(fin, n) si fin >= 0,
+  //                                       max(n + fin, 0) si fin < 0 (tranche
+  //                                       Python depuis la fin)
+  //   while i < fin : ...                -> si fin > n, la boucle finit par lire
+  //                                       calme[n] : IndexError cote Python.
+  // Rend la liste des plages [i, j) (j exclu), dans l'ordre.
+  function plagesCalmes(v, fin) {
+    const n = v.length;
+    const lc = fin >= 0 ? Math.min(fin, n) : Math.max(n + fin, 0);
+    const calme = new Uint8Array(lc);
+    for (let k = 0; k < lc; k++) calme[k] = Math.abs(v[k]) < 0.05 ? 1 : 0;
+    function lire(k) {
+      if (k >= lc) {
+        throw new Error("IndexError: index " + k + " is out of bounds for axis 0 with size " + lc);
+      }
+      return calme[k];
+    }
+    const runs = [];
+    let i = 0;
+    while (i < fin) {
+      if (lire(i)) {
+        let j = i;
+        while (j < fin && lire(j)) j += 1;
+        runs.push([i, j]);
+        i = j;
+      } else {
+        i += 1;
+      }
+    }
+    return runs;
+  }
+
+  // ------------------------------------------------------- coeur (ys donne)
+
+  // Tout reference_depart APRES le lissage. Separe pour que la recette puisse
+  // lui donner le ys EXACT de scipy et exiger l'egalite binaire sur tout le
+  // reste, independamment du residu de savgol (lot 16).
+  function depuisLisse(ysEntree, fps, pxCm, reps) {
+    if (!reps || reps.length === 0) return null;
+    const ys = ysEntree instanceof Float64Array ? ysEntree : Float64Array.from(ysEntree);
+    const g = gradient(ys);
+    if (pxCm === null || pxCm === undefined) {
+      throw new Error("TypeError: unsupported operand type(s) for /: 'float' and 'NoneType' (px_cm absent)");
+    }
+    // v = np.gradient(ys) * fps / px_cm / 100 : l'ordre (((g*fps)/px)/100) est
+    // celui de Python, et il decide du dernier bit.
+    const v = new Float64Array(g.length);
+    for (let k = 0; k < g.length; k++) v[k] = ((g[k] * fps) / pxCm) / 100;
+    const r0 = reps[0];
+    if (!("image_debut" in r0)) throw new Error("KeyError: 'image_debut'");
+    const fin = r0.image_debut;
+    if (!Number.isInteger(fin)) {
+      throw new Error("TypeError: slice indices must be integers (image_debut = " + fin + ")");
+    }
+    let runs = plagesCalmes(v, fin);
+    // filtre >= 0.8 s : division flottante comparee a 0.8, PAS un nombre
+    // d'images arrondi. fps = 0 avec au moins une plage : ZeroDivisionError
+    // cote Python (fps est un float Python).
+    if (runs.length && fps === 0) throw new Error("ZeroDivisionError: float division by zero");
+    runs = runs.filter(function (r) { return (r[1] - r[0]) / fps >= 0.8; });
+    if (!runs.length) return null;
+    // la DERNIERE plage retenue, pas la plus longue
+    const a0 = runs[runs.length - 1][0], b0 = runs[runs.length - 1][1];
+    const seg = ys.subarray(a0, b0);
+    const med = mediane(seg);
+    // garde-fou : ys.max() sur la serie ENTIERE (le point le plus bas, y vers
+    // le bas), compare a la mediane de la plage. Strict : 12 pile passe.
+    if ((maxNumpy(ys) - med) / pxCm > 12) return null;
+    return [med, (b0 - a0) / fps, ecartType(seg) / pxCm, ys];
+  }
+
+  // ------------------------------------------------------ fonction complete
+
+  function referenceDepart(yPx, fps, pxCm, reps) {
+    if (!reps || reps.length === 0) return null;
+    exigerSG();
+    const ys = globalThis.SG.savgolFilter(yPx, fps < 45 ? 7 : 13, 2);
+    return depuisLisse(ys, fps, pxCm, reps);
+  }
+
+  globalThis.RD = {
+    referenceDepart: referenceDepart,
+    depuisLisse: depuisLisse,
+    gradient: gradient,
+    mediane: mediane,
+    ecartType: ecartType,
+    maxNumpy: maxNumpy,
+    plagesCalmes: plagesCalmes,
+    VERSION_REFERENCE: VERSION_REFERENCE,
+  };
+})();
+// <<< BLOC REFERENCE - FIN >>>
+</script>
+<script>
+// <<< BLOC SEANCE - DEBUT >>>
+// Portage JS de morceaux de main_seance (analyse_serie.py), pour UNE serie :
+//   lot 21 : usage du resultat de reference_depart (l. 903 a 915) ;
+//   lot 22 : alertes et assemblage du dict de la serie (l. 916 a 933), puis
+//            elagage des profils des reps intermediaires (l. 935 a 939) ;
+//   lot 23 : debut de la boucle d'une serie (l. 870 a 900) : dict `base`,
+//            branches « NON ANALYSEE », choix de l'echelle ;
+//   lot 24 : champs de toute la seance (l. 841 a 869) : vote, top set, pdc,
+//            date, semaine, seance, echelles, mediane, type de serie deduit ;
+//   lot 25 : le reste de main_seance (l. 816 a 840 : calibration, --fixe,
+//            --echelle, construction des lignes ; l. 940 a 944 : dict de tete
+//            et nom du fichier), et l'enchainement complet seanceComplete ;
+//   lot 26 : analyser (l. 733 a 756), facteur_profondeur (l. 278 a 290) et
+//            echelle_fil (l. 291 a 316) : analyserSuivi, faireAnalyser ;
+//   lot 27 : le suivi a partir des taches : blobs_video (l. 196 a 214, apres
+//            la lecture), marques_fixes (l. 216 a 234), suivre_marque
+//            (l. 236 a 276) : suivreTaches, faireSuivre.
+// Hors de ce bloc : la lecture OCR (legende_seance, images_legende), le
+// decodage video et marques(im) (taches de chaque image), et le resume
+// imprime (l. 945 et suivantes). OCR, decodage et taches sont des ENTREES.
+//
+// CE BLOC EST LA SOURCE depuis le lot 27 (seance-lot21.txt, seance-lot22.txt,
+// outils-lot23/seance-lot23.txt a outils-lot26/seance-lot26.txt sont figes :
+// etats des lots 21 a 26). Il est greffe dans outils-lot27/seance.mjs par
+// `node outils-lot27/greffer-seance.mjs`.
+// Ne jamais editer seance.mjs.
+//
+// Il n'expose qu'UN SEUL nom global, `SE` (pour « seance »). Il DEPEND de `MS`
+// (MS.arrondir = round()), de `RS` (RS.formater = "%.1f", RS.resume = resume()), de `RD`
+// (RD.maxNumpy = ys.max()) et, depuis le lot 26, directement de `SG`
+// (savgol_filter d'analyser). Dans une page : SG, FP, MS, RS, RD, puis SE.
+//
+// Ce que lisent les lignes 903-915 (releve par grep) :
+//   ref = (y_ref, duree, sd, ys_) ou None   — resultat de reference_depart
+//   px                                       — echelle retenue pour la serie
+//   reps[i]["image_sommet"]                  — et RIEN d'autre dans une rep
+// Ce qu'elles ecrivent :
+//   reps[i]["hauteur_cm"] (en place), `reference` (dict ou None), au plus UNE
+//   alerte ajoutee a `al`.
+//
+// Ici la fonction est PURE : elle ne touche pas aux reps recues, elle rend
+//   { reps: copies (avec hauteur_cm si ref), reference: objet|null, alertes: [] }
+// L'appelant ajoute `alertes` a sa liste, a l'endroit ou Python fait al.append.
+//
+// Pieges de convention, tous testes (journal-lot21.md, § 3) :
+//  - hauteur_cm = round(float((y_ref - ys_[sommet]) / px), 1) : SOUSTRAIRE puis
+//    diviser. y_ref/px - ys/px change le dernier bit, et parfois le chiffre
+//    arrondi (cas arete_ordre_hauteur). Idem (ys_.max() - y_ref) / px.
+//  - round() porte sur un float Python partout ici (float(...) enveloppe les
+//    deux quotients numpy ; duree et sd sont deja des floats) : c'est l'arrondi
+//    exact de Python, MS.arrondir, PAS celui de numpy (x*10^n, rint, /10^n).
+//  - seuil STRICT sd > 1.0 sur sd NON arrondi : sd = 1.0 pile -> pas d'alerte ;
+//    sd = 1.0000000000000002 -> alerte « 1.0 cm ». L'alerte peut donc afficher
+//    1.0 ; ecart_type_cm peut valoir 1.0 avec ou sans alerte.
+//  - ref None -> AUCUNE cle hauteur_cm (ni null, ni 0) : l'alerte « hauteur
+//    mesuree depuis le point le plus bas » renvoie a hauteur_sommet_cm (mesurer).
+//  - ref vide (tuple vide) compte comme faux, comme `if ref:` en Python.
+(function () {
+  "use strict";
+
+  const VERSION_SEANCE = "lot 27";
+  const TYPE_REFERENCE = "suspension avant la 1re rep";
+  const ALERTE_SANS_SUSPENSION =
+    "pas de suspension stable avant la 1re rep : hauteur mesuree depuis le point le plus bas";
+
+  function exiger(nom, lot) {
+    if (typeof globalThis[nom] === "undefined") {
+      throw new Error("seance : le bloc " + lot + " (global " + nom + ") doit etre charge avant");
+    }
+  }
+
+  // `if ref:` de Python : None -> faux ; tuple -> vrai s'il n'est pas vide.
+  function refVraie(ref) {
+    if (ref === null || ref === undefined) return false;
+    if (Array.isArray(ref)) return ref.length > 0;
+    throw new Error("TypeError: ref doit etre null ou un tableau, recu " + typeof ref);
+  }
+
+  // `y_ref, duree, sd, ys_ = ref` : exactement quatre valeurs.
+  function depaqueter(ref) {
+    if (ref.length < 4) {
+      throw new Error("ValueError: not enough values to unpack (expected 4, got " + ref.length + ")");
+    }
+    if (ref.length > 4) throw new Error("ValueError: too many values to unpack (expected 4)");
+    return ref;
+  }
+
+  // `r["image_sommet"]` puis `ys_[k]` : cle absente -> KeyError ; indice
+  // negatif compte depuis la fin ; hors bornes ou non entier -> IndexError.
+  function valeurAuSommet(ys, r) {
+    if (r === null || typeof r !== "object" || !("image_sommet" in r)) {
+      throw new Error("KeyError: 'image_sommet'");
+    }
+    let k = r.image_sommet;
+    if (typeof k !== "number") {
+      throw new Error("TypeError: indice non numerique (" + typeof k + ")");
+    }
+    if (!Number.isInteger(k)) {
+      throw new Error("IndexError: only integers ... are valid indices (" + k + ")");
+    }
+    const n = ys.length;
+    if (k < -n || k >= n) {
+      throw new Error("IndexError: index " + k + " is out of bounds for axis 0 with size " + n);
+    }
+    if (k < 0) k += n;
+    return ys[k];
+  }
+
+  function copier(reps) {
+    if (reps === null || reps === undefined) return reps;
+    return Array.from(reps, function (r) { return Object.assign({}, r); });
+  }
+
+  // Lignes 903-915, ref deja calcule (ligne 903 = RD.referenceDepart).
+  function usageReference(ref, reps, px) {
+    exiger("MS", "mesurer (lot 18)");
+    exiger("RS", "resume (lot 19)");
+    exiger("RD", "reference (lot 20)");
+    const arrondir = globalThis.MS.arrondir;
+    const alertes = [];
+    let sortieReps = copier(reps);
+    let reference = null;
+
+    if (refVraie(ref)) {
+      const t = depaqueter(ref);
+      const yRef = t[0], duree = t[1], sd = t[2], ys = t[3];
+      if (sortieReps === null || sortieReps === undefined) {
+        throw new Error("TypeError: 'NoneType' object is not iterable");
+      }
+      // for r in reps: r["hauteur_cm"] = round(float((y_ref - ys_[sommet]) / px), 1)
+      for (const r of sortieReps) {
+        r.hauteur_cm = arrondir((yRef - valeurAuSommet(ys, r)) / px, 1);
+      }
+      // dict(type, duree_s, ecart_type_cm, ecart_point_bas_cm) — cet ordre.
+      reference = {
+        type: TYPE_REFERENCE,
+        duree_s: arrondir(duree, 2),
+        ecart_type_cm: arrondir(sd, 2),
+        ecart_point_bas_cm: arrondir((globalThis.RD.maxNumpy(ys) - yRef) / px, 1),
+      };
+      if (sd > 1.0) {
+        alertes.push("suspension de depart peu stable (ecart-type " + globalThis.RS.formater(sd, 1) + " cm)");
+      }
+    } else {
+      alertes.push(ALERTE_SANS_SUSPENSION);
+    }
+    return { reps: sortieReps, reference: reference, alertes: alertes };
+  }
+
+  // =====================================================================
+  // LOT 22 — l. 916 a 933 (alertes, dict de la serie), l. 935 a 939 (elagage)
+  // =====================================================================
+  // Pieges de convention, tous testes (journal-lot22.md, § 3) :
+  //  - bool() de Python : NaN est VRAI (Boolean(NaN) est faux en JS), 0.0 faux.
+  //    echelle_verifiee = bool(m["px_cm"]) : le fil de CETTE video, pas `px` —
+  //    une echelle aberrante remplacee par la mediane reste « verifiee ».
+  //  - `if base["reps_annoncees"]` : 0 et None ne declenchent rien ; « is None »
+  //    (legende illisible) : seul None compte, un lest de 0 n'est pas illisible.
+  //  - m.get("facteur_profondeur", 1) != 1 : cle ABSENTE -> 1 -> pas de cles fil ;
+  //    valeur None -> None != 1 -> cles fil ecrites avec facteur_profondeur null.
+  //  - hauteur_mini_cm ne regarde que reps[0] ; min() de Python garde le premier
+  //    a egalite (0.0 avant -0.0) et ignore un NaN qui n'est pas en tete
+  //    (Math.min rendrait -0 et NaN : piege).
+  //  - resume(reps) vide = {} mais dict({}, hauteur_mini_cm=None) n'est PAS vide.
+  //  - "%d" tronque un flottant (6.7 -> "6"), leve sur NaN et inf.
+  //  - os.path.basename : separateur « / » seulement (Python sous Linux).
+  //  - la date du jour est une ENTREE (analyseLe) : la fonction ne lit jamais
+  //    l'horloge. dateDuJour(new Date()) la fabrique, a l'integration.
+
+  const A_PROPRE = Object.prototype.hasOwnProperty;
+
+  function nomType(x) {
+    if (x === null || x === undefined) return "NoneType";
+    if (Array.isArray(x)) return "list";
+    return typeof x;
+  }
+
+  // bool() de Python, pour les valeurs qui passent ici.
+  function pyBool(x) {
+    if (x === null || x === undefined) return false;
+    if (typeof x === "boolean") return x;
+    if (typeof x === "number") return x !== 0;   // NaN !== 0 : vrai, comme Python
+    if (typeof x === "string") return x.length > 0;
+    if (Array.isArray(x) || ArrayBuffer.isView(x)) return x.length > 0;
+    if (typeof x === "object") return Object.keys(x).length > 0;
+    throw new Error("TypeError: bool() non porte pour " + typeof x);
+  }
+
+  // d[k] de Python : cle absente -> KeyError, jamais undefined en silence.
+  function cle(d, k) {
+    if (d === null || typeof d !== "object") {
+      throw new Error("TypeError: '" + nomType(d) + "' object is not subscriptable");
+    }
+    if (!A_PROPRE.call(d, k)) throw new Error("KeyError: '" + k + "'");
+    return d[k];
+  }
+
+  // d.get(k, defaut) de Python.
+  function prendre(d, k, defaut) {
+    return A_PROPRE.call(d, k) ? d[k] : defaut;
+  }
+
+  // x != 1 de Python (None, NaN, chaine : vrai ; 1.0 et True : faux).
+  function differentDeUn(x) {
+    if (typeof x === "number") return x !== 1;
+    if (typeof x === "boolean") return x !== true;
+    return true;
+  }
+
+  // round(x, n) / round(float(x), n) : arrondi de Python (MS.arrondir), mais
+  // None ou une chaine levent, au lieu de passer en silence.
+  function rond(x, n) {
+    if (typeof x !== "number") {
+      throw new Error("TypeError: round() / float() sur " + nomType(x));
+    }
+    return globalThis.MS.arrondir(x, n);
+  }
+
+  // "%d" % x : entier tel quel ; flottant TRONQUE vers zero ; NaN et inf levent.
+  function pourcentD(x) {
+    if (typeof x === "boolean") return x ? "1" : "0";
+    if (typeof x !== "number") {
+      throw new Error("TypeError: %d format: a real number is required, not " + nomType(x));
+    }
+    if (x !== x) throw new Error("ValueError: cannot convert float NaN to integer");
+    if (!Number.isFinite(x)) throw new Error("OverflowError: cannot convert float infinity to integer");
+    return BigInt(Math.trunc(x)).toString();
+  }
+
+  // len() de Python.
+  function longueur(x) {
+    if (x === null || x === undefined || typeof x.length !== "number") {
+      throw new Error("TypeError: object of type '" + nomType(x) + "' has no len()");
+    }
+    return x.length;
+  }
+
+  // os.path.basename sous Linux : ce qui suit le DERNIER « / » (« \ » n'est pas
+  // un separateur ; « dossier/ » donne une chaine vide).
+  function basename(p) {
+    if (typeof p !== "string") {
+      throw new Error("TypeError: expected str, bytes or os.PathLike object, not " + nomType(p));
+    }
+    return p.slice(p.lastIndexOf("/") + 1);
+  }
+
+  // min(r["hauteur_cm"] for r in reps) if reps and "hauteur_cm" in reps[0] else None
+  // min() de Python : parcours dans l'ordre, remplace seulement si v < courant.
+  // Donc 0.0 puis -0.0 -> 0.0 ; NaN en tete -> NaN ; NaN plus loin -> ignore.
+  // Les valeurs sont lues A LA DEMANDE (generateur) : une cle absente plus loin
+  // leve KeyError, une valeur None leve TypeError a la comparaison.
+  function hauteurMini(reps) {
+    if (!pyBool(reps)) return null;
+    const r0 = reps[0];
+    if (r0 === null || typeof r0 !== "object" || !A_PROPRE.call(r0, "hauteur_cm")) return null;
+    let m = cle(r0, "hauteur_cm");
+    for (let i = 1; i < reps.length; i++) {
+      const v = cle(reps[i], "hauteur_cm");
+      if (typeof v !== "number" || typeof m !== "number") {
+        throw new Error("TypeError: '<' not supported between instances of '" + nomType(v) + "' and '" + nomType(m) + "'");
+      }
+      if (v < m) m = v;
+    }
+    return m;
+  }
+
+  // datetime.date.today().isoformat() : date LOCALE, AAAA-MM-JJ. N'est PAS
+  // appelee par assemblerSerie : l'integration l'appelle une fois avec
+  // new Date() et passe le resultat en analyseLe. Ainsi tout reste testable.
+  function dateDuJour(d) {
+    if (!(d instanceof Date) || d.getTime() !== d.getTime()) {
+      throw new Error("seance : dateDuJour attend une Date valide");
+    }
+    const deux = function (k) { return (k < 10 ? "0" : "") + k; };
+    return String(d.getFullYear()).padStart(4, "0") + "-" + deux(d.getMonth() + 1) + "-" + deux(d.getDate());
+  }
+
+  const MOTIF_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const ALERTE_TYPE_DEDUIT = "type de serie deduit de la charge (legende illisible)";
+  const CHAMPS_LEGENDE = ["lest_kg", "reps_annoncees", "type_serie"];
+
+  function copierRep(r) {
+    return r !== null && typeof r === "object" ? Object.assign({}, r) : r;
+  }
+
+  // Lignes 916-933. Entree : un objet aux noms de main_seance —
+  //   base      : dict de la serie deja construit l. 873-878 (non modifie)
+  //   leg       : la legende (seul leg.type_deduit est lu)
+  //   ligne     : { n, video }   (l["n"], l["video"])
+  //   m         : sortie d'analyser : fps, nb, taux, px_cm, px_cm_fil, facteur_profondeur
+  //   px, src   : echelle retenue et sa provenance (l. 884-900, hors lot)
+  //   al        : alertes deja posees (echelle, controles, usageReference)
+  //   reps      : reps avec hauteur_cm (sortie de usageReference)
+  //   reference : bloc reference (sortie de usageReference) ou null
+  //   analyseLe : "AAAA-MM-JJ", la date du jour, PASSEE en entree
+  // Sortie : NOUVEL objet = base + video, mesure, alertes, resume, reps,
+  // observations_manuelles, dans l'ordre Python. Les profils ne sont PAS encore
+  // elagues (Python elague apres la boucle des series : elaguerProfils).
+  function assemblerSerie(e) {
+    exiger("MS", "mesurer (lot 18)");
+    exiger("RS", "resume (lot 19)");
+    if (typeof e.analyseLe !== "string" || !MOTIF_DATE.test(e.analyseLe)) {
+      throw new Error("seance : analyseLe doit etre une date AAAA-MM-JJ, passee en entree (voir SE.dateDuJour)");
+    }
+    const base = e.base, leg = e.leg, l = e.ligne, m = e.m;
+    if (!Array.isArray(e.al)) throw new Error("seance : al doit etre un tableau");
+    const al = e.al.slice();
+    const reps = e.reps === null || e.reps === undefined ? e.reps : Array.from(e.reps, copierRep);
+
+    // 916-917 : `if base["reps_annoncees"] and len(reps) != base["reps_annoncees"]`
+    const annoncees = cle(base, "reps_annoncees");
+    if (pyBool(annoncees) && longueur(reps) !== annoncees) {
+      al.push(pourcentD(longueur(reps)) + " reps detectees pour " + pourcentD(annoncees) + " annoncees");
+    }
+    // 918-919
+    if (pyBool(prendre(leg, "type_deduit", null))) al.push(ALERTE_TYPE_DEDUIT);
+    // 920-922 : `is None` strict, dans cet ordre
+    for (const k of CHAMPS_LEGENDE) {
+      if (cle(base, k) === null) {
+        al.push("legende : " + k + " illisible (corriger avec --fixe " + pourcentD(cle(l, "n")) + "=LESTxREPS)");
+      }
+    }
+    // 923
+    const video = { fichier: basename(cle(l, "video")), fps: rond(cle(m, "fps"), 2), nb_images: cle(m, "nb") };
+    // 924-931
+    const mesure = {
+      repere: "marque de couleur sur la ceinture",
+      marqueur: "couleur",
+      px_par_cm: rond(e.px, 3),
+      echelle: e.src,
+    };
+    if (pyBool(prendre(m, "px_cm_fil", null)) && differentDeUn(prendre(m, "facteur_profondeur", 1))) {
+      mesure.px_par_cm_fil = rond(cle(m, "px_cm_fil"), 3);
+      mesure.facteur_profondeur = cle(m, "facteur_profondeur");
+    }
+    mesure.echelle_epinglee = !pyBool(cle(m, "px_cm"));
+    mesure.echelle_verifiee = pyBool(cle(m, "px_cm"));
+    mesure.taux_detection = rond(cle(m, "taux"), 3);
+    mesure.analyse_le = e.analyseLe;
+    mesure.reference = e.reference === null || e.reference === undefined ? null : Object.assign({}, e.reference);
+    // 932 : dict(resume(reps), hauteur_mini_cm=...)
+    const res = Object.assign({}, globalThis.RS.resume(reps));
+    res.hauteur_mini_cm = hauteurMini(reps);
+    // base.update(...) : cles neuves a la suite, cles deja la gardent leur place
+    const sortie = Object.assign({}, base);
+    sortie.video = video;
+    sortie.mesure = mesure;
+    sortie.alertes = al;
+    sortie.resume = res;
+    sortie.reps = reps;
+    sortie.observations_manuelles = { notes: "" };
+    return sortie;
+  }
+
+  // Lignes 935-939, pour UNE serie : retire profil_vitesse_ms et
+  // profil_hauteur_cm des reps intermediaires ; la PREMIERE et la DERNIERE
+  // gardent leurs profils (1 ou 2 reps : rien a elaguer). Rend une copie.
+  function elaguerProfils(serie) {
+    const s = Object.assign({}, serie);
+    if (!A_PROPRE.call(serie, "reps")) return s;          // s_.get("reps", [])
+    const reps = serie.reps;
+    if (reps === null || reps === undefined || typeof reps.length !== "number") {
+      throw new Error("TypeError: '" + nomType(reps) + "' object is not iterable");
+    }
+    const n = reps.length;
+    s.reps = Array.from(reps, function (r, i) {
+      if (0 < i && i < n - 1) {
+        if (r === null || typeof r !== "object") {
+          throw new Error("AttributeError: '" + nomType(r) + "' object has no attribute 'pop'");
+        }
+        const c = Object.assign({}, r);
+        delete c.profil_vitesse_ms;                        // r.pop(..., None)
+        delete c.profil_hauteur_cm;
+        return c;
+      }
+      return copierRep(r);
+    });
+    return s;
+  }
+
+  // =====================================================================
+  // LOT 23 — l. 870 a 900 : debut de la boucle d'UNE serie (dict `base`,
+  // branches « NON ANALYSEE », choix de l'echelle)
+  // =====================================================================
+  // Ce que lisent ces lignes (releve par grep) :
+  //   l   : leg, m, n, video, brut ; err SEULEMENT si m est faux
+  //   leg : type_serie, variante, lest_kg, reps_annoncees (par .get)
+  //   m   : px_cm et d_px, rien d'autre (fps, y_px... : apres la l. 900)
+  //   seance (calcule avant la boucle, l. 816-869, ENTREE, non porte) :
+  //         date, mouvement (a.mouvement), sem, sea, pdc, fil, echelles (seule
+  //         sa LONGUEUR compte), ech_med, ech (dict n -> echelle epinglee)
+  // Ce qu'elles ecrivent : `base` (14 cles), puis SOIT une serie « NON
+  // ANALYSEE » (base + alertes, reps [], resume {}), SOIT al, px, src pour la
+  // suite (l. 901 et suivantes : MS.mesurer, RS.controles, RD.referenceDepart,
+  // SE.usageReference, SE.assemblerSerie).
+  //
+  // SE.preparerSerie({ ligne, seance }) rend un NOUVEL objet :
+  //   { analysee: false, serie }                 — serie a ajouter telle quelle
+  //   { analysee: true, base, al, px, src }      — a passer aux l. 901 et suivantes
+  // ligne = { n, video, leg, brut, m, err } (le dict `l` de Python, l. 840) ;
+  // seance = { date, mouvement, sem, sea, pdc, fil, echelles, ech_med, ech },
+  // les noms de Python ; ech est un objet dont les cles sont les n en texte
+  // (c'est ce que donne json.dumps d'un dict a cles entieres).
+  //
+  // Pieges de convention, tous testes (journal-lot23.md, § 3) :
+  //  - dict(...) evalue ses arguments de gauche a droite : une cle absente de
+  //    `l` leve KeyError dans cet ordre (leg, m, n, video, ..., brut).
+  //  - legende_ocr = brut[:120] : 120 POINTS DE CODE (Python), pas 120 unites
+  //    UTF-16 (String.slice couperait un emoji en deux).
+  //  - id = splitext(basename(video))[0] : seul le DERNIER point coupe, et les
+  //    points de tete ne comptent pas (« .mp4 », « ..mp4 » restent entiers).
+  //  - charge_systeme_kg : « is not None » sur pdc ET lest (0 compte, NaN aussi).
+  //  - `if not m` : None ET dict vide. Le message est "NON ANALYSEE : " + err :
+  //    err None leve TypeError (JS ecrirait « null » en silence).
+  //  - src : "%.1f" % (fil or 0) et "%.0f" % (m["d_px"] or 0) : None, 0 ET -0.0
+  //    donnent 0 (« 0.0 », « 0 ») ; NaN est vrai et s'ecrit « nan ». Arrondi
+  //    de Python au pair exact (RS.formater), pas toFixed.
+  //  - garde-fou : `px and ech_med and len(echelles) >= 3 and abs(px - ech_med)
+  //    / ech_med > 0.10` — court-circuit (len() pas evalue si px ou ech_med est
+  //    faux), seuil STRICT, soustraire PUIS diviser par ech_med, px NaN : la
+  //    comparaison est fausse, NaN reste.
+  //  - l'epinglage passe APRES le garde-fou : l'alerte « aberrante » reste
+  //    alors que c'est l'echelle epinglee qui est utilisee ; une epinglee a 0
+  //    retombe sur la mediane (deux alertes d'echelle).
+  //  - `if not px` deux fois : 0.0 et None sont faux, NaN est vrai. La seconde
+  //    branche « NON ANALYSEE » JETTE les alertes d'echelle deja posees.
+  //  - SCHEMA = "velocite-serie/v1" (constante de analyse_serie.py, l. 48).
+  const SCHEMA_SERIE = "velocite-serie/v1";
+  const PREFIXE_NON_ANALYSEE = "NON ANALYSEE : ";
+  const ALERTE_SANS_ECHELLE = "NON ANALYSEE : aucune echelle (fil absent de toute la seance)";
+  const SRC_MEDIANE_ABERRANTE = "mediane de la seance (fil mal detecte sur cette video)";
+  const SRC_EPINGLEE = "epinglee a la main (fil mal detecte sur cette video)";
+  const SRC_MEDIANE_ABSENT = "mediane des autres videos de la seance (fil non detecte ici)";
+  const ALERTE_ECHELLE_REPRISE = "echelle reprise des autres videos de la seance : +-2 %";
+
+  function estNone(x) { return x === null || x === undefined; }
+
+  // d.get(k) de Python sur un dict ; None -> AttributeError.
+  function lireGet(d, k) {
+    if (d === null || typeof d !== "object" || Array.isArray(d)) {
+      throw new Error("AttributeError: '" + nomType(d) + "' object has no attribute 'get'");
+    }
+    return A_PROPRE.call(d, k) ? d[k] : null;
+  }
+
+  // `x or defaut` de Python.
+  function ou(x, defaut) { return pyBool(x) ? x : defaut; }
+
+  // Nombre reel au sens de Python (bool compris) ; le reste leve TypeError.
+  function reel(x) {
+    if (typeof x === "boolean") return x ? 1 : 0;
+    if (typeof x !== "number") throw new Error("TypeError: must be real number, not " + nomType(x));
+    return x;
+  }
+
+  // "%.<n>f" % x de Python (arrondi exact au pair : RS.formater).
+  function pourcentF(x, n) { return globalThis.RS.formater(reel(x), n); }
+
+  // os.path.splitext(p)[0] sous Linux (genericpath._splitext) : seul le dernier
+  // point coupe, et seulement s'il suit un caractere autre qu'un point dans le
+  // nom de fichier (les points de tete ne font pas une extension).
+  function sansExtension(p) {
+    const sep = p.lastIndexOf("/"), point = p.lastIndexOf(".");
+    if (point > sep) {
+      for (let i = sep + 1; i < point; i++) {
+        if (p[i] !== ".") return p.slice(0, point);
+      }
+    }
+    return p;
+  }
+
+  // s[:120] de Python sur une chaine : en points de code.
+  function tranche120(s) {
+    if (typeof s !== "string") {
+      throw new Error("TypeError: '" + nomType(s) + "' object is not subscriptable");
+    }
+    const pc = Array.from(s);
+    return pc.length <= 120 ? s : pc.slice(0, 120).join("");
+  }
+
+  // `n in ech` puis ech[n] : dict a cles entieres, cote JS objet a cles texte.
+  function epingle(ech, n) {
+    if (ech === null || typeof ech !== "object" || Array.isArray(ech)) {
+      throw new Error("TypeError: argument of type '" + nomType(ech) + "' is not iterable");
+    }
+    const k = String(n);
+    return A_PROPRE.call(ech, k) ? { trouve: true, valeur: ech[k] } : { trouve: false };
+  }
+
+  function preparerSerie(e) {
+    exiger("MS", "mesurer (lot 18)");
+    exiger("RS", "resume (lot 19)");
+    const l = e.ligne, s = e.seance;
+    // 872 : leg, m = l["leg"], l["m"]
+    const leg = cle(l, "leg"), m = cle(l, "m");
+    // 873-877 : base = dict(...), arguments evalues de gauche a droite
+    const base = {};
+    base.schema = SCHEMA_SERIE;
+    base.n = cle(l, "n");
+    base.id = sansExtension(basename(cle(l, "video")));
+    base.date = cle(s, "date");
+    base.mouvement = cle(s, "mouvement");
+    base.semaine = cle(s, "sem");
+    base.seance = cle(s, "sea");
+    base.type_serie = lireGet(leg, "type_serie");
+    base.variante = lireGet(leg, "variante");
+    base.lest_kg = lireGet(leg, "lest_kg");
+    base.reps_annoncees = lireGet(leg, "reps_annoncees");
+    base.poids_corps_kg = cle(s, "pdc");
+    base.legende_ocr = tranche120(cle(l, "brut"));
+    // 878 : charge systeme, « is not None » des deux cotes
+    const pdc = base.poids_corps_kg, lest = base.lest_kg;
+    base.charge_systeme_kg = (!estNone(pdc) && !estNone(lest)) ? reel(pdc) + reel(lest) : null;
+    // 879-882 : video non analysee (analyser a leve)
+    if (!pyBool(m)) {
+      const err = cle(l, "err");
+      if (typeof err !== "string") {
+        throw new Error('TypeError: can only concatenate str (not "' + nomType(err) + '") to str');
+      }
+      base.alertes = [PREFIXE_NON_ANALYSEE + err];
+      base.reps = [];
+      base.resume = {};
+      return { analysee: false, serie: base };
+    }
+    // 883-884 : echelle du fil de CETTE video, et sa provenance
+    const al = [];
+    let px = cle(m, "px_cm");
+    const fil0 = ou(cle(s, "fil"), 0), dpx0 = ou(cle(m, "d_px"), 0);
+    let src = "fil d'etalonnage " + pourcentF(fil0, 1) + " cm (" + pourcentF(dpx0, 0) + " px)";
+    // 888-891 : garde-fou de la mediane (seuil strict, 3 echelles au moins)
+    const echMed = cle(s, "ech_med");
+    if (pyBool(px) && pyBool(echMed) && longueur(cle(s, "echelles")) >= 3 &&
+        Math.abs(reel(px) - reel(echMed)) / reel(echMed) > 0.10) {
+      al.push("echelle du fil aberrante (" + pourcentF(px, 2) + " px/cm contre " + pourcentF(echMed, 2) +
+        " de mediane) : mediane de la seance utilisee, +-2 %");
+      px = echMed;
+      src = SRC_MEDIANE_ABERRANTE;
+    }
+    // 892-893 : echelle epinglee a la main, APRES le garde-fou
+    const ep = epingle(cle(s, "ech"), cle(l, "n"));
+    if (ep.trouve) {
+      px = ep.valeur;
+      src = SRC_EPINGLEE;
+    }
+    // 894-896 : pas d'echelle -> mediane de la seance
+    if (!pyBool(px)) {
+      px = echMed;
+      src = SRC_MEDIANE_ABSENT;
+      al.push(ALERTE_ECHELLE_REPRISE);
+    }
+    // 897-900 : toujours rien -> non analysee (les alertes d'echelle sont jetees)
+    if (!pyBool(px)) {
+      base.alertes = [ALERTE_SANS_ECHELLE];
+      base.reps = [];
+      base.resume = {};
+      return { analysee: false, serie: base };
+    }
+    return { analysee: true, base: base, al: al, px: px, src: src };
+  }
+
+  // =====================================================================
+  // LOT 24 — l. 841 a 869 : champs de TOUTE la seance (vote, top set, pdc,
+  // date, semaine, seance, echelles, mediane, type de serie deduit)
+  // =====================================================================
+  // Ce que lisent les l. 841-869 (releve par grep) :
+  //   lignes[i]["leg"]           — toutes ; `k in leg` puis leg[k] pour
+  //                                poids_corps_kg, date, semaine, seance ;
+  //                                .get puis [ ] pour type_serie et lest_kg
+  //   lignes[i]["m"]["px_cm"]    — seulement si m est vrai
+  //   a.pdc, a.date              — arguments de la ligne de commande
+  //   et RIEN d'autre : ni n, ni video, ni brut, ni err.
+  // Ce qu'elles ecrivent : vote, top, pdc, date, sem, sea, echelles, ech_med,
+  // lourdes, et EN PLACE leg["type_serie"], leg["type_deduit"] (l. 863-869).
+  //
+  // SE.champsSeance({ lignes, a: { pdc, date } }) rend un NOUVEL objet
+  //   { lignes, top, pdc, date, sem, sea, echelles, ech_med, lourdes }
+  // ou `lignes` sont des COPIES (chaque l et son leg ; m n'est que lu, il est
+  // partage) portant le type deduit ; `top` est le leg (copie) du top set LU.
+  // Les entrees ne sont jamais modifiees. Pour la boucle des series (lot 23) :
+  //   seance = { date, mouvement, sem, sea, pdc, fil, echelles, ech_med, ech }
+  // avec mouvement, fil et ech venus d'avant (l. 816-829, non portees).
+  //
+  // Pieges de convention, tous testes (journal-lot24.md, § 3) :
+  //  - most_common(1) = max() sur les comptes : a EGALITE, la valeur RENCONTREE
+  //    EN PREMIER gagne. Les cles du Counter suivent == et hash de Python :
+  //    2 et 2.0 et True sont UNE cle, et c'est la premiere ecrite qui est rendue.
+  //  - `k in l["leg"]` : une cle PRESENTE a None compte comme un vote (None peut
+  //    gagner). `k in pref` : une cle presente a None dans le top set est rendue
+  //    telle quelle, SANS vote.
+  //  - top = premier leg dont type_serie == "top set", calcule AVANT la
+  //    deduction : un top set deduit ne donne jamais semaine ni seance.
+  //  - `a.pdc or vote(...)` : 0, 0.0, None, "" -> vote ; NaN est vrai et gagne.
+  //    Le vote n'est evalue QUE si a.pdc est faux (il peut lever).
+  //  - echelles : `l["m"] and l["m"]["px_cm"]` : m None ou {} ignores ; px_cm
+  //    absent d'un m vrai -> KeyError ; px_cm 0, -0.0, None ignores ; NaN gardee.
+  //  - ech_med = float(np.median(echelles)) : NaN si une echelle est NaN ; pair :
+  //    (a + b) / 2 des deux du milieu, au bit (mean de numpy sur 2 valeurs).
+  //  - lourdes : lest VRAI (0 et None exclus) et type != "echauffement" (None
+  //    compte, "" aussi). top set deduit : lest == max(lourdes) ET count == 1 ;
+  //    deux lourdes egales -> ni type, ni type_deduit ; plus leger -> back-off.
+  //  - saut : `leg.get("type_serie") or leg.get("lest_kg") is None` : un type
+  //    "" ou None ne protege pas ; un lest absent ou None saute la ligne.
+  //  - type_serie et type_deduit sont ajoutes EN FIN de leg s'ils manquent,
+  //    ecrits a leur place s'ils existent (meme ordre de cles que Python).
+  //  - HORS DOMAINE, non porte au bit : un lest ou une echelle NaN dans un vote
+  //    ou un max (Python depend de l'identite de l'objet NaN), un lest en texte
+  //    (max leve ici, Python compare les chaines). legende_seance ne produit
+  //    que des float tires de chiffres : ni NaN, ni texte.
+
+  // a.<attr> : attribut absent -> AttributeError.
+  function attribut(a, k) {
+    if (a === null || typeof a !== "object" || !A_PROPRE.call(a, k)) {
+      throw new Error("AttributeError: '" + nomType(a) + "' object has no attribute '" + k + "'");
+    }
+    return a[k];
+  }
+
+  // `k in d` de Python, pour un dict. None leve TypeError.
+  function dans(d, k) {
+    if (d === null || d === undefined || typeof d !== "object" || Array.isArray(d)) {
+      throw new Error("TypeError: argument of type '" + nomType(d) + "' is not iterable");
+    }
+    return A_PROPRE.call(d, k);
+  }
+
+  function estNum(x) { return typeof x === "number" || typeof x === "boolean"; }
+
+  // == de Python pour None, bool, nombres et chaines (types differents : faux).
+  function egal(a, b) {
+    if (estNum(a) && estNum(b)) return Number(a) === Number(b);
+    if (estNone(a) || estNone(b)) return estNone(a) && estNone(b);
+    return a === b;
+  }
+
+  // Comparaison d'ordre (> ou <) : nombres seulement, le reste leve TypeError.
+  function ordre(a, b, op) {
+    if (!estNum(a) || !estNum(b)) {
+      throw new Error("TypeError: '" + op + "' not supported between instances of '" + nomType(a) + "' and '" + nomType(b) + "'");
+    }
+    return op === ">" ? Number(a) > Number(b) : Number(a) < Number(b);
+  }
+
+  // Une cle de Counter doit etre hachable : dict et list levent.
+  function hachable(v) {
+    if (v !== null && typeof v === "object") {
+      throw new Error("TypeError: unhashable type: '" + (Array.isArray(v) ? "list" : "dict") + "'");
+    }
+    return v;
+  }
+
+  // vote(k, pref) des l. 845-849 : pref d'abord (si la CLE y est), sinon
+  // Counter(...).most_common(1)[0][0], ou None si aucun leg n'a la cle.
+  function vote(lignes, k, pref) {
+    if (!estNone(pref) && dans(pref, k)) return pref[k];
+    const valeurs = [], comptes = [];
+    for (let i = 0; i < lignes.length; i++) {
+      const leg = cle(lignes[i], "leg");
+      if (!dans(leg, k)) continue;
+      const v = hachable(leg[k]);
+      let j = 0;
+      while (j < valeurs.length && !egal(valeurs[j], v)) j++;   // NaN : jamais egal
+      if (j === valeurs.length) { valeurs.push(v); comptes.push(1); } else comptes[j]++;
+    }
+    if (!valeurs.length) return null;
+    let g = 0;
+    for (let j = 1; j < comptes.length; j++) if (comptes[j] > comptes[g]) g = j;   // le premier a egalite
+    return valeurs[g];
+  }
+
+  // max(liste) de Python : garde le premier, remplace si x > courant.
+  function maxPython(xs) {
+    if (!xs.length) throw new Error("ValueError: max() iterable argument is empty");
+    let m = xs[0];
+    for (let i = 1; i < xs.length; i++) if (ordre(xs[i], m, ">")) m = xs[i];
+    return m;
+  }
+
+  // liste.count(v) de Python (==). NaN : hors domaine (voir plus haut).
+  function compter(xs, v) {
+    let c = 0;
+    for (let i = 0; i < xs.length; i++) if (xs[i] === v || egal(xs[i], v)) c++;
+    return c;
+  }
+
+  // float(np.median(xs)), xs non vide : NaN s'il y a un NaN ; sinon la valeur
+  // du milieu, ou (a + b) / 2 des deux du milieu (np.mean de deux valeurs).
+  function medianeNumpy(xs) {
+    const t = Array.from(xs, function (x) {
+      if (!estNum(x)) throw new Error("TypeError: np.median sur " + nomType(x));
+      return Number(x);
+    });
+    for (let i = 0; i < t.length; i++) if (t[i] !== t[i]) return NaN;
+    t.sort(function (p, q) { return p - q; });
+    const h = t.length >> 1;
+    return t.length % 2 ? t[h] : (t[h - 1] + t[h]) / 2;
+  }
+
+  // Copie de l et de son leg (les l. 863-869 ecrivent dans leg). Un l ou un
+  // leg qui n'est pas un dict est garde tel quel : il levera plus loin, la ou
+  // Python leve.
+  function copierLigne(l) {
+    if (l === null || typeof l !== "object" || Array.isArray(l)) return l;
+    const c = Object.assign({}, l);
+    const leg = l.leg;
+    if (A_PROPRE.call(l, "leg") && leg !== null && typeof leg === "object" && !Array.isArray(leg)) {
+      c.leg = Object.assign({}, leg);
+    }
+    return c;
+  }
+
+  function champsSeance(e) {
+    const a = cle(e, "a");
+    const src = cle(e, "lignes");
+    if (!Array.isArray(src)) throw new Error("TypeError: lignes doit etre une liste");
+    const lignes = src.map(copierLigne);
+
+    // 850 : top = premier leg LU « top set » (avant toute deduction)
+    let top = null;
+    for (let i = 0; i < lignes.length; i++) {
+      const leg = cle(lignes[i], "leg");
+      if (lireGet(leg, "type_serie") === "top set") { top = leg; break; }
+    }
+    // 851-853 : `x or vote(...)` n'evalue le vote que si x est faux
+    const aPdc = attribut(a, "pdc");
+    const pdc = pyBool(aPdc) ? aPdc : vote(lignes, "poids_corps_kg", top);
+    const aDate = attribut(a, "date");
+    const date = pyBool(aDate) ? aDate : vote(lignes, "date", null);
+    const sem = vote(lignes, "semaine", top);
+    const sea = vote(lignes, "seance", top);
+
+    // 854-855
+    const echelles = [];
+    for (let i = 0; i < lignes.length; i++) {
+      const m = cle(lignes[i], "m");
+      if (pyBool(m) && pyBool(cle(m, "px_cm"))) echelles.push(m.px_cm);
+    }
+    const ech_med = echelles.length ? medianeNumpy(echelles) : null;
+
+    // 857
+    const lourdes = [];
+    for (let i = 0; i < lignes.length; i++) {
+      const leg = cle(lignes[i], "leg");
+      if (pyBool(lireGet(leg, "lest_kg")) && !egal(lireGet(leg, "type_serie"), "echauffement")) {
+        lourdes.push(cle(leg, "lest_kg"));
+      }
+    }
+
+    // 858-869 : type deduit de la charge, ecrit dans le leg COPIE
+    for (let i = 0; i < lignes.length; i++) {
+      const leg = cle(lignes[i], "leg");
+      if (pyBool(lireGet(leg, "type_serie")) || estNone(lireGet(leg, "lest_kg"))) continue;
+      const lest = cle(leg, "lest_kg");
+      if (egal(lest, 0)) {
+        leg.type_serie = "echauffement";
+      } else if (lourdes.length && egal(lest, maxPython(lourdes)) && compter(lourdes, maxPython(lourdes)) === 1) {
+        leg.type_serie = "top set";
+      } else if (lourdes.length && ordre(lest, maxPython(lourdes), "<")) {
+        leg.type_serie = "back-off";
+      }
+      if (pyBool(lireGet(leg, "type_serie"))) leg.type_deduit = true;
+    }
+
+    return { lignes: lignes, top: top, pdc: pdc, date: date, sem: sem, sea: sea,
+      echelles: echelles, ech_med: ech_med, lourdes: lourdes };
+  }
+
+  // =====================================================================
+  // LOT 25 — l. 816 a 840 (calibration, --fixe, --echelle, lignes), l. 940 a
+  // 944 (dict de tete, nom du fichier) et enchainement de toute main_seance
+  // (hors OCR, hors analyser, hors resume imprime)
+  // =====================================================================
+  // Ce que lisent les l. 816-840 (releve par grep) :
+  //   CALIB, os.path.exists(CALIB), json.load(open(CALIB))  -> cal (ENTREE ici)
+  //   a.fil_cm, cal.get("fil_centre_a_centre_cm"), cal.get("fil_etalonnage_cm")
+  //   a.fixe (attribut OBLIGATOIRE), getattr(a, "echelle", None) (facultatif)
+  //   videos ; legende_seance(images_legende(v)) et analyser(v, fil) : ENTREES
+  // Ce qu'elles ecrivent : cal, fil, fixe (n -> (lest, reps)), ech (n -> px/cm),
+  //   lignes ; EN PLACE leg["lest_kg"] et leg["reps_annoncees"] si n est dans
+  //   --fixe (ici : sur une COPIE du leg).
+  // Ce que lisent les l. 940-944 : date, a.mouvement, pdc, sem, sea, series,
+  //   a.sortie, videos[0] (NON trie). Elles ecrivent sortie, dest, le fichier
+  //   (ici : rien n'est ecrit, on rend { sortie, nom, chemin }).
+  //
+  // Entrees de seanceComplete :
+  //   videos      : les chemins, dans l'ordre de la ligne de commande
+  //   a           : { pdc, date, mouvement, fil_cm, fixe, echelle, sortie } (les
+  //                 attributs de argparse ; fixe et echelle : listes de textes)
+  //   cal         : le contenu de calibration.json ; cle ABSENTE (ou undefined)
+  //                 = fichier absent ({}). null = fichier qui contient null.
+  //   dossierDe(v): os.path.dirname(os.path.abspath(v)), fourni par l'appelant
+  //                 (le navigateur n'a ni chemins ni dossier courant) ; appele
+  //                 UNE fois, avec videos[0] NON trie, seulement si a.sortie est
+  //                 faux
+  //   legende(v)  : rend { leg, brut } (legende_seance(images_legende(v)))
+  //   analyser(v, fil) : rend m, ou LEVE SE.systemExit(message) ; toute autre
+  //                 exception remonte, comme en Python (seul SystemExit est pris)
+  //   analyseLe   : la date du jour, "AAAA-MM-JJ" (jamais l'horloge)
+  //
+  // Pieges de convention, tous testes (journal-lot25.md, § 3) :
+  //  - n, v = f.split("=") : deballage STRICT, 1 morceau -> « not enough values
+  //    to unpack (expected 2, got 1) », 3 -> « too many values to unpack
+  //    (expected 2) » (textes de CPython 3.13 ; 3.14 les change).
+  //  - re.split(r"[x*]", v.lower()) : le « X » majuscule passe par lower() ;
+  //    « Ｘ » pleine chasse n'est PAS un separateur.
+  //  - fixe[int(n)] = (float(l...), int(r)) : Python evalue la VALEUR avant la
+  //    cle : float(l), puis int(r), puis int(n). « a=bx5 » leve sur float('b').
+  //  - l.replace(",", ".") remplace TOUTES les virgules (JS : split/join, pas
+  //    replace) ; la virgule n'est remplacee que dans le lest et l'echelle,
+  //    jamais dans les reps ni dans n : int("5,0") leve.
+  //  - int() et float() de Python : espaces Unicode retires en tete et en queue
+  //    (insecable, U+0085, U+2000-200A...), mais PAS \x1c-\x1f (isspace() dit
+  //    oui, int() dit non) ni U+FEFF (que trim() de JS retire) ; chiffres
+  //    Unicode (pleine chasse, arabes...) acceptes ; soulignes entre deux
+  //    chiffres acceptes ; int("5.0") leve ; float accepte inf, nan, ".5", "5.".
+  //    Messages : « invalid literal for int() with base 10: '5.0' » (repr tronque
+  //    a 200), « could not convert string to float: 'abc' » (repr de Python).
+  //  - n est un entier de Python, sans borne : cle gardee en TEXTE (BigInt).
+  //  - fil = a.fil_cm or cal.get(...) or cal.get(...) : 0 et None passent au
+  //    suivant ; .get, donc un cal incomplet donne None, pas KeyError ; cal
+  //    n'est lu QUE si a.fil_cm est faux (un cal liste ne leve alors pas).
+  //  - sorted(videos) : ordre des POINTS DE CODE (majuscules avant minuscules,
+  //    « é » apres « z », U+FF21 avant U+1D7D8), pas localeCompare, pas le tri
+  //    par defaut de JS (unites UTF-16, qui inverse ces deux derniers).
+  //  - videos[0] (l. 942) est la premiere video DONNEE, pas la premiere triee ;
+  //    aucune video et pas de --sortie : IndexError.
+  //  - "seance-%s.json" % (date or "sans-date") : "" et None -> sans-date ; la
+  //    date est mise telle quelle (une « / » passe dans le chemin).
+  //  - os.path.join : pas de « / » ajoute si le dossier finit deja par « / ».
+  //  - ensure_ascii=False : sans objet ici (rien n'est serialise) ; voir le
+  //    journal pour ce que le texte de Python ecrit autrement que JSON.stringify.
+  //  - HORS DOMAINE, non porte au bit : une date non textuelle dans le nom
+  //    (str() de Python), un repr de texte dont les categories Unicode
+  //    different entre CPython 3.13 (Unicode 15.1) et le moteur JS, des noms de
+  //    video non textuels ou a demi-paires UTF-16 (surrogateescape).
+
+  const SEANCE_SCHEMA = "velocite-seance/v1";
+  const SCRIPT_SEANCE = "analyse_serie v7";
+
+  // type(x).__name__ de Python, pour les messages (2.0 et 2 : « int » en JS).
+  function nomPy(x) {
+    if (x === null || x === undefined) return "NoneType";
+    if (typeof x === "boolean") return "bool";
+    if (typeof x === "bigint") return "int";
+    if (typeof x === "number") return Number.isInteger(x) ? "int" : "float";
+    if (typeof x === "string") return "str";
+    if (Array.isArray(x)) return "list";
+    return "dict";
+  }
+
+  function dictPy(x) { return x !== null && typeof x === "object" && !Array.isArray(x); }
+
+  function valueError(m) { return new Error("ValueError: " + m); }
+
+  // repr() d'un texte en CPython : guillemets simples, sauf s'il contient ' et
+  // pas " ; \\, \t, \n, \r ; \xNN sous 0x20 et 0x7f ; hors ASCII, le caractere
+  // s'il est imprimable, sinon \xNN, \uNNNN ou \UNNNNNNNN.
+  const NON_IMPRIMABLE = /^[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]$/u;
+  function hexa(cp, n) { let h = cp.toString(16); while (h.length < n) h = "0" + h; return h; }
+  function reprPy(s) {
+    const q = s.indexOf("'") >= 0 && s.indexOf('"') < 0 ? '"' : "'";
+    let o = q;
+    for (const ch of s) {
+      const cp = ch.codePointAt(0);
+      if (ch === q || ch === "\\") o += "\\" + ch;
+      else if (ch === "\t") o += "\\t";
+      else if (ch === "\n") o += "\\n";
+      else if (ch === "\r") o += "\\r";
+      else if (cp < 0x20 || cp === 0x7f) o += "\\x" + hexa(cp, 2);
+      else if (cp < 0x7f || !NON_IMPRIMABLE.test(ch)) o += ch;
+      else if (cp <= 0xff) o += "\\x" + hexa(cp, 2);
+      else if (cp <= 0xffff) o += "\\u" + hexa(cp, 4);
+      else o += "\\U" + hexa(cp, 8);
+    }
+    return o + q;
+  }
+
+  // Ce que fait CPython avant de lire un nombre (TransformDecimalAndSpaceToASCII) :
+  // hors ASCII, un espace Unicode devient " ", un chiffre decimal (Nd) devient
+  // son chiffre ASCII, tout autre caractere devient "?" (donc invalide). Puis
+  // les espaces ASCII de Py_ISSPACE sont retires en tete et en queue.
+  const ESPACES_NON_ASCII = "\u0085          " +
+    "       　";
+  const ND = /^\p{Nd}$/u;
+  function chiffreNd(ch) {
+    if (!ND.test(ch)) return -1;
+    const cp = ch.codePointAt(0);
+    let z = cp;
+    while (ND.test(String.fromCodePoint(z - 1))) z--;   // les Nd vont par suites 0..9
+    return (cp - z) % 10;
+  }
+  function normaliserNombre(s) {
+    let t = "";
+    for (const ch of s) {
+      if (ch.codePointAt(0) < 128) t += ch;
+      else if (ESPACES_NON_ASCII.indexOf(ch) >= 0) t += " ";
+      else { const d = chiffreNd(ch); t += d >= 0 ? String(d) : "?"; }
+    }
+    return t.replace(/^[ \t\n\v\f\r]+/, "").replace(/[ \t\n\v\f\r]+$/, "");
+  }
+
+  // int(s) de Python, base 10 : rend un BigInt (entier sans borne).
+  function intPy(s) {
+    if (typeof s !== "string") throw new Error("TypeError: int() non porte pour " + nomPy(s));
+    const t = normaliserNombre(s);
+    if (!/^[+-]?[0-9]+(?:_[0-9]+)*$/.test(t)) {
+      throw valueError("invalid literal for int() with base 10: " + Array.from(reprPy(s)).slice(0, 200).join(""));
+    }
+    const neg = t[0] === "-";
+    const v = BigInt(t.replace(/^[+-]/, "").replace(/_/g, ""));
+    return neg ? -v : v;
+  }
+
+  // float(s) de Python : soulignes seulement entre deux chiffres, puis la
+  // grammaire de float (inf, infinity, nan sans casse ; ".5", "5." acceptes).
+  function floatPy(s) {
+    if (typeof s !== "string") throw new Error("TypeError: float() non porte pour " + nomPy(s));
+    const err = function () { return valueError("could not convert string to float: " + reprPy(s)); };
+    let t = normaliserNombre(s);
+    if (t.indexOf("_") >= 0) {
+      for (let i = 0; i < t.length; i++) {
+        if (t[i] === "_" && !(/[0-9]/.test(t[i - 1] || "") && /[0-9]/.test(t[i + 1] || ""))) throw err();
+      }
+      t = t.replace(/_/g, "");
+    }
+    if (/^[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(t)) return Number(t);
+    const sp = /^([+-]?)(inf|infinity|nan)$/i.exec(t);
+    if (sp) return sp[2].toLowerCase() === "nan" ? NaN : (sp[1] === "-" ? -Infinity : Infinity);
+    throw err();
+  }
+
+  // x, y = liste : deballage strict de Python.
+  function deux(liste) {
+    if (liste.length < 2) throw valueError("not enough values to unpack (expected 2, got " + liste.length + ")");
+    if (liste.length > 2) throw valueError("too many values to unpack (expected 2)");
+    return liste;
+  }
+  function couper(s, sep) {
+    if (typeof s !== "string") throw new Error("AttributeError: '" + nomPy(s) + "' object has no attribute 'split'");
+    return s.split(sep);
+  }
+  // s.replace(",", ".") de Python : TOUTES les occurrences.
+  function virgules(s) { return s.split(",").join("."); }
+
+  // d[k] = v dans un dict de Python, garde comme liste de paires [cle, valeur] :
+  // une cle deja presente garde sa place, sa valeur change.
+  function poser(paires, k, v) {
+    for (let i = 0; i < paires.length; i++) if (paires[i][0] === k) { paires[i][1] = v; return; }
+    paires.push([k, v]);
+  }
+
+  // cal.get(k) : cal doit etre un dict ; cle absente -> None.
+  function calGet(cal, k) {
+    if (!dictPy(cal)) throw new Error("AttributeError: '" + nomPy(cal) + "' object has no attribute 'get'");
+    return A_PROPRE.call(cal, k) ? cal[k] : null;
+  }
+
+  // l. 817-829. Rend { cal, fil, fixe, ech } ; fixe et ech sont les dicts de
+  // Python en listes de paires [n en texte, valeur], dans leur ordre.
+  function optionsSeance(e) {
+    const a = cle(e, "a");
+    // 817 : json.load(open(CALIB)) if os.path.exists(CALIB) else {}
+    const cal = A_PROPRE.call(e, "cal") && e.cal !== undefined ? e.cal : {};
+    // 820 : `or` n'evalue la suite que si besoin
+    const filCm = attribut(a, "fil_cm");
+    let fil = filCm;
+    if (!pyBool(fil)) fil = calGet(cal, "fil_centre_a_centre_cm");
+    if (!pyBool(fil)) fil = calGet(cal, "fil_etalonnage_cm");
+    // 821-824
+    const fixe = [];
+    const lf = attribut(a, "fixe");
+    for (const f of (pyBool(lf) ? lf : [])) {
+      const nv = deux(couper(f, "="));
+      const lr = deux(nv[1].toLowerCase().split(/[x*]/));
+      const lest = floatPy(virgules(lr[0]));   // la valeur d'abord...
+      const reps = Number(intPy(lr[1]));
+      poser(fixe, intPy(nv[0]).toString(), [lest, reps]);   // ... la cle ensuite
+    }
+    // 825-828 : getattr(a, "echelle", None)
+    const ech = [];
+    const le = dictPy(a) && A_PROPRE.call(a, "echelle") ? a.echelle : null;
+    for (const x of (pyBool(le) ? le : [])) {
+      const nv = deux(couper(x, "="));
+      const val = floatPy(virgules(nv[1]));
+      poser(ech, intPy(nv[0]).toString(), val);
+    }
+    return { cal: cal, fil: fil, fixe: fixe, ech: ech };
+  }
+
+  // sorted() de Python sur des textes : ordre des points de code.
+  function pointsDeCode(s) { return Array.from(s, function (c) { return c.codePointAt(0); }); }
+  function trierPython(videos) {
+    if (!Array.isArray(videos)) throw new Error("TypeError: videos doit etre une liste");
+    const cles = videos.map(function (v) {
+      if (typeof v !== "string") throw new Error("TypeError: nom de video non textuel (hors domaine)");
+      return { v: v, c: pointsDeCode(v) };
+    });
+    cles.sort(function (p, q) {
+      const n = Math.min(p.c.length, q.c.length);
+      for (let i = 0; i < n; i++) if (p.c[i] !== q.c[i]) return p.c[i] - q.c[i];
+      return p.c.length - q.c.length;
+    });
+    return cles.map(function (x) { return x.v; });
+  }
+
+  // SystemExit(message), a lever depuis le rappel analyser.
+  function systemExit(message) {
+    const e = new Error(message);
+    e.name = "SystemExit";
+    return e;
+  }
+
+  // l. 830-840. e = { videos, fil, fixe (paires), legende, analyser } ; rend les
+  // lignes { n, video, leg, brut, m, err }. Le leg rendu par legende(v) est
+  // COPIE avant que --fixe y ecrive.
+  function lignesSeance(e) {
+    const videos = trierPython(cle(e, "videos"));
+    const fil = cle(e, "fil");
+    const fixe = cle(e, "fixe");
+    const legende = cle(e, "legende"), analyser = cle(e, "analyser");
+    const lignes = [];
+    for (let i = 0; i < videos.length; i++) {
+      const n = i + 1, v = videos[i];
+      const o = legende(v);
+      let leg = cle(o, "leg");
+      const brut = cle(o, "brut");
+      if (dictPy(leg)) leg = Object.assign({}, leg);
+      for (let j = 0; j < fixe.length; j++) {
+        if (fixe[j][0] !== String(n)) continue;
+        if (!dictPy(leg)) throw new Error("TypeError: '" + nomPy(leg) + "' object does not support item assignment");
+        leg.lest_kg = fixe[j][1][0];
+        leg.reps_annoncees = fixe[j][1][1];
+      }
+      let m, err;
+      try {
+        m = analyser(v, fil);
+        err = null;
+      } catch (x) {
+        if (!(x && x.name === "SystemExit")) throw x;
+        m = null;
+        err = String(x.message);
+      }
+      lignes.push({ n: n, video: v, leg: leg, brut: brut, m: m, err: err });
+    }
+    return lignes;
+  }
+
+  // UNE ligne de la boucle (l. 870-939), dans l'ordre de Python :
+  // preparerSerie -> mesurer -> controles -> referenceDepart -> usageReference
+  // -> assemblerSerie -> elaguerProfils (la chaine des lots 21 a 24).
+  function serieSeance(ligne, seance, analyseLe) {
+    const MS = globalThis.MS, RS = globalThis.RS, RD = globalThis.RD;
+    const p = preparerSerie({ ligne: ligne, seance: seance });
+    if (!p.analysee) return elaguerProfils(p.serie);
+    const m = ligne.m, px = p.px;
+    const reps0 = MS.mesurer(m.y_px, m.fps, px, p.base.charge_systeme_kg).reps;
+    const al = p.al.concat(RS.controles(m.y_px, px, m.fps, reps0));
+    const ref = RD.referenceDepart(m.y_px, m.fps, px, reps0);
+    const u = usageReference(ref, reps0, px);
+    const s = assemblerSerie({ base: p.base, leg: ligne.leg, ligne: { n: ligne.n, video: ligne.video }, m: m,
+      px: px, src: p.src, al: al.concat(u.alertes), reps: u.reps, reference: u.reference, analyseLe: analyseLe });
+    return elaguerProfils(s);
+  }
+
+  // "%s" % date : seulement un texte (une date non textuelle est hors domaine).
+  function textePy(x) {
+    if (typeof x !== "string") throw new Error("TypeError: date non textuelle dans le nom du fichier (hors domaine)");
+    return x;
+  }
+
+  // os.path.join(dossier, nom) sous Linux, nom ne commencant pas par « / ».
+  function joindre(dossier, nom) {
+    if (typeof dossier !== "string") {
+      throw new Error("TypeError: expected str, bytes or os.PathLike object, not " + nomPy(dossier));
+    }
+    if (dossier === "" || dossier.endsWith("/")) return dossier + nom;
+    return dossier + "/" + nom;
+  }
+
+  // l. 940-943. e = { a, videos (NON tries), dossierDe, date, pdc, sem, sea, series }.
+  function sortieSeance(e) {
+    const a = cle(e, "a");
+    const sortie = { schema: SEANCE_SCHEMA, date: cle(e, "date"), mouvement: attribut(a, "mouvement"),
+      poids_corps_kg: cle(e, "pdc"), semaine: cle(e, "sem"), seance: cle(e, "sea"), script: SCRIPT_SEANCE,
+      series: cle(e, "series") };
+    const aSortie = attribut(a, "sortie");
+    let dossier;
+    if (pyBool(aSortie)) {
+      dossier = aSortie;
+    } else {
+      const videos = cle(e, "videos");
+      if (!videos.length) throw new Error("IndexError: list index out of range");
+      dossier = cle(e, "dossierDe")(videos[0]);
+    }
+    const nom = "seance-" + (pyBool(sortie.date) ? textePy(sortie.date) : "sans-date") + ".json";
+    return { sortie: sortie, nom: nom, chemin: joindre(dossier, nom) };
+  }
+
+  // Toute main_seance, l. 816 a 944, hors OCR, analyser et ecriture du fichier.
+  function seanceComplete(e) {
+    const a = cle(e, "a");
+    const o = optionsSeance(A_PROPRE.call(e, "cal") ? { a: a, cal: e.cal } : { a: a });
+    const videos = cle(e, "videos");
+    const lignes = lignesSeance({ videos: videos, fil: o.fil, fixe: o.fixe,
+      legende: cle(e, "legende"), analyser: cle(e, "analyser") });
+    const ch = champsSeance({ lignes: lignes, a: a });
+    const series = [];
+    if (ch.lignes.length) {
+      const ech = {};
+      o.ech.forEach(function (p) { ech[p[0]] = p[1]; });
+      const seance = { date: ch.date, mouvement: attribut(a, "mouvement"), sem: ch.sem, sea: ch.sea, pdc: ch.pdc,
+        fil: o.fil, echelles: ch.echelles, ech_med: ch.ech_med, ech: ech };
+      const analyseLe = cle(e, "analyseLe");
+      ch.lignes.forEach(function (l) { series.push(serieSeance(l, seance, analyseLe)); });
+    }
+    return sortieSeance({ a: a, videos: videos, dossierDe: e.dossierDe, date: ch.date, pdc: ch.pdc,
+      sem: ch.sem, sea: ch.sea, series: series });
+  }
+
+  // =====================================================================
+  // LOT 26 — analyser (l. 733 a 756), facteur_profondeur (l. 278 a 290) et
+  // echelle_fil (l. 291 a 316), hors suivi video
+  // =====================================================================
+  //
+  // Ce que lisent les lignes 733-756 (releve par grep) :
+  //   blobs_video(chemin) -> tout, fps ; marques_fixes(tout) -> fixes ;
+  //   suivre_marque(tout, fixes) -> y_px, taux, aire     : ENTREES (suivi video
+  //                                                        non porte ici) ;
+  //   savgol_filter (SG), np.ptp, echelle_fil (porte ici), facteur_profondeur
+  //   (porte ici), fil_cm.
+  // Ce qu'elles ecrivent : rien en place ; elles rendent le dict m, ou levent.
+  // facteur_profondeur lit calibration.json A CHAQUE APPEL (CALIB), par .get,
+  // independamment du cal de main_seance (qui, lui, n'est lu que si --fil-cm
+  // est faux).
+  //
+  // Pieges de convention, tous testes (journal-lot26.md, § 3) :
+  //  - ORDRE : amp est calcule AVANT les trois tests (une trajectoire de moins
+  //    de 9 images leve la ValueError de scipy avant tout SystemExit) ; puis
+  //    taux, aire, amp ; puis le fil ; facteur_profondeur est lu APRES, meme
+  //    quand px_cm est None (un cal qui n'est pas un dict leve alors quand
+  //    meme une AttributeError, que main_seance ne rattrape pas).
+  //  - "%d %%" % round(100 * taux) : round au PAIR de Python (88.5 -> 88,
+  //    89.5 -> 90), sur le produit 100 * taux tel que le calcule le double ;
+  //    taux 0.8999999999999999 est refuse avec le message « 90 % ».
+  //  - "%d px" % aire et % amp : %d TRONQUE vers zero (149.9 -> « 149 »),
+  //    NaN -> ValueError, inf -> OverflowError, grand flottant -> tous ses
+  //    chiffres (SE.pourcentD, lot 22).
+  //  - seuils : taux < 0.90 et aire < 150 STRICTS (0.9 et 150 passent) ;
+  //    120 <= amp <= 700 INCLUSIFS. Un NaN passe les deux premiers tests (toute
+  //    comparaison est fausse) et fait lever le troisieme en ValueError (le
+  //    %d du message), pas en SystemExit.
+  //  - amp = np.ptp(savgol_filter(y_px, 9, 2)) : SG n'est pas identique a
+  //    scipy au dernier bit (~1e-13 px sur les series reelles). amp n'est PAS
+  //    dans m : seule la decision a moins de ~1e-13 px de 120 ou 700 (ou la
+  //    troncature du message pres d'un entier) pourrait differer.
+  //  - `if fil_cm:` est bool() de Python : 0, -0.0, None, "", [] -> pas
+  //    d'echelle ; NaN, "229.75", [229.75] -> vrais. Un fil non numerique ne
+  //    leve qu'a la division d / longueur_cm, donc seulement si une paire est
+  //    trouvee (TypeError « unsupported operand type(s) for /: 'float' and
+  //    'str' »).
+  //  - len(gros) >= 2, gros = fixes d'aire >= 150 (150 compris) ; dans
+  //    echelle_fil : |dx| > 120 ou dy < 600 ecarte la paire (dx = 120 et
+  //    dy = 600 passent) ; note = min() de PYTHON (le premier si egalite) et
+  //    `note > best` STRICT : a note egale, la premiere paire gagne.
+  //  - px_cm_fil est garde AVANT la multiplication ; px_cm *= fp seulement si
+  //    px_cm est vrai (0.0 et -0.0 restent tels quels, NaN est multiplie).
+  //  - ordre des cles de m : y_px, fps, taux, nb, px_cm, d_px, px_cm_fil,
+  //    facteur_profondeur, fixes. y_px et fixes sont les objets RECUS eux-memes
+  //    (Python rend les memes objets : `is`).
+  //  - facteur_profondeur = float(cal.get("facteur_profondeur") or 1.0), sous
+  //    try/except (TypeError, ValueError) -> 1.0 : cle absente, None, 0, "",
+  //    [], {} -> 1.0 ; "0.9" -> 0.9 ; "0" -> 0.0 (texte non vide : vrai) ;
+  //    "0,9", [0.9] -> 1.0 ; "nan" -> NaN. cal absent (fichier absent) -> {}.
+  //    cal non dict (liste, None, texte, nombre) -> AttributeError NON
+  //    rattrapee (elle n'est pas dans le except).
+  //
+  // Hors domaine, non porte au bit : un fixe dont y n'est pas un flottant (le
+  // type de d n'apparait que dans le message de la TypeError, ecrit 'float') ;
+  // un facteur_profondeur entier trop grand pour un double (OverflowError en
+  // Python, que JSON.parse ne distingue pas d'un inf) ; un cal qui vaut un
+  // flottant entier (nomPy dit 'int').
+
+  const MSG_SAVGOL_COURT =
+    "If mode is 'interp', window_length must be less than or equal to the size of x.";
+
+  // min(a, b) de Python : rend b seulement si b < a (NaN : le premier gagne).
+  function minPy(a, b) { return b < a ? b : a; }
+
+  // [f for f in fixes if f["aire"] >= 150]
+  function grosses(fixes) {
+    const g = [];
+    for (const f of fixes) if (cle(f, "aire") >= 150) g.push(f);
+    return g;
+  }
+
+  // d / longueur_cm de Python, d etant un float (fixes de marques_fixes).
+  function diviser(d, l) {
+    if (typeof l === "boolean") return d / (l ? 1 : 0);
+    if (typeof l === "number") return d / l;
+    throw new Error("TypeError: unsupported operand type(s) for /: 'float' and '" + nomPy(l) + "'");
+  }
+
+  // l. 291-316 : echelle_fil(fixes, longueur_cm) -> [px_cm, d] ou [null, null].
+  function echelleFil(fixes, longueurCm) {
+    if (!pyBool(longueurCm)) return [null, null];
+    const gros = grosses(fixes);
+    let best = null;
+    for (let i = 0; i < gros.length; i++) {
+      for (let j = i + 1; j < gros.length; j++) {
+        const a = gros[i], b = gros[j];
+        const ordre = cle(a, "y") < cle(b, "y");
+        const haut = ordre ? a : b, bas = ordre ? b : a;
+        if (Math.abs(cle(haut, "x") - cle(bas, "x")) > 120 || (cle(bas, "y") - cle(haut, "y")) < 600) continue;
+        const note = minPy(cle(haut, "aire"), cle(bas, "aire"));
+        if (best === null || note > best[0]) best = [note, haut, bas];
+      }
+    }
+    if (best === null) return [null, null];
+    const d = best[2].y - best[1].y;
+    return [diviser(d, longueurCm), d];
+  }
+
+  // float(x) de Python sur ce que json.load peut rendre.
+  function floatValeur(x) {
+    if (typeof x === "boolean") return x ? 1 : 0;
+    if (typeof x === "number") return x;
+    if (typeof x === "string") return floatPy(x);
+    throw new Error("TypeError: float() argument must be a string or a real number, not '" + nomPy(x) + "'");
+  }
+
+  // l. 278-290. e = { cal } : contenu de calibration.json ; cle absente =
+  // fichier absent ({}). Rend un nombre, ou leve AttributeError (cal non dict).
+  function facteurProfondeur(e) {
+    const cal = A_PROPRE.call(e, "cal") && e.cal !== undefined ? e.cal : {};
+    try {
+      // cal.get est DANS le try de Python, mais AttributeError n'est pas dans
+      // le except : elle remonte.
+      const v = calGet(cal, "facteur_profondeur");
+      return floatValeur(pyBool(v) ? v : 1.0);
+    } catch (x) {
+      if (/^(TypeError|ValueError): /.test(String(x && x.message))) return 1.0;
+      throw x;
+    }
+  }
+
+  // round(x) de Python sur un float, rendu entier (inf -> OverflowError).
+  function roundPy(x) {
+    if (x !== x) throw valueError("cannot convert float NaN to integer");
+    if (!Number.isFinite(x)) throw new Error("OverflowError: cannot convert float infinity to integer");
+    return globalThis.MS.arrondir(x, null);
+  }
+
+  // np.ptp : max - min, NaN si un NaN.
+  function ptp(z) {
+    let hi = -Infinity, lo = Infinity;
+    for (let i = 0; i < z.length; i++) {
+      const v = z[i];
+      if (v !== v) return NaN;
+      if (v > hi) hi = v;
+      if (v < lo) lo = v;
+    }
+    return hi - lo;
+  }
+
+  // l. 733-756, hors suivi. e = { suivi: { nb, fps, fixes, y_px, taux, aire },
+  // fil_cm, cal } (cal : comme facteurProfondeur). Rend m (dict de Python, dans
+  // son ordre) ou leve SE.systemExit(message) comme Python leve SystemExit ;
+  // les autres erreurs de Python (ValueError, OverflowError, TypeError,
+  // AttributeError, KeyError) levent une Error « Type: message ».
+  function analyserSuivi(e) {
+    const s = cle(e, "suivi");
+    const nb = cle(s, "nb"), fps = cle(s, "fps"), fixes = cle(s, "fixes");
+    const yPx = cle(s, "y_px"), taux = cle(s, "taux"), aire = cle(s, "aire");
+    const filCm = cle(e, "fil_cm");
+    // 738
+    if (longueur(yPx) < 9) throw valueError(MSG_SAVGOL_COURT);
+    const amp = ptp(globalThis.SG.savgolFilter(yPx, 9, 2));
+    // 739-744
+    if (taux < 0.90) throw systemExit("marque suivie sur " + pourcentD(roundPy(100 * taux)) + " % des images seulement");
+    if (aire < 150) throw systemExit("tache trop petite (" + pourcentD(aire) + " px) pour etre la marque de ceinture");
+    if (!(120 <= amp && amp <= 700)) throw systemExit("amplitude invraisemblable (" + pourcentD(amp) + " px)");
+    // 745-749
+    let pxCm = null, dPx = null;
+    if (pyBool(filCm)) {
+      const gros = grosses(fixes);
+      if (gros.length >= 2) {
+        const r = echelleFil(gros, filCm);
+        pxCm = r[0]; dPx = r[1];
+      }
+    }
+    // 750-752
+    const fp = facteurProfondeur(A_PROPRE.call(e, "cal") ? { cal: e.cal } : {});
+    const pxCmFil = pxCm;
+    if (pyBool(pxCm)) pxCm = pxCm * fp;
+    // 753-754
+    return { y_px: yPx, fps: fps, taux: taux, nb: nb, px_cm: pxCm, d_px: dPx,
+      px_cm_fil: pxCmFil, facteur_profondeur: fp, fixes: fixes };
+  }
+
+  // Le rappel analyser(v, fil) de seanceComplete, fait en JS :
+  //   suivre(v) -> { nb, fps, fixes, y_px, taux, aire } (blobs_video,
+  //   marques_fixes, suivre_marque : ENTREE ; peut lever SE.systemExit) ;
+  //   cal : contenu de calibration.json (cle absente = fichier absent).
+  function faireAnalyser(o) {
+    const suivre = cle(o, "suivre");
+    const avecCal = A_PROPRE.call(o, "cal");
+    return function (v, fil) {
+      const s = suivre(v);
+      return analyserSuivi(avecCal ? { suivi: s, fil_cm: fil, cal: o.cal } : { suivi: s, fil_cm: fil });
+    };
+  }
+
+  // =====================================================================
+  // LOT 27 — le suivi video a partir des taches de chaque image :
+  // blobs_video (l. 196 a 214, ce qui suit la lecture), marques_fixes
+  // (l. 216 a 234) et suivre_marque (l. 236 a 276)
+  // =====================================================================
+  //
+  // Ce que lisent et ecrivent ces lignes (releve par grep) :
+  //   blobs_video : lit cap.isOpened(), cap.get(CAP_PROP_FPS), cap.read() et
+  //     marques(im) image par image -> ENTREES (decodage et taches) ; ecrit
+  //     tout (liste des taches { x, y, h, aire } par image), fps
+  //     (= cap.get(...) or 30.0) et premiere (image grise, inutilisee par
+  //     analyser) ; leve « video illisible » (ENTREE) et « video trop courte »
+  //     (moins de 30 images, porte ici) ;
+  //   marques_fixes : lit tout ; ecrit une NOUVELLE liste de dicts
+  //     { y, x, h, aire } (moyennes numpy), triee par y ;
+  //   suivre_marque : lit tout et fixes ; ecrit un NOUVEAU tableau y, et rend
+  //     (y, float(taux), float(aire)) ou leve SystemExit.
+  // Rien n'est modifie en place dans les entrees.
+  //
+  // Pourquoi ces lignes sont portees ICI et pas prises a PV (noyau, lot 15) :
+  // voir journal-lot27 § 1. En bref : PV vit dans un autre bloc que la page
+  // de SE ne charge pas ; ses moyennes et son ecart-type sont des sommes
+  // sequentielles (numpy somme par paires) ; son interpolation n'a pas la
+  // formule de np.interp ; il rend `erreur` au lieu de lever, avec un
+  // message tronque, et ne fait ni « video trop courte » ni `or 30.0`.
+
+  const MSG_TROP_COURTE = "video trop courte";
+  const MSG_AUCUNE_MOBILE = "aucune marque mobile detectee : verifier la couleur du repere";
+  const MSG_PERDUE = "marque perdue sur plus de la moitie de la video";
+
+  // float(np.mean(a)) d'une liste de nombres : somme PAR PAIRES de numpy
+  // (RS.sommePairwise, lot 19) divisee par n.
+  function moyenneNp(a) {
+    return globalThis.RS.sommePairwise(a, 0, a.length) / a.length;
+  }
+
+  // np.array(a).std() (ddof = 0) : moyenne par paires, carres des ecarts,
+  // somme par paires, division par n, racine.
+  function ecartTypeNp(a) {
+    const m = moyenneNp(a);
+    const c = new Array(a.length);
+    for (let i = 0; i < a.length; i++) { const d = a[i] - m; c[i] = d * d; }
+    return Math.sqrt(globalThis.RS.sommePairwise(c, 0, c.length) / c.length);
+  }
+
+  // sorted(liste, key=...) de Python avec un comparateur « < » : tri STABLE.
+  function trierStable(liste, inf) {
+    const i = liste.map(function (_, j) { return j; });
+    i.sort(function (a, b) {
+      if (inf(liste[a], liste[b])) return -1;
+      if (inf(liste[b], liste[a])) return 1;
+      return a - b;
+    });
+    return i.map(function (j) { return liste[j]; });
+  }
+
+  // min(liste, key=f) de Python : remplace seulement si f(x) < meilleur ;
+  // en cas d'egalite, le PREMIER gagne.
+  function minCle(liste, f) {
+    let best = liste[0], kb = f(best);
+    for (let i = 1; i < liste.length; i++) {
+      const k = f(liste[i]);
+      if (k < kb) { best = liste[i]; kb = k; }
+    }
+    return best;
+  }
+
+  // l. 216-234 : marques_fixes(tout, tol=6.0, presence=0.5).
+  function marquesFixes(tout) {
+    // ref = max(tout, key=len) : le PREMIER des plus longs (> strict).
+    if (!tout.length) throw valueError("max() iterable argument is empty");
+    let ref = tout[0];
+    for (let i = 1; i < tout.length; i++) if (tout[i].length > ref.length) ref = tout[i];
+    const fixes = [];
+    for (const b of ref) {
+      const vus = [];
+      for (const bl of tout) {
+        // c = taches a moins de 12 px (strict) en y ET en x ; min par |dy|
+        let best = null, kb = 0;
+        for (const q of bl) {
+          if (Math.abs(q.y - b.y) < 12 && Math.abs(q.x - b.x) < 12) {
+            const k = Math.abs(q.y - b.y);
+            if (best === null || k < kb) { best = q; kb = k; }
+          }
+        }
+        if (best !== null) vus.push(best);
+      }
+      if (vus.length < 0.5 * tout.length) continue;      // presence : 50 % pile passe
+      const ys = vus.map(function (q) { return q.y; });
+      if (ecartTypeNp(ys) < 6.0) {                         // tol : 6 pile refuse
+        fixes.push({ y: moyenneNp(ys), x: moyenneNp(vus.map(function (q) { return q.x; })),
+          h: moyenneNp(vus.map(function (q) { return q.h; })),
+          aire: moyenneNp(vus.map(function (q) { return q.aire; })) });
+      }
+    }
+    return trierStable(fixes, function (a, b) { return a.y < b.y; });
+  }
+
+  // y[~vus] = np.interp(idx[~vus], idx[vus], y[vus]), EN PLACE, avec la
+  // formule de numpy (compiled_base.c) : pente puis pente*(x - xp[j]) + fp[j] ;
+  // aux bords, la premiere ou la derniere valeur vue.
+  function interpTrous(y, vus) {
+    const xp = [], fp = [];
+    for (let i = 0; i < y.length; i++) if (vus[i]) { xp.push(i); fp.push(y[i]); }
+    const L = xp.length;
+    let j = 0;
+    for (let i = 0; i < y.length; i++) {
+      if (vus[i]) continue;
+      if (i < xp[0]) { y[i] = fp[0]; continue; }
+      if (i > xp[L - 1]) { y[i] = fp[L - 1]; continue; }
+      while (xp[j + 1] <= i) j++;
+      const pente = (fp[j + 1] - fp[j]) / (xp[j + 1] - xp[j]);
+      let r = pente * (i - xp[j]) + fp[j];
+      if (r !== r) {
+        r = pente * (i - xp[j + 1]) + fp[j + 1];
+        if (r !== r && fp[j] === fp[j + 1]) r = fp[j];
+      }
+      y[i] = r;
+    }
+  }
+
+  // l. 236-276 : suivre_marque(tout, fixes, saut_max=60.0) -> [y, taux, aire]
+  // ou leve SE.systemExit.
+  function suivreMarque(tout, fixes) {
+    function mobile(bl) {
+      return bl.filter(function (b) {
+        return b.h <= 65 && !fixes.some(function (f) {
+          return Math.abs(b.y - f.y) < 14 && Math.abs(b.x - f.x) < 14;
+        });
+      });
+    }
+    let depart = -1;
+    for (let i = 0; i < tout.length; i++) if (mobile(tout[i]).length) { depart = i; break; }
+    if (depart < 0) throw systemExit(MSG_AUCUNE_MOBILE);
+    const n = tout.length;
+
+    function piste(graine) {
+      let cur = graine, aire = graine.aire;
+      const y = new Array(n).fill(NaN);
+      y[depart] = cur.y;
+      for (let i = depart + 1; i < n; i++) {
+        const cands = mobile(tout[i]).filter(function (b) {
+          return Math.abs(b.y - cur.y) < 60.0 && 0.4 * aire < b.aire && b.aire < 2.5 * aire;
+        });
+        if (!cands.length) continue;
+        const avant = cur;
+        cur = minCle(cands, function (b) { return Math.abs(b.y - avant.y) - 0.02 * b.aire; });
+        aire = 0.9 * aire + 0.1 * cur.aire;
+        y[i] = cur.y;
+      }
+      const vus = y.map(function (v) { return v === v; });
+      let nvus = 0, hi = -Infinity, lo = Infinity;
+      for (const v of y) if (v === v) { nvus++; if (v > hi) hi = v; if (v < lo) lo = v; }
+      const amp = nvus > 5 ? hi - lo : 0.0;              // np.nanmax - np.nanmin
+      return { y: y, vus: vus, nvus: nvus, amp: amp };
+    }
+
+    // sorted(mobile(tout[depart]), key=lambda b: -b["aire"])[:8] : stable
+    const graines = trierStable(mobile(tout[depart]), function (a, b) { return -a.aire < -b.aire; }).slice(0, 8);
+    const essais = graines.map(function (g) {
+      const p = piste(g), taux = p.nvus / n;               // vus.mean()
+      return { ok90: taux >= 0.9, amp: p.amp, taux: taux, y: p.y, vus: p.vus, nvus: p.nvus, aire: g.aire };
+    });
+    // essais.sort(key=lambda e: (e[0], e[1])) : tuples (bool, float), stable ;
+    // on garde le DERNIER (a cle egale, le dernier essai).
+    const tries = trierStable(essais, function (a, b) {
+      if (a.ok90 !== b.ok90) return !a.ok90 && b.ok90;
+      if (a.amp === b.amp) return false;
+      return a.amp < b.amp;
+    });
+    const e = tries[tries.length - 1];
+    if (e.nvus < 0.5 * e.y.length) throw systemExit(MSG_PERDUE);   // 50 % pile passe
+    interpTrous(e.y, e.vus);
+    return [e.y, e.taux, e.aire];                          // aire de la GRAINE
+  }
+
+  // blobs_video (ce qui suit la lecture) puis marques_fixes et suivre_marque,
+  // comme les l. 735-737 d'analyser. e = { tout, fps } : tout = taches de
+  // chaque image (rendu de marques), fps = cap.get(CAP_PROP_FPS) BRUT.
+  // Rend { nb, fps, fixes, y_px, taux, aire }, l'entree de analyserSuivi.
+  function suivreTaches(e) {
+    const tout = cle(e, "tout");
+    const fpsBrut = A_PROPRE.call(e, "fps") ? e.fps : null;
+    const fps = pyBool(fpsBrut) ? fpsBrut : 30.0;       // cap.get(...) or 30.0
+    if (tout.length < 30) throw systemExit(MSG_TROP_COURTE);
+    const fixes = marquesFixes(tout);
+    const r = suivreMarque(tout, fixes);
+    return { nb: tout.length, fps: fps, fixes: fixes, y_px: r[0], taux: r[1], aire: r[2] };
+  }
+
+  // Le rappel suivre(v) de faireAnalyser : lire(v) -> { tout, fps } (decodage
+  // et taches : ENTREE ; peut lever SE.systemExit("video illisible")).
+  function faireSuivre(o) {
+    const lire = cle(o, "lire");
+    return function (v) { return suivreTaches(lire(v)); };
+  }
+
+  globalThis.SE = {
+    seanceComplete: seanceComplete,
+    optionsSeance: optionsSeance,
+    lignesSeance: lignesSeance,
+    serieSeance: serieSeance,
+    sortieSeance: sortieSeance,
+    systemExit: systemExit,
+    trierPython: trierPython,
+    intPy: intPy,
+    floatPy: floatPy,
+    reprPy: reprPy,
+    SEANCE_SCHEMA: SEANCE_SCHEMA,
+    champsSeance: champsSeance,
+    preparerSerie: preparerSerie,
+    SCHEMA_SERIE: SCHEMA_SERIE,
+    assemblerSerie: assemblerSerie,
+    elaguerProfils: elaguerProfils,
+    dateDuJour: dateDuJour,
+    hauteurMini: hauteurMini,
+    pyBool: pyBool,
+    pourcentD: pourcentD,
+    basename: basename,
+    ALERTE_TYPE_DEDUIT: ALERTE_TYPE_DEDUIT,
+    usageReference: usageReference,
+    valeurAuSommet: valeurAuSommet,
+    TYPE_REFERENCE: TYPE_REFERENCE,
+    ALERTE_SANS_SUSPENSION: ALERTE_SANS_SUSPENSION,
+    VERSION_SEANCE: VERSION_SEANCE,
+    analyserSuivi: analyserSuivi,
+    facteurProfondeur: facteurProfondeur,
+    echelleFil: echelleFil,
+    faireAnalyser: faireAnalyser,
+    marquesFixes: marquesFixes,
+    suivreMarque: suivreMarque,
+    suivreTaches: suivreTaches,
+    faireSuivre: faireSuivre,
+  };
+})();
+// <<< BLOC SEANCE - FIN >>>
+</script>
+<script type="application/json" id="calibration">
+{
+ "athlete": {
+  "taille_cm": 179
+ },
+ "fil_etalonnage_cm": 245.5,
+ "fil_etalonnage_cm_note": "longueur totale, extremite a extremite : ne sert plus a l'echelle depuis le 24/09/2026, gardee pour relire les analyses anterieures",
+ "fil_centre_a_centre_cm": 229.75,
+ "fil_centre_a_centre_note": "centre du scotch (236,0 cm du sol) au centre du baudrier (6,25 cm du sol), mesure au metre ruban le 24/09/2026. Fil inchange depuis le 19/09/2026",
+ "facteur_profondeur": 0.9,
+ "facteur_profondeur_note": "echelle au plan de la marque de ceinture / echelle mesuree sur le fil. Le fil pend environ 26 cm plus pres de l'objectif. Mesure du 24/09/2026 : ruban de 1 m suspendu a la ceinture, 536 px pour 100 cm (VID_20260924_173557_2), fil a 6,004 px/cm, soit 0,893. Geometrie : 245,5 / (245,5 + 31 + 13 - 18,25) = 0,905. Valeur retenue 0,90, incertitude environ 1 %. A remesurer si la prise, la position de la camera ou l'accroche du fil changent.",
+ "marque_couleur": {
+  "ceinture": "rose/rouge, suivie image par image",
+  "fil": "deux extremites peintes, immobiles, donnent l'echelle",
+  "teinte_hsv": "H >= 158 ou H \u003c= 8, S >= 60, V >= 70"
+ },
+ "reperes": [
+  {
+   "nom": "jardin-19-09",
+   "px_cm": 6.09,
+   "echelle_verifiee": true,
+   "mode": "couleur",
+   "note": "fil de 245,5 cm = 1495 px. Camera inchangee entre le 19/09 15h54 et 16h20 (6,112 puis 6,088 px/cm, 0,4 % d'ecart). Sur VID_20260919_155433, la detection automatique du fil choisit une mauvaise paire de marques (5,68 px/cm) : echelle de ce repere a imposer."
+  },
+  {
+   "nom": "jardin-18-09",
+   "px_cm": 6.005,
+   "echelle_verifiee": true,
+   "note": "mesure sur le fil de 238 cm : 1430 px. Repere de validite : marque de ceinture au pixel 692 pendant la pause menton-au-dessus ; sommets des deux reps a 686 et 697.",
+   "mode": "couleur"
+  },
+  {
+   "nom": "jardin-17-09",
+   "boite": [
+    330,
+    1000,
+    170,
+    70
+   ],
+   "px_cm": 5.52,
+   "miroir": true,
+   "echelle_verifiee": false,
+   "note": "avant les marques peintes ; echelle estimee sur la taille, +-7 %"
+  },
+  {
+   "nom": "jardin-16-07",
+   "boite": [
+    260,
+    1020,
+    140,
+    60
+   ],
+   "px_cm": 5.52,
+   "miroir": true,
+   "echelle_verifiee": false,
+   "note": "echelle reprise du 17-09, non verifiee"
+  },
+  {
+   "nom": "jardin-03-09",
+   "boite": [
+    580,
+    1040,
+    100,
+    110
+   ],
+   "px_cm": 5.52,
+   "miroir": true,
+   "echelle_verifiee": false,
+   "note": "echelle reprise du 17-09, non verifiee"
+  }
+ ],
+ "bareme_hauteur_ceinture": {
+  "reference": "cm au-dessus de la suspension relachee, marque de ceinture",
+  "a_15kg": {
+   "non_valide_ne_touche_pas": 38.7,
+   "validee_menton_touche": 40.0,
+   "franche": 49.5,
+   "source": "VID_20260919_155433, positions tenues"
+  },
+  "a_vide": {
+   "plafond_max": 61.0,
+   "vitesse_pic_max_ms": [
+    1.16,
+    1.28,
+    1.31
+   ],
+   "source": "VID_20260919_162018, 3 reps maximales"
+  },
+  "incertitude_cm": 1.3,
+  "remarque": "suspension epaules engagees = +3,3 cm au-dessus de la suspension relachee",
+  "depuis_suspension_depart": {
+   "reference": "cm au-dessus de la suspension stable avant la 1re rep (reference du script v7, champ hauteur_cm)",
+   "a_15kg": {
+    "non_valide_ne_touche_pas": 34.3,
+    "validee_menton_touche": 36.3,
+    "franche": 45.6,
+    "seuil_valide": 35.3,
+    "plages_tenues_cm": {
+     "non_valide": [
+      33.6,
+      34.8
+     ],
+     "validee": [
+      34.8,
+      37.0
+     ],
+     "franche": [
+      45.2,
+      46.4
+     ]
+    },
+    "source": "VID_20260919_155433, remesure le 21/09/2026 ; suspension de depart 3,2-8,2 s (stable a 0,35 cm), relachee 3,5 cm plus bas"
+   },
+   "controle": "depuis la suspension relachee, la meme video redonne 37,8 / 39,8 / 49,1 cm contre 38,7 / 40,0 / 49,5 au bareme d'origine",
+   "limite": "mesure a 15 kg seulement"
+  }
+ }
+}
+</script>
+<script>
+// <<< BLOC SERIE31 - DEBUT >>>
+// Lot 31 — la logique de la page serie-telephone.html, SANS le DOM : saisie -> entrees
+// de SE, fps de cv2 lu dans le MP4, analyse d'UNE serie par SE.seanceComplete, vue
+// affichee, fichier de controle. Greffe tel quel dans la page par
+// outils-lot31/faire-page.mjs ; la recette Node (t-lot31.mjs) l'execute en le lisant
+// DANS LA PAGE. N'expose qu'un nom global : S31.
+// Depend : SE (et par lui SG, FP, MS, RS, RD) ; pour fpsCv2, des fonctions du
+// demultiplexeur greffe de proto-video.html (chercher, tousLes, T). Ne lit jamais
+// l'horloge : la date du jour (analyseLe) est une ENTREE.
+(function () {
+  "use strict";
+
+  const MOUVEMENTS = ["tractions", "dips"];
+  const TYPES = ["top set", "back-off", "echauffement"];
+
+  function ErreurSaisie(champ, message) {
+    const e = new Error(message);
+    e.champ = champ;
+    e.saisie = true;
+    return e;
+  }
+
+  // nombre saisi a la francaise : « 37,5 » ou « 37.5 » ; vide -> null
+  function nombre(texte, champ, nom, entier, mini) {
+    const t = String(texte == null ? "" : texte).trim().replace(",", ".");
+    if (t === "") return null;
+    if (!/^[0-9]+(\.[0-9]+)?$/.test(t)) throw ErreurSaisie(champ, nom + " : « " + texte + " » n'est pas un nombre.");
+    const v = Number(t);
+    if (entier && !Number.isInteger(v)) throw ErreurSaisie(champ, nom + " : un nombre entier est attendu.");
+    if (v < mini) throw ErreurSaisie(champ, nom + " : au moins " + mini + ".");
+    return v;
+  }
+
+  // saisie (textes du formulaire) -> { a, leg, brut }, les entrees de SE.
+  // leg = ce que l'OCR aurait lu sur la legende ; a = les options de la ligne de
+  // commande (--pdc, mouvement). Champ vide = absent de la legende, comme une
+  // lecture ratee : SE le traite comme Python (type deduit, alerte « illisible »).
+  function lireSaisie(s) {
+    const mouvement = String(s.mouvement || "");
+    if (MOUVEMENTS.indexOf(mouvement) < 0) throw ErreurSaisie("mouvement", "Choisissez le mouvement.");
+    const type = String(s.type_serie || "");
+    if (type !== "" && TYPES.indexOf(type) < 0) throw ErreurSaisie("type_serie", "Type de série inconnu : " + type);
+    const lest = nombre(s.lest_kg, "lest_kg", "Lest", false, 0);
+    if (lest === null) throw ErreurSaisie("lest_kg", "Indiquez le lest (0 au poids du corps).");
+    const reps = nombre(s.reps_annoncees, "reps_annoncees", "Reps annoncées", true, 1);
+    if (reps === null) throw ErreurSaisie("reps_annoncees", "Indiquez le nombre de reps annoncées.");
+    const semaine = nombre(s.semaine, "semaine", "Semaine", true, 1);
+    const seance = nombre(s.seance, "seance", "Séance", true, 1);
+    const pdc = nombre(s.pdc, "pdc", "Poids de corps", false, 1);
+    if (pdc === null) throw ErreurSaisie("pdc", "Indiquez votre poids de corps.");
+    const date = String(s.date || "").trim();
+    if (date !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw ErreurSaisie("date", "Date de la séance : AAAA-MM-JJ.");
+    const leg = {};
+    if (type !== "") leg.type_serie = type;
+    leg.lest_kg = lest;
+    leg.reps_annoncees = reps;
+    if (semaine !== null) leg.semaine = semaine;
+    if (seance !== null) leg.seance = seance;
+    if (date !== "") leg.date = date;
+    const a = { pdc: pdc, date: null, mouvement: mouvement, fil_cm: null, fixe: null, echelle: null, sortie: null };
+    return { a: a, leg: leg, brut: "" };
+  }
+
+  // date de la seance proposee d'apres le nom de l'appareil photo (VID_AAAAMMJJ_...)
+  function dateDuNom(nom) {
+    const m = /(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})_\d{6}/.exec(String(nom || ""));
+    return m ? m[1] + "-" + m[2] + "-" + m[3] : "";
+  }
+
+  // fps tel que le rend cv2.CAP_PROP_FPS (FFmpeg) pour un MP4 : avg_frame_rate =
+  // echelle de temps x nombre d'echantillons / somme des durees de stts, de la
+  // piste video. Python divise deux entiers exacts : le double est le meme.
+  function fpsCv2(buf) {
+    const dv = new DataView(buf);
+    const moov = chercher(dv, 0, buf.byteLength, ["moov"]);
+    if (!moov) throw new Error("fps : boite moov introuvable");
+    let trak = null;
+    for (const t of tousLes(dv, moov.corps, moov.bout, "trak")) {
+      const h = chercher(dv, t.corps, t.bout, ["mdia", "hdlr"]);
+      if (h && T(dv, h.corps + 8) === "vide") { trak = t; break; }
+    }
+    if (!trak) throw new Error("fps : aucune piste video");
+    const mdhd = chercher(dv, trak.corps, trak.bout, ["mdia", "mdhd"]);
+    const echelle = dv.getUint8(mdhd.corps) === 1 ? dv.getUint32(mdhd.corps + 20) : dv.getUint32(mdhd.corps + 12);
+    const stts = chercher(dv, trak.corps, trak.bout, ["mdia", "minf", "stbl", "stts"]);
+    if (!stts) throw new Error("fps : table stts introuvable");
+    let n = 0, somme = 0;
+    const k = dv.getUint32(stts.corps + 4);
+    for (let i = 0; i < k; i++) {
+      const c = dv.getUint32(stts.corps + 8 + 8 * i), d = dv.getUint32(stts.corps + 12 + 8 * i);
+      n += c; somme += c * d;
+    }
+    const fps = (n > 0 && somme > 0) ? (echelle * n) / somme : 0;
+    return { fps: fps, echelle_temps: echelle, echantillons: n, somme_durees: somme };
+  }
+
+  function copie(x) { return JSON.parse(JSON.stringify(x)); }
+
+  // UNE serie : la seance d'une seule video, par le vrai chemin de SE (seanceComplete :
+  // suivi, analyser, champs de seance, serie, elagage). tout = [[x, y, h, aire], ...]
+  // par image (rendu de marques), fps = celui de cv2. Rend { sortie, nom } ; rien
+  // n'est ecrit.
+  function analyserSerie(o) {
+    const tout = o.tout.map(function (bl) { return bl.map(function (t) { return { x: t[0], y: t[1], h: t[2], aire: t[3] }; }); });
+    const fps = o.fps, e = o.entrees;
+    let lu = 0;
+    const lire = function (v) {
+      if (v !== o.nom) throw SE.systemExit("video illisible");
+      lu++;
+      return { tout: tout, fps: fps };
+    };
+    const r = SE.seanceComplete({
+      videos: [o.nom], a: copie(e.a), cal: copie(o.cal), analyseLe: o.analyseLe,
+      dossierDe: function () { return "/telephone"; },
+      legende: function () { return { leg: copie(e.leg), brut: e.brut }; },
+      analyser: SE.faireAnalyser({ suivre: SE.faireSuivre({ lire: lire }), cal: copie(o.cal) }),
+    });
+    if (lu !== 1) throw new Error("serie : la video a ete lue " + lu + " fois");
+    return { sortie: r.sortie, nom: r.nom };
+  }
+
+  // ce que la page affiche, tire de la sortie de SE sans rien recalculer
+  function vue(sortie) {
+    const s = sortie.series[0];
+    const non = (s.alertes || []).filter(function (a) { return a.indexOf("NON ANALYSEE : ") === 0; });
+    return {
+      analysee: non.length === 0,
+      raison: non.length ? non[0].slice("NON ANALYSEE : ".length) : null,
+      mouvement: s.mouvement, type_serie: s.type_serie, lest_kg: s.lest_kg, charge_systeme_kg: s.charge_systeme_kg,
+      reps_annoncees: s.reps_annoncees, nb_reps: s.resume && s.resume.nb_reps !== undefined ? s.resume.nb_reps : 0,
+      perte_v_moy_pct: s.resume ? (s.resume.perte_v_moy_pct === undefined ? null : s.resume.perte_v_moy_pct) : null,
+      hauteur_depuis: s.mesure ? (s.mesure.reference ? "suspension" : "point bas") : null,
+      reps: (s.reps || []).map(function (r) {
+        return { rep: r.rep, hauteur_cm: r.hauteur_cm === undefined ? null : r.hauteur_cm, course_cm: r.course_cm,
+          vitesse_moy_ms: r.vitesse_moy_ms, vitesse_pic_ms: r.vitesse_pic_ms };
+      }),
+      alertes: (s.alertes || []).filter(function (a) { return a.indexOf("NON ANALYSEE : ") !== 0; }),
+      px_par_cm: s.mesure ? s.mesure.px_par_cm : null, taux_detection: s.mesure ? s.mesure.taux_detection : null,
+      analyse_le: s.mesure ? s.mesure.analyse_le : null,
+    };
+  }
+
+  globalThis.S31 = {
+    lireSaisie: lireSaisie, dateDuNom: dateDuNom, fpsCv2: fpsCv2, analyserSerie: analyserSerie, vue: vue,
+    MOUVEMENTS: MOUVEMENTS, TYPES: TYPES,
+  };
+})();
+// <<< BLOC SERIE31 - FIN >>>
+</script>
+<script>
+/* ==================== page : decodage, affichage (lot 31) ==================== */
+(function () {
+'use strict';
+const PAGE = {"version":"lot 31","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977","SG_sha256":"b7cc72eb89132dabc840f8facac2cb62bacce549dca49c38b2ab676b86c188c8","FP_sha256":"7cd8ef3b2b5b83b6cb88132573246d8118f4db7d1bf8dbca020d9a64962b103c","MS_sha256":"76246a98364cfe889aa365b38698a63cc48a75d4d4521cf1b3e6be9e9944bbec","RS_sha256":"06a0edc09ef36f896c15a8d330550aead277a9eb6c20d24e0d0fa159f6839383","RD_sha256":"b1439ef827260c168a31a861d24c6a21c9acf0d9de8946f74da8f6b2e32668e7","SE_sha256":"82a74ce373e0280baddef7caffa3b181c9e87a88d7b23023dcb45084e518bedf","S31_sha256":"ad332d5ea6d41a4dca929b685b8fccd4bd3b578802e6a732e2caeae650df7e6d"};
+const CAL = JSON.parse(document.getElementById('calibration').textContent);
+const K = 1;                                  // definitif depuis le lot 15
+const CHAMPS = ['mouvement', 'type_serie', 'lest_kg', 'reps_annoncees', 'semaine', 'seance', 'date', 'pdc'];
+const $ = (i) => document.getElementById(i);
+const pause = () => new Promise((r) => setTimeout(r, 0));
+let fichier = null, blobUrl = null, nomControle = '', masquee = 0, enCours = false;
+
+class Echec extends Error { constructor(titre, quoi, faire, tech) { super(titre); this.titre = titre; this.quoi = quoi; this.faire = faire; this.tech = tech || ''; } }
+
+function etat(t) { $('etat').textContent = t; }
+function barre(p) { document.querySelector('.barre>div').style.width = (100 * p).toFixed(1) + '%'; }
+function cacher() { for (const i of ['erreur', 'non', 'res', 'controle']) $(i).style.display = 'none'; for (const c of CHAMPS) $(c).classList.remove('faux'); }
+function montrerErreur(e) {
+  const x = e instanceof Echec ? e : new Echec('Erreur imprévue', "L'analyse s'est arrêtée sur une erreur que la page ne prévoyait pas.",
+    "Faites une capture d'écran de ce cadre et joignez-la à la conversation.", String(e && (e.stack || e.message) || e));
+  $('err-titre').textContent = x.titre; $('err-quoi').textContent = x.quoi; $('err-faire').textContent = x.faire;
+  $('err-tech').textContent = x.tech ? 'Détail technique : ' + x.tech : '';
+  $('erreur').style.display = 'grid'; $('erreur').scrollIntoView({ block: 'center' });
+  etat('Arrêté : voir le cadre rouge ci-dessous.');
+}
+const virgule = (v, d) => (v === null || v === undefined || Number.isNaN(v)) ? '—' : v.toFixed(d).replace('.', ',').replace('-', '−');
+
+document.addEventListener('visibilitychange', () => { if (enCours && document.hidden) masquee++; });
+$('fichier').addEventListener('change', (e) => {
+  fichier = e.target.files[0] || null;
+  $('go').disabled = !fichier;
+  cacher();
+  if (fichier && !$('date').value) $('date').value = S31.dateDuNom(fichier.name);
+  etat(fichier ? 'Prêt : ' + fichier.name + ' (' + (fichier.size / 1048576).toFixed(1) + ' Mo).' : 'En attente de la vidéo.');
+});
+$('go').addEventListener('click', async () => {
+  cacher(); barre(0);
+  // 1. la saisie d'abord : une faute se corrige avant de lancer quatre minutes de calcul
+  const saisie = {}; for (const c of CHAMPS) saisie[c] = $(c).value;
+  let entrees;
+  try { entrees = S31.lireSaisie(saisie); }
+  catch (e) {
+    if (e && e.saisie) { $(e.champ).classList.add('faux'); $(e.champ).focus(); montrerErreur(new Echec('Saisie à corriger', e.message, 'Corrigez le champ encadré en rouge, puis relancez.')); return; }
+    montrerErreur(e); return;
+  }
+  const analyseLe = SE.dateDuJour(new Date());   // la date du jour, prise UNE fois : une entree
+  $('go').disabled = true; $('fichier').disabled = true;
+  let verrou = null;
+  try { if (navigator.wakeLock) verrou = await navigator.wakeLock.request('screen'); } catch (e) { verrou = null; }
+  enCours = true; masquee = 0;
+  try { await analyser(entrees, analyseLe, saisie); }
+  catch (e) { montrerErreur(e); }
+  enCours = false;
+  try { if (verrou) await verrou.release(); } catch (e) {}
+  $('go').disabled = false; $('fichier').disabled = false;
+});
+$('dl').addEventListener('click', () => {
+  const a = document.createElement('a'); a.href = blobUrl; a.download = nomControle;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+function infoImage(f) {
+  const cs = f.colorSpace ? (f.colorSpace.toJSON ? f.colorSpace.toJSON() : { primaries: f.colorSpace.primaries, transfer: f.colorSpace.transfer, matrix: f.colorSpace.matrix, fullRange: f.colorSpace.fullRange }) : null;
+  return { format: f.format, codedWidth: f.codedWidth, codedHeight: f.codedHeight, displayWidth: f.displayWidth, displayHeight: f.displayHeight, colorSpace: cs };
+}
+
+// decodage et taches : la boucle de la page du lot 29 (elle-meme celle du prototype)
+async function decoder() {
+  if (!window.isSecureContext) throw new Echec('Page ouverte sans https', "Le décodeur vidéo du navigateur n'est disponible que sur une adresse sécurisée.",
+    "Ouvrez la page par son adresse https://…github.io/… (celle donnée dans la passation).");
+  if (!('VideoDecoder' in window)) throw new Echec('Navigateur sans décodeur vidéo (WebCodecs)', "Ce navigateur ne propose pas VideoDecoder.",
+    "Ouvrez la page dans Chrome pour Android, à jour (Play Store → Chrome → Mettre à jour).");
+  etat('Lecture du fichier…');
+  let buf, m, fc;
+  try { buf = await fichier.arrayBuffer(); }
+  catch (e) { throw new Echec('Fichier illisible', "Le téléphone n'a pas pu lire le fichier choisi.", 'Choisissez-le à nouveau, depuis la galerie ou le dossier DCIM.', e.message); }
+  try { m = demuxerMaison(buf); fc = S31.fpsCv2(buf); }
+  catch (e) { throw new Echec("Ce fichier n'a pas pu être lu comme une vidéo MP4", "La page lit les MP4 tels que les produit l'appareil photo.",
+    "Choisissez la vidéo d'origine (VID_…mp4), pas une copie convertie ou envoyée par une messagerie.", e.message); }
+  const rot = m.rot;
+  const dispoW = (rot === 90 || rot === 270) ? m.hauteur : m.largeur;
+  const dispoH = (rot === 90 || rot === 270) ? m.largeur : m.hauteur;
+  const n = m.ech.length;
+  const dureeS = n > 1 ? (m.ech[n - 1].ts - m.ech[0].ts) / 1e6 : 0;
+  const cfg = { codec: m.codec, codedWidth: m.largeur, codedHeight: m.hauteur };
+  if (m.desc) cfg.description = m.desc;
+  let soutien;
+  try { soutien = (await VideoDecoder.isConfigSupported(cfg)).supported; }
+  catch (e) { throw new Echec('Configuration du décodeur refusée', 'Le navigateur a rejeté les paramètres de la vidéo.', "Faites une capture d'écran de ce cadre.", e.message); }
+  if (!soutien) throw new Echec('Ce navigateur ne sait pas décoder cette vidéo', 'Codec ' + m.codec + ' (' + m.nomEnt + '), ' + m.largeur + ' × ' + m.hauteur + ' : refusé par WebCodecs.',
+    'Ouvrez la page dans Chrome pour Android à jour. Un navigateur sans codecs H.264 (Chromium « libre ») ne peut pas faire cette analyse.');
+
+  const cw = Math.max(1, Math.round(dispoW / K)), ch = Math.max(1, Math.round(dispoH / K));
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+  const cx = cv.getContext('2d', { willReadFrequently: true, alpha: false });
+  const poser = (ctx, ech) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(1 / ech, 1 / ech);
+    if (rot === 90) { ctx.translate(dispoW, 0); ctx.rotate(Math.PI / 2); }
+    else if (rot === 180) { ctx.translate(dispoW, dispoH); ctx.rotate(Math.PI); }
+    else if (rot === 270) { ctx.translate(0, dispoH); ctx.rotate(-Math.PI / 2); }
+  };
+  const etatM = nouvelEtat(cw, ch);
+  const aireMin = SEUILS.AIRE_MIN / (K * K);
+  const tout = [], tus = [];
+  let image0 = null, attente = [], fini = false, erreurDec = null, apresBoucle = 0;
+  const dec = new VideoDecoder({ output: (f) => attente.push(f), error: (e) => { erreurDec = e; } });
+  dec.configure(cfg);
+  const t1 = performance.now();
+  let i = 0;
+  etat('Décodage : 0 / ' + n + ' images');
+  while (i < n || attente.length || !fini) {
+    if (erreurDec) throw new Echec('Le décodage a échoué en cours de route', "Le décodeur du téléphone s'est arrêté à l'image " + tout.length + ' sur ' + n + '.',
+      "Fermez les autres applications, rechargez la page et relancez. Si ça recommence, faites une capture d'écran.", erreurDec.message);
+    while (i < n && attente.length < 8 && dec.decodeQueueSize < 12) {
+      const s = m.ech[i];
+      dec.decode(new EncodedVideoChunk({ type: s.cle ? 'key' : 'delta', timestamp: s.ts, data: new Uint8Array(buf, s.debut, s.taille) }));
+      i++;
+    }
+    if (i >= n && !fini && attente.length <= 2) { fini = true; try { await dec.flush(); } catch (e) { if (!erreurDec) erreurDec = e; } }
+    if (!attente.length) { if (fini) break; await pause(); continue; }
+    const f = attente.shift();
+    if (!image0) image0 = infoImage(f);
+    poser(cx, K);
+    cx.drawImage(f, 0, 0);
+    tus.push(f.timestamp);
+    f.close();
+    const px = cx.getImageData(0, 0, cw, ch).data;
+    tout.push(marques(px, cw, ch, 4, etatM, aireMin).map((b) => [b.x, b.y, b.h, b.aire]));
+    if (tout.length % 5 === 0) {
+      const ms = (performance.now() - t1) / tout.length, reste = Math.max(0, (n - tout.length) * ms / 1000);
+      barre(tout.length / n);
+      etat('Décodage : ' + tout.length + ' / ' + n + ' images — encore ~' + (reste >= 60 ? Math.floor(reste / 60) + ' min ' : '') + Math.round(reste % 60) + ' s');
+      await pause();
+    }
+  }
+  if (erreurDec) throw new Echec('Le décodage a échoué en fin de vidéo', 'Le décodeur a signalé une erreur après ' + tout.length + ' images sur ' + n + '.',
+    "Relancez l'analyse ; si ça recommence, faites une capture d'écran.", erreurDec.message);
+  try { dec.close(); } catch (e) {}
+  if (attente.length) { apresBoucle = attente.length; for (const f of attente) f.close(); attente = []; }
+  barre(1);
+  return { tout, tus, image0, n, apresBoucle, fc, fpsPage: dureeS > 0 ? (n - 1) / dureeS : 0, rot, cw, ch, m,
+    duree_s: Math.round((performance.now() - t1) / 100) / 10 };
+}
+
+async function analyser(entrees, analyseLe, saisie) {
+  const d = await decoder();
+  if (d.tout.length !== d.n) throw new Echec('Des images manquent', 'Le décodeur a rendu ' + d.tout.length + ' images sur ' + d.n + ' : la mesure serait faussée.',
+    "Relancez l'analyse ; si ça recommence, faites une capture d'écran.", 'images rendues après la boucle : ' + d.apresBoucle);
+  etat('Calcul des reps…'); await pause();
+  const r = S31.analyserSerie({ nom: fichier.name, tout: d.tout, fps: d.fc.fps, entrees, analyseLe, cal: CAL });
+  const v = S31.vue(r.sortie);
+  afficher(v);
+  const controle = {
+    format: 'serie-telephone, lot 31', video: fichier.name, taille_octets: fichier.size,
+    saisie, entrees, analyseLe,
+    fps: d.fc, fps_page: d.fpsPage, images_annoncees: d.n, images_mesurees: d.tout.length, images_rendues_apres_la_boucle: d.apresBoucle,
+    rotation: { tkhd: d.m.rot, appliquee: d.rot, sens: d.rot === 90 ? 'horaire' : d.rot === 270 ? 'antihoraire' : d.rot === 180 ? 'demi-tour' : 'aucune' },
+    canevas: { largeur: d.cw, hauteur: d.ch }, codec: d.m.codec, image0: d.image0,
+    marques: { k: K, aireMin: SEUILS.AIRE_MIN / (K * K), stride: 4 },
+    vue: v, sortie: r.sortie, nom_seance: r.nom,
+    tout: d.tout, t_us: d.tus,
+    navigateur: navigator.userAgent, page: PAGE, duree_s: d.duree_s, page_masquee_pendant_la_mesure: masquee,
+  };
+  const texte = JSON.stringify(controle);
+  if (blobUrl) URL.revokeObjectURL(blobUrl);
+  blobUrl = URL.createObjectURL(new Blob([texte], { type: 'application/json' }));
+  nomControle = fichier.name.replace(/\.[^.]*$/, '') + '.serie31.json';
+  $('controle').style.display = 'grid';
+  etat('Terminé : ' + d.tout.length + ' images en ' + Math.round(d.duree_s) + ' s.');
+}
+
+function afficher(v) {
+  if (!v.analysee) {
+    $('non-raison').textContent = 'Raison : ' + v.raison + '.';
+    $('non-faire').textContent = "Vérifiez que la marque rose de la ceinture et les deux marques du fil sont bien dans l'image, du début à la fin, puis refilmez. Si la vidéo vous semble bonne, téléchargez le fichier de contrôle et joignez-le à la conversation.";
+    $('non').style.display = 'grid'; $('non').scrollIntoView({ block: 'start' });
+    return;
+  }
+  $('res-titre').textContent = (v.mouvement === 'dips' ? 'Dips' : 'Tractions') + (v.lest_kg !== null ? ' · ' + String(v.lest_kg).replace('.', ',') + ' kg' : '') + (v.type_serie ? ' · ' + v.type_serie : '');
+  $('r-nb').textContent = String(v.nb_reps);
+  $('r-nb-sur').textContent = v.reps_annoncees ? 'reps sur ' + v.reps_annoncees + ' annoncées' : 'reps';
+  $('r-perte').textContent = v.perte_v_moy_pct === null ? '—' : virgule(v.perte_v_moy_pct, 1) + ' %';
+  const ul = $('alertes'); ul.textContent = '';
+  if (!v.alertes.length) { ul.className = 'aucune'; const li = document.createElement('li'); li.textContent = 'Aucune alerte'; ul.appendChild(li); }
+  else { ul.className = 'av'; for (const a of v.alertes) { const li = document.createElement('li'); li.textContent = a; ul.appendChild(li); } }
+  const tb = $('r-reps'); tb.textContent = '';
+  for (const r of v.reps) {
+    const tr = document.createElement('tr');
+    for (const t of [String(r.rep), virgule(r.hauteur_cm, 1), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)]) { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); }
+    tb.appendChild(tr);
+  }
+  $('r-note').textContent = 'Hauteur mesurée depuis ' + (v.hauteur_depuis === 'suspension' ? 'la suspension de départ' : 'le point le plus bas') + '. Charge système ' + virgule(v.charge_systeme_kg, 1) + ' kg · échelle ' + virgule(v.px_par_cm, 3) + ' px/cm · marque suivie sur ' + Math.round(100 * v.taux_detection) + ' % des images · analysé le ' + v.analyse_le + '.';
+  $('res').style.display = 'grid'; $('res').scrollIntoView({ block: 'start' });
+}
+})();
+</script>
+</body>
+</html>
