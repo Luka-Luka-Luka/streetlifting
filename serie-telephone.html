@@ -44,12 +44,14 @@ th:first-child,td:first-child{text-align:left}
 #alertes.aucune{background:#eefbee;border:2px solid var(--ok);color:var(--ok);font-weight:700}
 #alertes.av{background:var(--av-bg);border:2px solid var(--av);color:#000}
 #alertes.av li::before{content:"⚠ ";color:var(--av);font-weight:700}
+#alertes li.info{font-weight:400;color:inherit}
+#alertes li.info::before{content:"ℹ ";color:inherit;font-weight:400}
 </style>
 </head>
 <body>
 <main>
 <header><h1>Analyse d'une série</h1>
-<p class="sous">Outil v34 · lot 33 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
+<p class="sous">Outil v34 · lot 37 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
 
 <section class="carte"><h2>1. La vidéo</h2>
 <input type="file" id="fichier" accept="video/mp4,video/*" aria-label="Vidéo de la série">
@@ -1783,8 +1785,10 @@ function demuxerMaison(buf) {
         if (bas[i] > hi) hi = bas[i];
         if (bas[i] < lo) lo = bas[i];
       }
-      const d = diviser(hi - lo, pxCm);
-      if (d > 5.0) al.push(chaineSuspension(d));
+      // LOT 37 : plus d'alerte ici. Le point bas descend reellement au fil d'une serie
+      // (epaules qui se relachent : +2 a +6 cm mesures le 29/09 et le 01/10) ; ce n'est
+      // pas un defaut de cadrage. La valeur devient une information (variationPointBas),
+      // et le cadrage est controle par les marques fixes (SE, cadrageFixes).
     }
 
     // 2. video coupee pendant une rep
@@ -1798,6 +1802,23 @@ function demuxerMaison(buf) {
       if (monte > 20) al.push(chaineCoupure(monte));
     }
     return al;
+  }
+
+  // LOT 37 : ecart, en cm, entre le point bas le plus haut et le plus bas des
+  // suspensions entre les reps (meme calcul que l'ancienne alerte 1). null si moins de
+  // deux suspensions.
+  function variationPointBas(yPx, pxCm, fps, reps) {
+    exigerSG();
+    const ys = globalThis.SG.savgolFilter(yPx, fps < 45 ? 7 : 13, 2);
+    const n = ys.length, bas = [];
+    let prec = 0;
+    for (const r of reps || []) {
+      const b = bornes(n, prec, r["image_debut"] + 1);
+      if (b.fin > b.deb) bas.push(maxTranche(ys, b.deb, b.fin));
+      prec = r["image_fin_descente"];
+    }
+    if (bas.length < 2) return null;
+    return (Math.max.apply(null, bas) - Math.min.apply(null, bas)) / pxCm;
   }
 
   // Division par px_cm reproduisant les erreurs de Python : un px_cm nul leve
@@ -1816,6 +1837,7 @@ function demuxerMaison(buf) {
   }
 
   globalThis.RS = {
+    variationPointBas: variationPointBas,
     resume: resume,
     controles: controles,
     moyenne: moyenne,
@@ -2098,7 +2120,12 @@ function demuxerMaison(buf) {
 (function () {
   "use strict";
 
-  const VERSION_SEANCE = "lot 27";
+  const VERSION_SEANCE = "lot 37";
+  const SEUIL_CADRAGE_CM = 1.0;   // lot 37 : derive commune des marques fixes, mesuree <= 0,4 cm
+  // lot 37 : une rep de FIN de serie dont le sommet est a plus de 8 cm sous la mediane des
+  // reps d'avant est une tentative ratee (bloquee en route), non comptee. 01/10 : 31,5 cm
+  // contre 44,4 ; la plus forte baisse de fatigue mesuree sur une rep reussie : 4,2 cm.
+  const ECART_TENTATIVE_CM = 8.0;
   const TYPE_REFERENCE = "suspension avant la 1re rep";
   const ALERTE_SANS_SUSPENSION =
     "pas de suspension stable avant la 1re rep : hauteur mesuree depuis le point le plus bas";
@@ -2336,6 +2363,26 @@ function demuxerMaison(buf) {
   // Sortie : NOUVEL objet = base + video, mesure, alertes, resume, reps,
   // observations_manuelles, dans l'ordre Python. Les profils ne sont PAS encore
   // elagues (Python elague apres la boucle des series : elaguerProfils).
+  // hauteur d'une rep : depuis la suspension de depart si elle existe, sinon depuis le point bas
+  function hauteurRep(r) { return r.hauteur_cm !== undefined && r.hauteur_cm !== null ? r.hauteur_cm : r.hauteur_sommet_cm; }
+  // lot 37 : marque en place les reps de fin de serie nettement sous les precedentes.
+  // On remonte depuis la derniere rep ; on s'arrete a la premiere qui n'est pas ratee.
+  // Il faut au moins deux reps avant la rep jugee. Rend les reps marquees, dans l'ordre.
+  function marquerTentatives(reps) {
+    const out = [];
+    if (!reps || reps.length < 3) return out;
+    for (let k = reps.length - 1; k >= 2; k--) {
+      const avant = reps.slice(0, k).map(hauteurRep).sort(function (a, b) { return a - b; });
+      const m = avant.length >> 1, med = avant.length % 2 ? avant[m] : (avant[m - 1] + avant[m]) / 2;
+      const ecart = med - hauteurRep(reps[k]);
+      if (!(ecart > ECART_TENTATIVE_CM)) break;
+      reps[k].tentative_ratee = true;
+      reps[k].ecart_tentative_cm = ecart;
+      out.unshift(reps[k]);
+    }
+    return out;
+  }
+
   function assemblerSerie(e) {
     exiger("MS", "mesurer (lot 18)");
     exiger("RS", "resume (lot 19)");
@@ -2347,10 +2394,20 @@ function demuxerMaison(buf) {
     const al = e.al.slice();
     const reps = e.reps === null || e.reps === undefined ? e.reps : Array.from(e.reps, copierRep);
 
+    // LOT 37 : tentatives ratees de fin de serie, signalees et non comptees
+    const tent = marquerTentatives(reps);
+    const comptees = tent.length ? reps.filter(function (r) { return !r.tentative_ratee; }) : reps;
+    for (const r of tent) {
+      al.push("rep " + r.rep + " : tentative ratee (sommet " + RS.formater(hauteurRep(r), 1).replace(".", ",") +
+        " cm, " + RS.formater(r.ecart_tentative_cm, 1).replace(".", ",") + " cm sous les precedentes), non comptee");
+      delete r.ecart_tentative_cm;
+    }
     // 916-917 : `if base["reps_annoncees"] and len(reps) != base["reps_annoncees"]`
+    // (lot 37 : sur les reps COMPTEES ; la saisie est celle des reps reussies)
     const annoncees = cle(base, "reps_annoncees");
-    if (pyBool(annoncees) && longueur(reps) !== annoncees) {
-      al.push(pourcentD(longueur(reps)) + " reps detectees pour " + pourcentD(annoncees) + " annoncees");
+    if (pyBool(annoncees) && longueur(comptees) !== annoncees) {
+      al.push(pourcentD(longueur(comptees)) + " reps " + (tent.length ? "comptees" : "detectees") +
+        " pour " + pourcentD(annoncees) + " annoncees");
     }
     // 918-919
     if (pyBool(prendre(leg, "type_deduit", null))) al.push(ALERTE_TYPE_DEDUIT);
@@ -2379,8 +2436,9 @@ function demuxerMaison(buf) {
     mesure.analyse_le = e.analyseLe;
     mesure.reference = e.reference === null || e.reference === undefined ? null : Object.assign({}, e.reference);
     // 932 : dict(resume(reps), hauteur_mini_cm=...)
-    const res = Object.assign({}, globalThis.RS.resume(reps));
-    res.hauteur_mini_cm = hauteurMini(reps);
+    const res = Object.assign({}, globalThis.RS.resume(comptees));
+    res.hauteur_mini_cm = hauteurMini(comptees);
+    if (tent.length) res.tentatives_ratees = tent.length;
     // base.update(...) : cles neuves a la suite, cles deja la gardent leur place
     const sortie = Object.assign({}, base);
     sortie.video = video;
@@ -3094,10 +3152,26 @@ function demuxerMaison(buf) {
     const m = ligne.m, px = p.px;
     const reps0 = MS.mesurer(m.y_px, m.fps, px, p.base.charge_systeme_kg).reps;
     const al = p.al.concat(RS.controles(m.y_px, px, m.fps, reps0));
+    // LOT 37 : cadrage controle par les marques fixes (voir cadrageFixes)
+    const cad = m.cadrage || null, deriveCm = cad && cad.derive_px !== null ? cad.derive_px / px : null;
+    if (deriveCm !== null && deriveCm > SEUIL_CADRAGE_CM) {
+      al.push("cadrage : les marques fixes ont bouge de " + RS.formater(deriveCm, 1).replace(".", ",") +
+        " cm pendant la video (telephone deplace) : hauteurs faussees, refaire la mesure");
+    }
     const ref = RD.referenceDepart(m.y_px, m.fps, px, reps0);
     const u = usageReference(ref, reps0, px);
     const s = assemblerSerie({ base: p.base, leg: ligne.leg, ligne: { n: ligne.n, video: ligne.video }, m: m,
       px: px, src: p.src, al: al.concat(u.alertes), reps: u.reps, reference: u.reference, analyseLe: analyseLe });
+    if (s.mesure) {
+      s.mesure.cadrage_cm = deriveCm === null ? null : MS.arrondir(deriveCm, 1);
+      const vpb = RS.variationPointBas(m.y_px, px, m.fps, reps0);
+      s.mesure.variation_point_bas_cm = vpb === null ? null : MS.arrondir(vpb, 1);
+      const infos = [];
+      if (deriveCm !== null && deriveCm <= SEUIL_CADRAGE_CM) infos.push("cadrage stable (marques fixes immobiles a " + RS.formater(deriveCm, 1).replace(".", ",") + " cm pres)");
+      if (vpb !== null) infos.push("point bas : varie de " + RS.formater(vpb, 1).replace(".", ",") +
+        " cm entre les reps (epaules qui se relachent au fil de la serie, normal)");
+      s.infos = infos;
+    }
     return elaguerProfils(s);
   }
 
@@ -3333,7 +3407,8 @@ function demuxerMaison(buf) {
     if (pyBool(pxCm)) pxCm = pxCm * fp;
     // 753-754
     return { y_px: yPx, fps: fps, taux: taux, nb: nb, px_cm: pxCm, d_px: dPx,
-      px_cm_fil: pxCmFil, facteur_profondeur: fp, fixes: fixes };
+      px_cm_fil: pxCmFil, facteur_profondeur: fp, fixes: fixes,
+      cadrage: A_PROPRE.call(s, "cadrage") ? s.cadrage : null };
   }
 
   // Le rappel analyser(v, fil) de seanceComplete, fait en JS :
@@ -3470,59 +3545,118 @@ function demuxerMaison(buf) {
     }
   }
 
-  // l. 236-276 : suivre_marque(tout, fixes, saut_max=60.0) -> [y, taux, aire]
-  // ou leve SE.systemExit.
+  // l. 236-276 : suivre_marque(tout, fixes) -> [y, taux, aire] ou leve SE.systemExit.
+  //
+  // LOT 37 (05/10/2026) — FIN DE LA PARITE AVEC analyse_serie.py SUR CE POINT.
+  // La poursuite gloutonne du Python (une graine, puis la tache la plus proche image par
+  // image) se faisait voler la marque en plein soleil : taches parasites de peau ou de
+  // short pres de la ceinture (29/09, VID_165221 : sommets manques de 15 cm) ou graine
+  // posee sur une autre tache (29/09, VID_163451 : 1re rep perdue, suspension de depart
+  // prise apres elle). Ici on cherche, sur TOUTE la video, le chemin de taches le moins
+  // couteux (programmation dynamique) :
+  //   cout d'un pas = |dy|/g + 0,5*|dx|/g + 20*|ln(aire/aire_prec)| + 100 par image sautee
+  // (g = ecart en images, 12 au plus). Une marque qui garde sa taille et avance sans
+  // a-coups coute peu ; sauter d'une tache a une autre de taille differente coute cher.
+  // Valeurs stables de 80 a 200 pour le saut et de 20 a 30 pour l'aire (essais du lot 37).
+  // Sur les videos propres (01/10, 04/10) le chemin est EXACTEMENT celui du Python :
+  // hauteurs inchangees au dixieme.
+  const PD = { AIRE_MIN: 100, H_MAX: 65, SAUT: 60.0, G: 12, MANQUE: 100, KA: 20, KX: 0.5 };
   function suivreMarque(tout, fixes) {
-    function mobile(bl) {
-      return bl.filter(function (b) {
-        return b.h <= 65 && !fixes.some(function (f) {
+    const n = tout.length;
+    const cand = new Array(n);
+    let total = 0;
+    for (let i = 0; i < n; i++) {
+      cand[i] = tout[i].filter(function (b) {
+        return b.h <= PD.H_MAX && b.aire >= PD.AIRE_MIN && !fixes.some(function (f) {
           return Math.abs(b.y - f.y) < 14 && Math.abs(b.x - f.x) < 14;
         });
       });
+      total += cand[i].length;
     }
-    let depart = -1;
-    for (let i = 0; i < tout.length; i++) if (mobile(tout[i]).length) { depart = i; break; }
-    if (depart < 0) throw systemExit(MSG_AUCUNE_MOBILE);
-    const n = tout.length;
-
-    function piste(graine) {
-      let cur = graine, aire = graine.aire;
-      const y = new Array(n).fill(NaN);
-      y[depart] = cur.y;
-      for (let i = depart + 1; i < n; i++) {
-        const cands = mobile(tout[i]).filter(function (b) {
-          return Math.abs(b.y - cur.y) < 60.0 && 0.4 * aire < b.aire && b.aire < 2.5 * aire;
-        });
-        if (!cands.length) continue;
-        const avant = cur;
-        cur = minCle(cands, function (b) { return Math.abs(b.y - avant.y) - 0.02 * b.aire; });
-        aire = 0.9 * aire + 0.1 * cur.aire;
-        y[i] = cur.y;
+    if (!total) throw systemExit(MSG_AUCUNE_MOBILE);
+    // cout[i][a] : meilleur cout d'un chemin qui finit sur la tache a de l'image i ;
+    // un chemin peut commencer a n'importe quelle image (les images d'avant comptent
+    // comme sautees) et finir a n'importe quelle image (idem pour celles d'apres).
+    const cout = new Array(n), prec = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const c = cand[i], ci = new Float64Array(c.length), pi = new Array(c.length);
+      for (let a = 0; a < c.length; a++) {
+        const b = c[a];
+        let best = PD.MANQUE * i, arg = null;
+        for (let g = 1; g <= PD.G && i - g >= 0; g++) {
+          const cp = cand[i - g], kp = cout[i - g];
+          for (let p = 0; p < cp.length; p++) {
+            const q = cp[p], dy = Math.abs(b.y - q.y);
+            if (dy >= PD.SAUT * g) continue;
+            const v = kp[p] + PD.MANQUE * (g - 1) + dy / g + PD.KX * Math.abs(b.x - q.x) / g +
+              PD.KA * Math.abs(Math.log(b.aire / q.aire));
+            if (v < best) { best = v; arg = [i - g, p]; }
+          }
+        }
+        ci[a] = best; pi[a] = arg;
       }
-      const vus = y.map(function (v) { return v === v; });
-      let nvus = 0, hi = -Infinity, lo = Infinity;
-      for (const v of y) if (v === v) { nvus++; if (v > hi) hi = v; if (v < lo) lo = v; }
-      const amp = nvus > 5 ? hi - lo : 0.0;              // np.nanmax - np.nanmin
-      return { y: y, vus: vus, nvus: nvus, amp: amp };
+      cout[i] = ci; prec[i] = pi;
     }
+    let fin = null, bestF = Infinity;
+    for (let i = 0; i < n; i++) for (let a = 0; a < cand[i].length; a++) {
+      const v = cout[i][a] + PD.MANQUE * (n - 1 - i);
+      if (v < bestF) { bestF = v; fin = [i, a]; }
+    }
+    const y = new Array(n).fill(NaN), aires = [];
+    for (let k = fin; k; k = prec[k[0]][k[1]]) { const b = cand[k[0]][k[1]]; y[k[0]] = b.y; aires.push(b.aire); }
+    const vus = y.map(function (v) { return v === v; });
+    let nvus = 0;
+    for (const v of vus) if (v) nvus++;
+    if (nvus < 0.5 * n) throw systemExit(MSG_PERDUE);
+    interpTrous(y, vus);
+    aires.sort(function (a, b) { return a - b; });
+    return [y, nvus / n, aires[aires.length >> 1]];   // aire : mediane du chemin
+  }
 
-    // sorted(mobile(tout[depart]), key=lambda b: -b["aire"])[:8] : stable
-    const graines = trierStable(mobile(tout[depart]), function (a, b) { return -a.aire < -b.aire; }).slice(0, 8);
-    const essais = graines.map(function (g) {
-      const p = piste(g), taux = p.nvus / n;               // vus.mean()
-      return { ok90: taux >= 0.9, amp: p.amp, taux: taux, y: p.y, vus: p.vus, nvus: p.nvus, aire: g.aire };
-    });
-    // essais.sort(key=lambda e: (e[0], e[1])) : tuples (bool, float), stable ;
-    // on garde le DERNIER (a cle egale, le dernier essai).
-    const tries = trierStable(essais, function (a, b) {
-      if (a.ok90 !== b.ok90) return !a.ok90 && b.ok90;
-      if (a.amp === b.amp) return false;
-      return a.amp < b.amp;
-    });
-    const e = tries[tries.length - 1];
-    if (e.nvus < 0.5 * e.y.length) throw systemExit(MSG_PERDUE);   // 50 % pile passe
-    interpTrous(e.y, e.vus);
-    return [e.y, e.taux, e.aire];                          // aire de la GRAINE
+  // LOT 37 — controle du cadrage par les marques fixes (remplace l'alerte « suspension
+  // variable » comme temoin du cadrage). Si le telephone bouge, TOUTES les marques fixes
+  // bougent ensemble ; une marque masquee par le corps ne bouge, elle, que seule. On prend
+  // donc, image par image, la MEDIANE du deplacement des grosses marques fixes (au moins
+  // deux), lissee par une mediane glissante de 31 images ; la derive est l'ecart entre
+  // le plus haut et le plus bas de ce deplacement commun (en x et en y, le pire des deux).
+  // Mesure du lot 37 : 0,5 a 1,8 px sur les huit videos du 29/09 au 04/10.
+  function medianeSimple(a) {
+    const s = a.slice().sort(function (p, q) { return p - q; }), m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  function cadrageFixes(tout, fixes) {
+    const gros = fixes.filter(function (f) { return f.aire >= 150; });
+    if (gros.length < 2) return { derive_px: null, marques: gros.length };
+    const dep = [[], []];
+    for (const bl of tout) {
+      const dx = [], dy = [];
+      for (const f of gros) {
+        let best = null, kb = 0;
+        for (const q of bl) {
+          if (Math.abs(q.y - f.y) < 40 && Math.abs(q.x - f.x) < 40 && q.aire >= 0.5 * f.aire && q.aire <= 2 * f.aire) {
+            const k = Math.abs(q.y - f.y) + Math.abs(q.x - f.x);
+            if (best === null || k < kb) { best = q; kb = k; }
+          }
+        }
+        if (best) { dx.push(best.x - f.x); dy.push(best.y - f.y); }
+      }
+      dep[0].push(dx.length >= 2 ? medianeSimple(dx) : null);
+      dep[1].push(dy.length >= 2 ? medianeSimple(dy) : null);
+    }
+    let pire = 0;
+    for (const d of dep) {
+      let hi = -Infinity, lo = Infinity;
+      for (let i = 0; i < d.length; i++) {
+        const w = [];
+        for (let j = Math.max(0, i - 15); j <= Math.min(d.length - 1, i + 15); j++) if (d[j] !== null) w.push(d[j]);
+        if (w.length < 8) continue;
+        const m = medianeSimple(w);
+        if (m > hi) hi = m;
+        if (m < lo) lo = m;
+      }
+      if (hi > lo && hi - lo > pire) pire = hi - lo;
+    }
+    return { derive_px: pire, marques: gros.length };
   }
 
   // blobs_video (ce qui suit la lecture) puis marques_fixes et suivre_marque,
@@ -3536,7 +3670,8 @@ function demuxerMaison(buf) {
     if (tout.length < 30) throw systemExit(MSG_TROP_COURTE);
     const fixes = marquesFixes(tout);
     const r = suivreMarque(tout, fixes);
-    return { nb: tout.length, fps: fps, fixes: fixes, y_px: r[0], taux: r[1], aire: r[2] };
+    return { nb: tout.length, fps: fps, fixes: fixes, y_px: r[0], taux: r[1], aire: r[2],
+      cadrage: cadrageFixes(tout, fixes) };
   }
 
   // Le rappel suivre(v) de faireAnalyser : lire(v) -> { tout, fps } (decodage
@@ -3840,9 +3975,10 @@ function demuxerMaison(buf) {
       hauteur_depuis: s.mesure ? (s.mesure.reference ? "suspension" : "point bas") : null,
       reps: (s.reps || []).map(function (r) {
         return { rep: r.rep, hauteur_cm: r.hauteur_cm === undefined ? null : r.hauteur_cm, course_cm: r.course_cm,
-          vitesse_moy_ms: r.vitesse_moy_ms, vitesse_pic_ms: r.vitesse_pic_ms };
+          vitesse_moy_ms: r.vitesse_moy_ms, vitesse_pic_ms: r.vitesse_pic_ms, tentative_ratee: !!r.tentative_ratee };
       }),
       alertes: (s.alertes || []).filter(function (a) { return a.indexOf("NON ANALYSEE : ") !== 0; }),
+      infos: s.infos || [],
       px_par_cm: s.mesure ? s.mesure.px_par_cm : null, taux_detection: s.mesure ? s.mesure.taux_detection : null,
       analyse_le: s.mesure ? s.mesure.analyse_le : null,
     };
@@ -3898,7 +4034,7 @@ function demuxerMaison(buf) {
 /* ==================== page : decodage, affichage (lot 31) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 33","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977","SG_sha256":"b7cc72eb89132dabc840f8facac2cb62bacce549dca49c38b2ab676b86c188c8","FP_sha256":"7cd8ef3b2b5b83b6cb88132573246d8118f4db7d1bf8dbca020d9a64962b103c","MS_sha256":"76246a98364cfe889aa365b38698a63cc48a75d4d4521cf1b3e6be9e9944bbec","RS_sha256":"06a0edc09ef36f896c15a8d330550aead277a9eb6c20d24e0d0fa159f6839383","RD_sha256":"b1439ef827260c168a31a861d24c6a21c9acf0d9de8946f74da8f6b2e32668e7","SE_sha256":"82a74ce373e0280baddef7caffa3b181c9e87a88d7b23023dcb45084e518bedf","S31_sha256":"ad332d5ea6d41a4dca929b685b8fccd4bd3b578802e6a732e2caeae650df7e6d"};
+const PAGE = {"version":"lot 37","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","noyau_sha256":"52e26b0994bcd7861af049bf46a1547653c56a3575797d663db1342b227e6ab8","demux_sha256":"d82aae893715aee1a56325eca7ff0c0de762bbec5e1c36f7904398a4976f5977","SG_sha256":"b7cc72eb89132dabc840f8facac2cb62bacce549dca49c38b2ab676b86c188c8","FP_sha256":"7cd8ef3b2b5b83b6cb88132573246d8118f4db7d1bf8dbca020d9a64962b103c","MS_sha256":"76246a98364cfe889aa365b38698a63cc48a75d4d4521cf1b3e6be9e9944bbec","RS_sha256":"06a0edc09ef36f896c15a8d330550aead277a9eb6c20d24e0d0fa159f6839383","RD_sha256":"b1439ef827260c168a31a861d24c6a21c9acf0d9de8946f74da8f6b2e32668e7","SE_sha256":"82a74ce373e0280baddef7caffa3b181c9e87a88d7b23023dcb45084e518bedf","S31_sha256":"ad332d5ea6d41a4dca929b685b8fccd4bd3b578802e6a732e2caeae650df7e6d"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const CHAMPS = ['mouvement', 'type_serie', 'lest_kg', 'reps_annoncees', 'semaine', 'seance', 'date', 'pdc'];
@@ -4097,10 +4233,11 @@ function afficher(v) {
   const ul = $('alertes'); ul.textContent = '';
   if (!v.alertes.length) { ul.className = 'aucune'; const li = document.createElement('li'); li.textContent = 'Aucune alerte'; ul.appendChild(li); }
   else { ul.className = 'av'; for (const a of v.alertes) { const li = document.createElement('li'); li.textContent = a; ul.appendChild(li); } }
+  for (const a of v.infos || []) { const li = document.createElement('li'); li.className = 'info'; li.textContent = 'Pour information : ' + a; ul.appendChild(li); }
   const tb = $('r-reps'); tb.textContent = '';
   for (const r of v.reps) {
     const tr = document.createElement('tr');
-    for (const t of [String(r.rep), virgule(r.hauteur_cm, 1), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)]) { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); }
+    for (const t of [String(r.rep), virgule(r.hauteur_cm, 1) + (r.tentative_ratee ? ' \u274c non comptée' : ''), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)]) { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); }
     tb.appendChild(tr);
   }
   $('r-note').textContent = 'Hauteur mesurée depuis ' + (v.hauteur_depuis === 'suspension' ? 'la suspension de départ' : 'le point le plus bas') + '. Charge système ' + virgule(v.charge_systeme_kg, 1) + ' kg · échelle ' + virgule(v.px_par_cm, 3) + ' px/cm · marque suivie sur ' + Math.round(100 * v.taux_detection) + ' % des images · analysé le ' + v.analyse_le + '.';

@@ -3331,10 +3331,17 @@ var SIM=0;
    une seule source, deux endroits pour la saisir. Codes internes identiques a ceux
    deja utilises par l'etalonnage (ko / ok / franc), plus « douteuse », qui n'entre pas
    dans le calcul du seuil : une rep dont vous n'etes pas sur ne doit pas le deplacer. */
-var VJ={ko:{e:'\ud83d\ude11',n:'ratée'},tr:{e:'\ud83e\udee3',n:'trichée'},dt:{e:'\ud83e\udd14',n:'douteuse'},
+var VJ={ec:{e:'\u274c',n:'échec'},ko:{e:'\ud83d\ude11',n:'ratée de peu'},tr:{e:'\ud83e\udee3',n:'trichée'},dt:{e:'\ud83e\udd14',n:'douteuse'},
         ok:{e:'\ud83d\ude00',n:'valide'},franc:{e:'\ud83d\ude0e',n:'franche'}};
-var VJO=['ko','tr','dt','ok','franc'];
-var JCOL={ko:'var(--bad)',tr:'var(--warn)',dt:'var(--warn)',ok:'var(--a2)',franc:'var(--ok)'};
+var VJO=['ec','ko','tr','dt','ok','franc'];
+/* Lot 37 : ❌ échec = bloquée en route, loin de la barre. Ne compte pas (comme 😑) mais ne
+   dit rien de l'endroit où passe le seuil : elle n'entre pas dans son calcul. 😑 = ratée de
+   peu, montée jusqu'à la barre et jugée trop basse : c'est elle qui règle le seuil.
+   ECHEC_CM : une rep proposée par la vidéo à plus de 4 cm sous le seuil est un échec.
+   KO_LOIN : une 😑 à plus de 5 cm sous la plus basse rep valide n'entre pas dans le seuil. */
+var ECHEC_CM=4, KO_LOIN=5;
+function nonCompte(c){return c==='ko'||c==='ec';}
+var JCOL={ec:'var(--bad)',ko:'var(--bad)',tr:'var(--warn)',dt:'var(--warn)',ok:'var(--a2)',franc:'var(--ok)'};
 /* T1 : une rep trichee COMPTE dans les reps faites, mais la serie qui en contient une
    ne sert jamais de reference : elle est ecartee de la meilleure perf (donc du record a
    battre) et de l'ajustement de courbe. Une serie propre a la meme charge repasse donc
@@ -3348,10 +3355,11 @@ function lienEntry(v){return (v&&v.lien&&v.lien.key)?entryOf(v.lien.key):null;}
 function lineMarks(key){
   if(SIM)return '';
   var e=entryOf(key), ko=0, dt=0, h='';
-  if(e&&e.valid)e.valid.forEach(function(a){(a||[]).forEach(function(c){if(c==='ko')ko++; if(c==='dt')dt++;});});
+  var ec=0;
+  if(e&&e.valid)e.valid.forEach(function(a){(a||[]).forEach(function(c){if(c==='ko')ko++; if(c==='ec')ec++; if(c==='dt')dt++;});});
   if(veloOfKey(key).length)h+=' \ud83c\udfa5';
   if(failPend(key))h+=' <b title="décision d\'échec à confirmer" style="color:var(--warn)">\u26a0</b>';
-  if(dt)h+=' '+VJ.dt.e+dt; if(ko)h+=' '+VJ.ko.e+ko;
+  if(dt)h+=' '+VJ.dt.e+dt; if(ko)h+=' '+VJ.ko.e+ko; if(ec)h+=' '+VJ.ec.e+ec;
   return h?'<span class="mk">'+h+'</span>':'';
 }
 /* jugements deja poses dans l'onglet Vitesse sur une analyse rattachee a cette ligne */
@@ -3394,28 +3402,39 @@ function baremeHTML(L){
     '<p class="note">'+(b?'<b>'+esc(b)+'</b>'
       :'<b>Aucun crit\u00e8re arr\u00eat\u00e9 pour ce mouvement.</b> \u00c9crivez-le dans sa fiche, onglet Mouvements : '+
        'sans crit\u00e8re \u00e9crit, deux s\u00e9ances ne se jugent pas de la m\u00eame fa\u00e7on.')+'</p>'+
-    '<p class="note">'+VJ.ko.e+' rat\u00e9e : <b>ne compte pas</b>, elle est retir\u00e9e des reps compt\u00e9es. '+
+    '<p class="note">'+VJ.ec.e+' \u00e9chec : bloqu\u00e9e en route, loin de la barre \u2014 <b>ne compte pas</b> et n\u2019entre pas dans le seuil vid\u00e9o. '+
+    VJ.ko.e+' rat\u00e9e de peu : mont\u00e9e jusqu\u2019\u00e0 la barre mais trop basse \u2014 <b>ne compte pas</b> ; c\u2019est elle qui r\u00e8gle le seuil vid\u00e9o. '+
     VJ.tr.e+' trich\u00e9e : <b>compte</b>, mais la s\u00e9rie ne sert plus de r\u00e9f\u00e9rence \u2014 '+
     'une s\u00e9rie propre \u00e0 la m\u00eame charge repassera devant elle et comptera comme record. '+
     VJ.dt.e+' douteuse : <b>compte</b>, mais n\u2019entre pas dans le calcul du seuil vid\u00e9o. '+
     VJ.ok.e+' valide et '+VJ.franc.e+' franche : comptent. '+
-    'Une s\u00e9rie reste conforme avec des douteuses ; seules les rat\u00e9es peuvent la faire passer sous la cible.</p></details>';
+    'Une s\u00e9rie reste conforme avec des douteuses ; seules les rat\u00e9es et les \u00e9checs peuvent la faire passer sous la cible.</p>'+
+    '<p class="note"><b>Saisie :</b> notez les reps <b>r\u00e9ussies</b>. Une rep rat\u00e9e en fin de s\u00e9rie, film\u00e9e, est ajout\u00e9e par la vid\u00e9o ('+VJ.ec.e+' ou '+VJ.ko.e+') sans \u00eatre compt\u00e9e. '+
+    'Une rep rat\u00e9e au milieu de la s\u00e9rie (rare) : comptez-la dans la saisie, puis jugez-la '+VJ.ko.e+'.</p></details>';
 }
 /* Verdict de hauteur propose par la video rattachee. Le seuil sort des jugements deja
    poses (veloSeuil) : on ne remplit que les reps NON jugees, on n'ecrase jamais un
    jugement a la main, et une rep dans la bande d'incertitude (VBANDE) devient douteuse,
    qui compte — mieux vaut une rep comptee qu'une rep retiree sur 1 cm d'incertitude. */
+/* verdict proposé pour une rep d'après sa hauteur (lot 37 : ❌ si la page téléphone l'a
+   marquée tentative ratée, ou si son sommet est à plus de ECHEC_CM sous le seuil) */
+function propRep(v,r,s){
+  var hh=hOf(v,r);
+  if(r.tentative_ratee)return 'ec';
+  if(!s||hh==null)return null;
+  var d=hh-s.valide;
+  if(d<-ECHEC_CM)return 'ec';
+  return (d>VBANDE)?((s.franche&&hh>=s.franche)?'franc':'ok'):((d<-VBANDE)?'ko':'dt');
+}
 function veloProp(key){
   var out=[];
   veloOfKey(key).forEach(function(v){
     var st=v.lien?v.lien.set:null; if(st==null)return;
-    var s=seuilOf(v); if(!s)return;
+    var s=seuilOf(v);
     (v.reps||[]).forEach(function(r){
       var i=r.rep-1;
       if((PV[st]||[])[i])return;
-      var hh=hOf(v,r); if(hh==null)return;
-      var d=hh-s.valide;
-      var c=(d>VBANDE)?((s.franche&&hh>=s.franche)?'franc':'ok'):((d<-VBANDE)?'ko':'dt');
+      var c=propRep(v,r,s); if(!c)return;
       out.push({st:st,r:i,c:c});
     });
   });
@@ -3472,7 +3491,7 @@ function countLine(reps){
   var ko=reps.map(function(t,st){return t==null?0:koCount({valid:PV},st,t);});
   if(!ko.some(Boolean))return '';
   return '<p class="note" style="margin-top:6px">Reps comptées : <b>'+reps.map(function(t,st){return t==null?'\u2014':Math.max(0,t-ko[st]);}).join(' / ')+
-    '</b> — les '+VJ.ko.e+' sont retirées à l\'enregistrement.</p>';
+    '</b> — les '+VJ.ko.e+' et '+VJ.ec.e+' sont retirées à l\'enregistrement.</p>';
 }
 function refreshV(p){
   var w=p.querySelector('[data-vrows]'), r=panelReps(p);
@@ -3509,7 +3528,7 @@ function copyRir(from,to,force){
    travaille donc sur les reps reussies sans rien changer d'autre. */
 function koCount(e,st,n){
   var a=(e.valid&&e.valid[st])||[], k=0;
-  for(var r=0;r<a.length&&r<n;r++)if(a[r]==='ko')k++;
+  for(var r=0;r<a.length&&r<n;r++)if(nonCompte(a[r]))k++;
   return k;
 }
 function stateOf(e){
@@ -3523,10 +3542,20 @@ function stateOf(e){
 function recount(e){
   if(!e||!e.sets)return;
   if(!e.tries){
-    var any=(e.valid||[]).some(function(a){return (a||[]).indexOf('ko')>=0;});
+    var any=(e.valid||[]).some(function(a){return (a||[]).some(nonCompte);});
     if(!any)return;
     e.tries=e.sets.slice();                 /* avant la convention, les reps saisies etaient toutes comptees */
   }
+  /* Lot 37 (saisie des reps réussies) : les reps jugées 😑 ou ❌ qui suivent la saisie, en fin
+     de série, sont des tentatives filmées en plus de ce qui a été saisi : elles rejoignent
+     les reps tentées, sans être comptées. Saisir 4 quand la vidéo montre 4 reps et un échec
+     donne donc 5 tentées, 4 comptées ; saisir 5 (l'ancienne convention) donne le même résultat. */
+  e.tries=e.tries.map(function(t,st){
+    if(t==null)return t;
+    var a=(e.valid&&e.valid[st])||[], k=t;
+    while(nonCompte(a[k]))k++;
+    return k;
+  });
   e.sets=e.tries.map(function(t,st){return t==null?null:Math.max(0,t-koCount(e,st,t));});
   if(e.tries.every(function(t,st){return t===e.sets[st];}))delete e.tries;
   e.state=stateOf(e);
@@ -3565,11 +3594,23 @@ function entryOf(key){
   }
   return EIX[key]||null;
 }
+/* Lot 37 : ce que le panneau affiche comme saisie = les reps tentées moins les 😑/❌ de FIN
+   de série (celles que la vidéo ajoute). Réenregistrer sans rien toucher redonne le même
+   résultat : recount les rajoute. */
+function saisieOf(e){
+  if(!e)return null;
+  return (e.tries||e.sets).map(function(t,st){
+    if(t==null)return t;
+    var a=(e.valid&&e.valid[st])||[], k=t;
+    while(k>0&&nonCompte(a[k-1]))k--;
+    return k;
+  });
+}
 function panelHTML(key){
   var f=findLine(key); if(!f)return '';
   var x=f.line, L=S.lifts[x.li], e=entryOf(key);
   var sets=[]; for(var i=0;i<x.sets;i++){
-    var tr=e?(e.tries||e.sets):null, done=tr&&tr[i]!=null?tr[i]:null;
+    var tr=saisieOf(e), done=tr&&tr[i]!=null?tr[i]:null;
     var cls=done==null?'':(done>=repMin(x.reps)?'done':'short');
     sets.push('<button class="pill set '+cls+'" data-set="'+i+'">'+(done==null?'S'+(i+1):done+' reps')+'</button>');
   }
@@ -3583,7 +3624,7 @@ function panelHTML(key){
   }
   var rirNow=e?(e.rir===null?null:e.rir):undefined;
   var each=x.sets>1&&(e&&e.rirs?true:(e?false:!!S.rirEach));
-  var trNow=e?(e.tries||e.sets):null;
+  var trNow=saisieOf(e);
   var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return trNow&&trNow[q]!=null?trNow[q]:null;})
                       :[trNow&&trNow[0]!=null?trNow[0]:repDflt(x.reps)];   /* D2 */
   var rirBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
@@ -3607,8 +3648,8 @@ function panelHTML(key){
     '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
-      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Reps tentées par série — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
-        :'<div class="field sm"><label>Reps tentées</label><input data-fld="reps" class="numin" type="text" inputmode="numeric" value="'+(e&&(e.tries||e.sets)&&(e.tries||e.sets)[0]!=null?(e.tries||e.sets)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
+      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Reps réussies par série — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
+        :'<div class="field sm"><label>Reps réussies</label><input data-fld="reps" class="numin" type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
     '</div>'+
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
@@ -5014,7 +5055,7 @@ $('ldate').addEventListener('change',lbwFill);
 var VSCHEMA='velocite-serie/v1';
 var VREPK=['rep','course_cm','hauteur_cm','hauteur_sommet_cm','montee_s','vitesse_moy_ms','vitesse_pic_ms',
            'vitesse_point_dur_ms','hauteur_point_dur_cm','temps_sous_02_s','descente_s',
-           'vitesse_pic_descente_ms','puissance_moy_w','pause_apres_s'];
+           'vitesse_pic_descente_ms','puissance_moy_w','pause_apres_s','tentative_ratee'];
 function veloLi(nom){
   var n=String(nom||'').toLowerCase(), hit=-1;
   S.lifts.forEach(function(L,i){
@@ -5045,6 +5086,9 @@ function veloTrim(d){
    analyser sont comptees et signalees, pas importees vides. */
 var SSCHEMA='velocite-seance/v1';
 function veloImportAny(d){
+  /* Lot 37 : le fichier de contrôle de la page téléphone (seance-AAAA-MM-JJ.controle34.json)
+     porte la séance sous « sortie » : on l'accepte comme le fichier de séance lui-même. */
+  if(d&&d.schema===undefined&&d.sortie&&d.sortie.schema===SSCHEMA)d=d.sortie;
   if(d&&d.schema===SSCHEMA){
     var ok=0, ko=[];
     (d.series||[]).forEach(function(x,i){
@@ -5111,6 +5155,19 @@ function mergeJuge(v){
     if(!e.valid[st][r.rep-1])e.valid[st][r.rep-1]=j;
     delete S.veloJuge[k];
   });
+  /* Lot 37 : les reps filmées au-delà de la saisie (reps réussies), en fin de série, que la
+     vidéo juge ❌ ou 😑, sont posées d'office : elles ne sont pas comptées. Une rep en trop
+     de hauteur valide n'est pas touchée (saisie oubliée ? c'est à vous de voir). */
+  var tr=(e.tries||e.sets||[])[st];
+  if(tr!=null){
+    var s=seuilOf(v), reps=v.reps.slice().sort(function(a,b){return a.rep-b.rep;});
+    for(var i=tr;i<reps.length;i++){
+      var c=propRep(v,reps[i],s); if(!nonCompte(c))break;
+      if(!e.valid)e.valid=[]; if(!e.valid[st])e.valid[st]=[];
+      if(!e.valid[st][i])e.valid[st][i]=c;
+      if(!nonCompte(e.valid[st][i]))break;
+    }
+  }
   recount(e);
 }
 function setLien(v,lien){
@@ -5127,9 +5184,10 @@ function veloAuto(v){
   var es=S.log.filter(function(e){return e.date===v.date&&(v.li<0||e.li===v.li)&&e.sets&&e.sets.length;});
   if(!es.length)return false;
   var n=v.reps.length, ts=String(v.type_serie||'').toLowerCase(), c=[];
+  var nOk=v.reps.filter(function(r){return !r.tentative_ratee;}).length;   /* lot 37 : saisie des reps réussies */
   es.forEach(function(e){ (e.tries||e.sets).forEach(function(r,st){
     var role=(/top/.test(ts)&&e.role==='top')||(/back/.test(ts)&&e.role==='back');
-    c.push({e:e,s:st,m:(r===n?2:0)+(role?1:0)});
+    c.push({e:e,s:st,m:(r===n||r===nOk?2:0)+(role?1:0)});
   });});
   c.sort(function(a,b){return b.m-a.m;});
   if(c.length===1||(c[0].m>0&&c[1].m<c[0].m)){ setLien(v,{key:c[0].e.key,set:c[0].s,auto:1}); return true; }
@@ -5162,32 +5220,43 @@ function veloHauteurs(mouvement,ref){
     if(ref&&vRef(v)!==ref)return;         /* deux mesures de hauteur differentes ne se melangent pas */
     v.reps.forEach(function(r){
       var j=jugeOf(v,r.rep);
-      if(!j||j==='dt'||j==='tr')return;   /* T1 */
+      if(!j||j==='dt'||j==='tr'||j==='ec')return;   /* T1 ; lot 37 : un échec ne dit rien du seuil */
       if(verif===null)verif=v.echelle_verifiee; else if(verif!==v.echelle_verifiee)mixte=true;
       (j==='ko'?ko:j==='ok'?ok:fr).push(hOf(v,r));
     });
   });
   return {ko:ko,ok:ok,franc:fr,mixte:mixte};
 }
+/* Lot 37 : le seuil est le milieu entre la 😑 la plus HAUTE et la rep valide (😀 ou 😎) la
+   plus basse. Les 😑 à plus de KO_LOIN cm sous cette rep valide sont ignorées : une rep
+   bloquée loin de la barre ne situe pas la limite (01/10 : 31,5 cm contre 44 ; seule, elle
+   aurait tiré le seuil vers 38 cm). 😎 compte comme valide : ça ne change le seuil que
+   lorsqu'aucune 😀 n'est jugée, cas où il n'y avait jusqu'ici pas de seuil du tout. */
 function veloSeuil(mouvement,ref){
   var h=veloHauteurs(mouvement,ref);
-  if(!h.ko.length||!h.ok.length)return null;
-  var maxKo=Math.max.apply(null,h.ko), minOk=Math.min.apply(null,h.ok);
+  var val=h.ok.concat(h.franc);
+  if(!h.ko.length||!val.length)return null;
+  var minOk=Math.min.apply(null,val);
+  var ko=h.ko.filter(function(x){return x>=minOk-KO_LOIN;});
+  if(!ko.length)return null;
+  var maxKo=Math.max.apply(null,ko);
   var seuil=(maxKo+minOk)/2, chevauche=Math.max(0,maxKo-minOk);
   var sf=null;
   if(h.franc.length&&h.ok.length){
     var maxOk=Math.max.apply(null,h.ok), minFr=Math.min.apply(null,h.franc);
     if(minFr>Math.min.apply(null,h.ok))sf=(maxOk+minFr)/2;
   }
-  return {valide:seuil, franche:sf, n:h.ko.length+h.ok.length+h.franc.length,
-          chevauche:chevauche, mixte:h.mixte};
+  return {valide:seuil, franche:sf, n:ko.length+h.ok.length+h.franc.length,
+          chevauche:chevauche, mixte:h.mixte, koLoin:h.ko.length-ko.length};
 }
 function veloVerdict(v,r){
   var j=jugeOf(v,r.rep);
-  if(j)return VJ[j].e+' '+(j==='ko'?'<b>'+VJ[j].n+'</b>':VJ[j].n);
+  if(j)return VJ[j].e+' '+(nonCompte(j)?'<b>'+VJ[j].n+'</b>':VJ[j].n);
+  if(r.tentative_ratee)return '<b>échec</b> (tentative ratée)';
   var s=seuilOf(v);
   if(!s)return '—';
   var d=hOf(v,r)-s.valide;
+  if(d<-ECHEC_CM)return '<b>échec</b>';
   if(d>VBANDE)return (s.franche&&hOf(v,r)>=s.franche)?'franche':'valide';
   if(d<-VBANDE)return '<b>non valide</b>';
   return 'limite';
@@ -5534,11 +5603,13 @@ function vScrSeuil(){
       var sj=veloSeuil(mv,ref), hs=veloHauteurs(mv,ref);
       h+='<div class="vtitle">'+esc(mv)+(ref==='bas'?' <span class="muted">· ancienne mesure</span>':'')+'</div>';
       if(sj)h+='<p class="note">Seuil <b>'+F(Math.round(sj.valide*10)/10)+' cm</b> ±'+F(VBANDE)+', tiré de vos jugements : '+
-        hs.ko.length+' 😑, '+hs.ok.length+' 😀, '+hs.franc.length+' 😎.'+(sj.chevauche>0?' <b>Jugements qui se chevauchent de '+F(Math.round(sj.chevauche*10)/10)+' cm</b> : le seuil est flou.':'')+'</p>';
+        (hs.ko.length-sj.koLoin)+' 😑, '+hs.ok.length+' 😀, '+hs.franc.length+' 😎.'+
+        (sj.koLoin?' '+sj.koLoin+' 😑 à plus de '+KO_LOIN+' cm sous la plus basse rep valide, ignorée'+(sj.koLoin>1?'s':'')+' : jugez-la plutôt ❌ échec.':'')+(sj.chevauche>0?' <b>Jugements qui se chevauchent de '+F(Math.round(sj.chevauche*10)/10)+' cm</b> : le seuil est flou.':'')+'</p>';
       else if(ref==='bas')h+='<p class="note">Pas de jugement : barème du 19/09 (validée à 44,4 cm, franche à 55 cm, mesurés à 15 kg).</p>';
       else h+='<p class="note">Seuil <b>'+F(BAREME_DEP.seuil)+' cm</b> ±'+F(VBANDE)+', tiré de la vidéo étalon du 19/09 (positions tenues à 15 kg, depuis la suspension de départ) : '+
         'rep invalide '+F(BAREME_DEP.nonvalide)+' cm, validée au minimum '+F(BAREME_DEP.valide)+' cm, franche '+F(BAREME_DEP.franche)+' cm. '+
-        'Non vérifié à d\'autres charges. Dès que vous jugez des reps (au moins une 😑 et une 😀), le seuil vient de vos jugements.</p>';
+        'Non vérifié à d\'autres charges. Dès que vous jugez des reps (au moins une 😑 ratée de peu, à moins de '+KO_LOIN+' cm de votre plus basse 😀 ou 😎), le seuil vient de vos jugements. '+
+        'Les ❌ échecs n\'y entrent jamais.'+(function(){var q=veloHauteurs(mv,ref);return q.ko.length?' Vous avez '+q.ko.length+' 😑, toutes trop loin des reps valides pour situer la limite.':'';})()+'</p>';
     });
   });
   var ds=vDates();
