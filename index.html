@@ -625,6 +625,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     </div>
     <p class="note" id="catnote"></p>
     <div class="btnrow"><button class="act" id="addlift">Ajouter</button></div>
+    <p class="note" style="margin:6px 0 0">Le mouvement ajouté n’entre dans aucun programme : choisissez son gabarit dans l’onglet Programme.</p>
     <details>
       <summary>Ce que vaut une estimation</summary>
       <p class="note">— Les rapports viennent de la matrice de Jovanović (fig. 3.28, d'après Dan Baker 2015), exprimés en
@@ -662,7 +663,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v37';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v38';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -722,7 +723,7 @@ function load(){
     if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
-    if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null;
+    if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null; tbwStale();   /* lot 40 */
     if(!S.done)S.done={}; if(S.tsel===undefined)S.tsel=null; if(!S.blockId)S.blockId=1;
     if(!S.blocks)S.blocks=[]; if(!S.verbo)S.verbo='norm'; if(!S.form)S.form={};
     if(!S.formOn)S.formOn={som:1,ene:1,cou:1,art:1,tra:1};
@@ -796,6 +797,27 @@ function bwEst(date){
 }
 function bwOf(e){return hasBw(e)?+e.bw:bwEst(e&&e.date);}
 function refBw(q){return hasBw(q)?+q.bw:bwEst(q&&q.date);}
+/* Lot 40 (2b) : le PdC d'en-tete suit la derniere pesee connue (series enregistrees, sautees,
+   hors programme, analyses video importees), sauf si l'en-tete a ete tape a la main apres elle.
+   S.bwSeen = derniere pesee deja prise en compte ; S.bwDate = jour de la derniere saisie a la main. */
+function bwFollow(){
+  var k=bwKnown(), last=k[k.length-1]; if(!last)return false;
+  var v=Math.round(last.bw*100)/100, sig=last.d+'|'+v;
+  if(S.bwSeen===sig)return false;
+  S.bwSeen=sig;
+  if(S.bwDate&&last.d<S.bwDate)return false;
+  if(v===S.bw)return false;
+  S.bw=v;
+  try{ $('bw').value=F(S.bw); if(S.tbw==null)$('tbw').value=F(S.bw); renderHead();renderCharges();renderLifts();renderCatPick(); }catch(e){}
+  return true;
+}
+/* Lot 40 (2b) : le « PdC du jour » ne vaut que le jour ou il a ete tape. */
+function tbwStale(){ if(S.tbw!=null&&S.tbwD!==todayISO()){ S.tbw=null; return true; } return false; }
+/* Lot 40 (2c) : jour leger = jour du gabarit dont toutes les lignes sont en variante (J2). */
+function jourLeger(L,lab){
+  var t=L&&L.prog&&tplOf(L.prog.tpl), d=t&&t.days&&t.days.filter(function(q){return q.label===lab;})[0];
+  return !!(d&&d.lines&&d.lines.length&&d.lines.every(function(l){return l.vari;}));
+}
 function e1rm(L,lo,reps,rir,bw){return (eff(L,bw)+lo)*(1+L.k*(reps+(rir||0)-1));}
 function loadAt(L,rm,reps,rir){return rm/(1+L.k*(reps+(rir||0)-1))-eff(L);}
 function rnd(v,st){return Math.round(v/st)*st;}
@@ -2008,6 +2030,7 @@ $('addlift').addEventListener('click',function(){
     var A=(from!==''&&S.lifts[+from])?S.lifts[+from]:null, lk=A?catLink(A.catId,sel):null;
     if(lk)L.ref.load=Math.max(0,Math.round((rmOf(A)*lk.f/(1+L.k*4)-(L.useBw?S.bw*RC:0))*4)/4);
   }
+  L.prog.tpl='off';   /* lot 40 (2a) : hors programme ; on le programme dans l'onglet Programme */
   S.lifts.push(L); save(); renderAll();
 });
 
@@ -3162,7 +3185,7 @@ function renderPlan(into,weeks,pfx,scope){
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
           '<span class="nm n'+col(x.li)+'">'+x.name+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
-          '<span class="in">'+x.info+'</span></div>'+(pfx==='t'?lastPerfHTML(x)+recordHTML(x):'');
+          '<span class="in">'+x.info+'</span></div>'+(pfx==='t'?lastPerfHTML(x)+recordHTML(x,day.label):'');
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
       if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
@@ -3915,7 +3938,7 @@ function saveLine(p,key){
   e.tries=sets.slice(); recount(e); if(!e.state)e.state=stateOf(e);
   if(/^[zh]\|/.test(key))fzEnsure(L);   /* B1 */
   var fAuto=failAuto(L,x,key,e);   /* B2 */
-  S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
+  S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e); bwFollow();   /* lot 40 */
   draftDrop(p,key); LASTOPEN=null;
   /* la ligne devient la reference des jugements de ses analyses video */
   veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
@@ -3945,7 +3968,7 @@ function skipLine(p,key){
     bw:o0?o0.bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl?noteEl.value.trim():'',setNotes:[],state:'skip'};
   if(/^[zh]\|/.test(key))fzEnsure(L);   /* B1 */
   flDropKey(key,1);   /* B2 : sautee = ni echec ni reussite */
-  S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
+  S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e); bwFollow();   /* lot 40 */
   draftDrop(p,key); LASTOPEN=null;
   var inToday=!!(p.closest&&p.closest('#todayout'));
   save(); closePanel(); refreshPlans();
@@ -4452,7 +4475,7 @@ $('todayout').addEventListener('input',function(e){
 $('start').addEventListener('change',function(){S.start=this.value;save();generate();renderToday();});
 $('tbw').addEventListener('input',function(){
   var v=num(this.value,null);
-  S.tbw=(v===null||v<=0)?null:Math.round(v*100)/100; save();
+  S.tbw=(v===null||v<=0)?null:Math.round(v*100)/100; S.tbwD=todayISO(); save();   /* lot 40 */
 });
 
 /* ================= Données ================= */
@@ -4668,14 +4691,15 @@ function renderRecords(){
 }
 /* Rappel en Seance du jour : a reps egales, ce qu'il faut porter AUJOURD'HUI pour egaler
    ou battre. Le record est un poids systeme, pas un lest : il se relit au PdC du jour. */
-function recordHTML(x){
+function recordHTML(x,lab){
   if(SIM)return '';
   var L=S.lifts[x.li]; if(!L)return '';
+  if(x.role==='var'||jourLeger(L,lab))return '';   /* lot 40 (2c) */
   var n=parseInt(x.reps,10); if(!(n>0))return '';
   var b=recBest(x.li,n,false); if(!b)return '';
   var t='record à '+n+' rep'+(n>1?'s':'')+' : <b>'+F(b.sys)+' kg</b> système ('+recLine(L,b)+')';
   if(L.useBw){
-    var bw=+S.bw||0, d=b.sys-bw;
+    var bw=+(S.tbw!=null?S.tbw:S.bw)||0, d=b.sys-bw;   /* lot 40 */
     if(d<-1e-9)t+=' · aujourd’hui à '+F(bw)+' kg, le poids de corps seul le dépasse';
     else{
       var need=Math.max(0,Math.ceil(d/1.25-1e-9)*1.25);
@@ -5036,7 +5060,7 @@ $('addlog').addEventListener('click',function(){
   var reps=repsRaw, load=loadRaw||0;
   S.log.push({v:SCHEMA,id:'pr'+Date.now(),key:'pr'+Date.now(),date:$('ldate').value||todayISO(),
     li:li,lift:L.name,tpl:null,week:null,day:null,role:'pr',presLoad:null,presReps:null,presSets:null,
-    load:load,sets:[reps],rir:rirv===''?null:+rirv,bw:LBWTOUCH?num($('lbw').value,null):null,note:$('lnote').value.trim(),state:null});   /* N6 : PdC non tapé → estimé à la lecture */
+    load:load,sets:[reps],rir:rirv===''?null:+rirv,bw:LBWTOUCH?num($('lbw').value,null):null,note:$('lnote').value.trim(),state:null}); bwFollow();   /* lot 40 */   /* N6 : PdC non tapé → estimé à la lecture */
   save(); renderData();
   $('lload').value='';$('lreps').value='';$('lnote').value='';
 });
@@ -5108,7 +5132,7 @@ function veloImport(d){
   if(!d.date)return 'date absente du fichier';
   var t=veloTrim(d);
   S.velo=(S.velo||[]).filter(function(x){return x.id!==t.id;});
-  S.velo.push(t);
+  S.velo.push(t); bwFollow();   /* lot 40 */
   S.velo.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
   return null;
 }
@@ -5783,7 +5807,7 @@ $('mergefile').addEventListener('change',function(){
 $('bw').addEventListener('input',function(){
   var v=num(this.value,null);
   if(v===null||v<=0)return;                    /* saisie en cours : on ne touche a rien */
-  S.bw=Math.round(v*100)/100; save();
+  S.bw=Math.round(v*100)/100; S.bwDate=todayISO(); save();   /* lot 40 */
   renderHead();renderCharges();renderLifts();renderAssign();generate();renderCatPick();
 });
 $('lift').addEventListener('change',function(){
@@ -5795,7 +5819,7 @@ function renderAll(){
   /* filet : si aucune page n'est marquee active, on ouvre la premiere */
   if(!document.querySelector('section.page.on'))$('p-today').classList.add('on');
   $('bw').value=F(S.bw); $('nwk').value=S.nwk; $('sep').value=S.sep; $('jours').value=S.jours;
-  $('start').value=S.start||''; if(!$('tbw').value)$('tbw').value=F(S.tbw!=null?S.tbw:S.bw);
+  $('start').value=S.start||''; if(tbwStale())$('tbw').value=''; if(!$('tbw').value)$('tbw').value=F(S.tbw!=null?S.tbw:S.bw);   /* lot 40 */
   if(!$('ldate').value)$('ldate').value=todayISO();
   lbwFill();   /* N6 */
   $('verbo').value=S.verbo;
