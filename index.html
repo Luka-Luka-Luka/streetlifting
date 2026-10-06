@@ -196,6 +196,13 @@ html,body{overflow-x:clip}
 .lastp{font:400 11px/1.35 var(--txt);color:var(--muted);margin:-3px 0 5px;padding-left:9px;
   border-left:3px solid transparent}
 .lastp b{font-weight:600;color:var(--ink)}
+/* lot 43 (R6) : ligne « derniere » discrete ; en Seance du jour, nom et prescription un peu plus grands */
+.lpd{font-size:10.5px}
+.lpd b{font-weight:600;color:inherit}
+.dt .line .nm{font-size:13.5px}
+.dt .line .pr{font-size:19px}
+.tbl{font:400 11.5px/1.3 var(--txt);color:var(--muted)}
+.runrule{margin:6px 0 0}
 .recp{border-left-color:var(--a2)}
 .recd{border-bottom:1px solid var(--rule);padding:5px 0}
 .recd>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
@@ -663,7 +670,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v39';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v40';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -1060,6 +1067,117 @@ function zRuns(L){
   });
   return R;
 }
+/* Lot 43 (R1) : FULL RUNDOWN du PDF Zlat (menu « Methode du run », P.fr, P.pair vide). L'increment depend des reps
+   du top set de l'unite de progression precedente : haut de la fourchette (5) -> +2,5 kg ; une de moins (4) -> +1,25 ;
+   bas (3) -> +0,5 ; sous le bas -> fin du run (regle Zlat, zRuns, inchangee). La suite part du lest FAIT ; quand le
+   lest fait est la prescription arrondie, elle part de la valeur exacte, pour que les +0,5 s'accumulent au lieu de
+   disparaitre a l'arrondi. Unites non faites : projetees aux reps du moment (fourchette apres echecs, zCut).
+   Repetition de charge (P.adj) : pas d'increment apres l'unite ratee. Nouveau run (reset) : depart = celui du reset.
+   Recalcul au PdC (z.rb) : le lest suit la charge systeme gardee, comme fzAt. Valeurs exactes, arrondies a l'affichage. */
+function frOn(L){var P=L&&L.prog, t=P&&tplOf(P.tpl); return !!(P&&P.fr&&!P.pair&&t&&isZlat(P.tpl)&&t.ranges&&t.calc==='recalc');}
+function frStep(r,lo,hi){return r>=hi?2.5:(r>=hi-1?1.25:(r>=lo?0.5:0));}
+function frTop(t){var tp=null; t.days.forEach(function(d){d.lines.forEach(function(l){if(!tp&&l.tag==='top')tp=l;});}); return tp;}
+function frUnits(L){
+  var P=L.prog, t=tplOf(P.tpl), U=[];
+  for(var w=0;w<S.nwk;w++)t.days.forEach(function(d){
+    if(!d.lines.some(function(l){return l.tag==='top'||l.tag==='amrap';}))return;
+    var u=unitIndex(t,w,d.label,P), q=U[u]||(U[u]={u:u,o:sessOrd(w,d.label),w:w,lab:d.label,dec:null});
+    if(!q.dec){ var n=-1; d.lines.forEach(function(l,k){if(n<0&&l.tag==='top')n=k;});
+      if(n>=0)q.dec={w:w,lab:d.label,n:n,o:sessOrd(w,d.label),off:d.offGap?-gapOf(P,L):(d.off||0)}; }
+  });
+  return U;
+}
+function frDone(i,dc){
+  var e=entryOf('z|'+i+'|'+dc.w+'|'+dc.lab+'|'+dc.n+BK()); if(!e||e.state==='skip'||e.load==null)return null;
+  var sv=(e.sets||[]).filter(function(v){return v!=null;}); if(!sv.length)return null;
+  return {load:+e.load,r:Math.min.apply(null,sv)};
+}
+/* lest exact du top set de l'unite u (avant l'ecart du jour), et le PdC du cadre dans lequel il est exprime */
+function frExact(L,i,u,zr){
+  var P=L.prog, t=tplOf(P.tpl), U=frUnits(L), tp=frTop(t), hi=repMax(tp?tp.reps:5), lo=repMin(tp?tp.reps:3), z=fzOf(L);
+  zr=zr||zRuns(L);
+  var rs={}; zr.resets.forEach(function(x){U.forEach(function(q){if(q&&q.o===x.o)rs[q.u]=x;});});
+  var ex=null, fb=null, ad=P.adj||[];
+  for(var k=0;k<=u&&k<U.length;k++){
+    var q=U[k]; if(!q)continue;
+    var fk=fzAt(L,q.w,q.lab), bk=fk?fk.bw:(z?z.bw:S.bw);
+    if(ex===null){ ex=fk?fk.s0:startLoad(L,t); fb=bk; }
+    else{
+      var p=U[k-1], inc=0, base=ex;
+      if(p){
+        var dn=p.dec?frDone(i,p.dec):null, off=p.dec?p.dec.off:0;
+        if(dn){ if(Math.abs(dn.load-rnd(ex+off,L.step))>0.01)base=dn.load-off; inc=frStep(dn.r,lo,hi); }
+        else inc=frStep(hi-zCut(zr,p.dec?p.dec.o:p.o),lo,hi);
+        if(ad.indexOf(k-1)>=0)inc=0;
+      }
+      ex=base+inc-(bwZ(L,bk)-bwZ(L,fb)); fb=bk;
+    }
+    if(rs[k]){ ex=rs[k].sD-(bwZ(L,bk)-bwZ(L,rs[k].bw)); fb=bk; }
+  }
+  return {ex:ex===null?startLoad(L,t):ex, bw:fb===null?(z?z.bw:S.bw):fb};
+}
+/* menu « Methode du run » : valeur affichee 'fr' = full rundown (P.fr), '' = fourchettes a increment fixe, 'a/b' = reps fixes */
+function pairUi(P){return P.pair||(P.fr?'fr':'');}
+function pairName(v){return v==='fr'?'full rundown':(v?'reps fixes '+v:'fourchettes à incrément fixe');}
+function pairOpts(cur){
+  return [['fr','Full rundown (barème du PDF)'],['','Fourchettes, incrément fixe']].concat(PAIRS.slice(1).map(function(q){
+    return [q[0]+'/'+q[1],'Reps fixes : top '+q[0]+', back-off '+q[1]];}))
+    .map(function(o){return '<option value="'+o[0]+'"'+(cur===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
+}
+function runRule(L,P,t){
+  var pu=(t.cadSwitch&&P)?((P.cad==='week')?1:2):t.perUnit, quand=pu===2?'la séance lourde suivante':'la semaine suivante';
+  var tp=frTop(t), r=tp?tp.reps:'3-5', hi=repMax(r), lo=repMin(r), x;
+  if(frOn(L))x='<b>Full rundown</b> (PDF Zlat) — la charge de '+quand+' dépend des reps de votre top set : <b>'+hi+' reps → +2,5 kg ; '+
+    (hi-1)+' → +1,25 kg ; '+lo+' → +0,5 kg</b> ; moins de '+lo+' → fin du run (deload 2 × 5, puis nouveau run un peu plus haut). '+
+    'Back-off : 2 reps de plus que le top set. La suite part du lest que vous avez fait ; les séances à venir sont projetées à vos reps du moment. '+
+    'Charges arrondies au pas de '+F(L.step||1.25)+' kg : un +0,5 n’apparaît qu’en s’accumulant. Votre incrément ('+F(P.inc)+' kg) ne sert plus qu’au départ du run suivant.';
+  else if(!P.pair)x='<b>Fourchettes, incrément fixe</b> — +'+F(P.inc)+' kg à '+quand+', quelles que soient les reps ; un top set sous la cible retire une rep aux tops suivants ('+
+    hi+' → '+(hi-1)+' → '+lo+') ; sous '+lo+', fin du run. Ce n’est pas le barème du PDF (5 → +2,5 ; 4 → +1,25 ; 3 → +0,5) : choisissez « Full rundown » pour l’appliquer.';
+  else x='<b>Reps fixes</b> (fixed rep run du PDF) — +'+F(P.inc)+' kg à '+quand+' ; fin du run dès que le nombre de reps n’est plus tenu, puis deload et nouveau run. '+
+    'Le PDF règle l’incrément sur le RPE (7-8 → +2,5 ; 8-10 → +1,25) : ici incrément fixe, votre choix.';
+  return '<p class="note runrule">'+x+'</p>';
+}
+/* Lot 43 (R3) : « top set … + back-off … » a cote du nom du lift, onglet Programme */
+function tbLab(P,t){
+  if(!t||!t.days)return '';
+  var tp=null, bk=null; t.days.forEach(function(d){d.lines.forEach(function(l){if(!tp&&l.tag==='top')tp=l; if(!bk&&l.tag==='back')bk=l;});});
+  if(!tp||!bk)return '';
+  var a=tp.reps, b=bk.reps; if(P.pair){a=P.pair.split('/')[0]; b=P.pair.split('/')[1];}
+  return ' <span class="tbl">· top set '+a+' + back-off '+b+'</span>';
+}
+/* Lot 43 (C2) : heure de chaque serie. e.at[i] = instant (ms) ou la serie i a ete validee dans le panneau
+   (pastille touchee, reps choisies, champ reps tape), sinon l'enregistrement. Une correction garde l'heure d'origine. */
+function atAttr(e,i){var v=e&&e.at&&e.at[i]; return v?' data-at="'+(+v)+'"':'';}
+function atStamp(el){ if(el&&el.dataset&&!el.dataset.at)el.dataset.at=String(Date.now()); }
+function atOf(el){var d=el&&el.dataset; return d&&d.at?+d.at:null;}
+function atRead(p){
+  var r=p.querySelector('[data-fld=reps]');
+  if(r)return [atOf(r)];
+  return Array.prototype.map.call(p.querySelectorAll('[data-set]')||[],atOf);
+}
+function atWrite(p,a){
+  if(!a)return; var r=p.querySelector('[data-fld=reps]');
+  var els=r?[r]:Array.prototype.slice.call(p.querySelectorAll('[data-set]')||[]);
+  els.forEach(function(el,i){ if(!el||!el.dataset)return; if(a[i])el.dataset.at=String(a[i]); else if(el.removeAttribute)el.removeAttribute('data-at'); });
+}
+function atSave(p,sets,o0){
+  var a=atRead(p)||[], now=Date.now(), any=false;
+  var out=sets.map(function(v,i){
+    if(v==null)return null;
+    var x=a[i]||(o0?((o0.at&&o0.at[i])||null):now); if(x)any=true; return x;
+  });
+  return any?out:null;
+}
+function hhmm(ms){var d=new Date(+ms); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+function atList(e){return (e.at||[]).map(function(v){return v?hhmm(v):'';}).join('/');}
+function atTxt(e){
+  if(!e.at||!e.at.some(Boolean))return '';
+  var prev=null;
+  return '<br><i>heures '+e.at.map(function(v,i){
+    if(!v)return 'S'+(i+1)+' ?';
+    var g=prev?' (+'+Math.round((v-prev)/60000)+' min)':''; prev=v; return 'S'+(i+1)+' '+hhmm(v)+g;
+  }).join(' · ')+'</i>';
+}
 function zCut(R,o){var n=0; R.cut.forEach(function(c){if(c.f<o)n=c.n;}); return n;}
 function repLess(r,n){
   if(!n)return r;
@@ -1115,7 +1233,7 @@ function failTxt(L,id,m){
   if(m==='stop')return 'Arrêt : plus rien de programmé pour ce mouvement après cette séance.';
   if(m==='h')return 'Semaine suivante : même charge, avec les reps de sa semaine (vague conservée). Deux échecs d\'affilée : −10 % de la charge système.';
   var o=zRuns(L).out[id]; if(!o)return 'Règle Zlat : sans effet ici (séance hors du run en cours).';
-  if(o.k==='cut')return 'Règle Zlat, fourchette : tops suivants à '+o.n+' reps, back-off à '+(o.n+2)+'.';
+  if(o.k==='cut')return 'Règle Zlat, fourchette : tops suivants à '+o.n+' reps, back-off à '+(o.n+2)+'.'+(frOn(L)?' Full rundown : la charge suivante monte selon les reps faites (5 → +2,5 ; 4 → +1,25 ; 3 → +0,5).':'');
   if(o.k==='stall')return 'Règle Zlat : semaine de stall '+o.n+'/3 (≤ 4 reps au max out). Fin du run à la 3e d\'affilée.';
   if(o.k==='stall3')return o.od?'Règle Zlat : 3e stall d\'affilée, fin du run. Comme le PDF : J1 et J2 sautés, test du 7-8RM en S'+(o.od.w+1)+' '+o.od.lab+
     ' (proposé à '+loadKg(L,o.dl)+', 0 rep en réserve)'+(o.on?', puis nouveau run depuis le lest du test ('+loadKg(L,o.s)+') dès S'+(o.on.w+1)+' '+o.on.lab:'')+
@@ -1448,6 +1566,11 @@ function accPlan(L,i){
       if(e){
         sv=(e.sets||[]).filter(function(v){return v!=null;});
         if(!sv.length)return;                            /* D1 : tout vide = comme saut\u00e9e */
+        if(e.load!=null&&e.load>load+0.01){   /* lot 43 (R8) : charge montee = nouveau depart a cette charge, +1 rep sur ce qui est fait ; jamais un echec */
+          var g=Math.min.apply(null,sv), full=sv.length>=(e.sets||[]).length; load=+e.load; miss=0;
+          if(g>=hi&&full){reps=lo;load+=inc;} else reps=Math.min(hi,Math.max(1,g+1));
+          return;
+        }
         if(sv.some(function(v){return v<reps;})||(e.load!=null&&e.load<load-0.01))ok=false;   /* D1 : \u00e9chec prioritaire */
         else if(sv.length<(e.sets||[]).length)return;    /* D1 : s\u00e9rie vide = ni progression ni \u00e9chec */
       }
@@ -2370,7 +2493,7 @@ function startLoad(L,t){
   if(P.startMode==='pr'){
     var u=unitIndex(t,P.prWeek-1,P.prDay,P), pd=t.days.filter(function(d){return d.label===P.prDay;})[0];
     var off=pd?(pd.offGap?-gapOf(P,L):(pd.off||0)):0;   /* lot 40 : un record vise en J3 tombait a « record - ecart » */
-    return rnd(prTarget(L,t).lest-P.inc*u-off,L.step);   /* lot 40 (Q3) */
+    return rnd(prTarget(L,t).lest-(frOn(L)?2.5:P.inc)*u-off,L.step);   /* lot 40 (Q3) ; lot 43 : full rundown projete a +2,5 */
   }
   return rnd(loadAt(L,rmOf(L),target,P.rir),L.step);
 }
@@ -2558,7 +2681,7 @@ function simDefaults(){
     lifts:S.lifts.map(function(L){
       var P=L.prog, lo=Math.min(30,Math.max(1,+P.accLo||8));
       return {tpl:P.tpl, rm:Math.round((rmOf(L)-eff(L))*4)/4,
-        inc:+P.inc||1.25, step:+L.step||1.25, repMode:P.repMode||'range', pair:P.pair||'',
+        inc:+P.inc||1.25, step:+L.step||1.25, repMode:P.repMode||'range', pair:pairUi(P),
         hdl:(P.hdl||[]).slice(), accDays:accDaysOf(P), accLo:lo,
         accHi:Math.min(30,Math.max(lo,+P.accHi||10))};
     })};
@@ -2613,12 +2736,11 @@ function renderSim(){
       '<div class="field sm"><label for="sims'+i+'">Pas de lestage</label><select id="sims'+i+'">'+
         STEPS.map(function(v){return '<option value="'+v+'"'+(+p.step===v?' selected':'')+'>'+F(v)+'</option>';}).join('')+
         '</select></div>'+
-      (acc?'':'<div class="field md"><label for="simm'+i+'">Fourchettes de reps</label><select id="simm'+i+'">'+
+      (acc?'':'<div class="field md"><label for="simm'+i+'">Application des fourchettes</label><select id="simm'+i+'">'+
         REPMODES.map(function(o){return '<option value="'+o[0]+'"'+(p.repMode===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+
         '</select></div>')+
-      (z&&t.ranges?'<div class="field sm"><label for="simp'+i+'">Rep range</label><select id="simp'+i+'" data-simp="'+i+'">'+
-        PAIRS.map(function(q){var v=q[0]?q[0]+'/'+q[1]:'';
-          return '<option value="'+v+'"'+(p.pair===v?' selected':'')+'>'+(v||'fourchettes')+'</option>';}).join('')+
+      (z&&t.ranges?'<div class="field md"><label for="simp'+i+'">Méthode du run</label><select id="simp'+i+'" data-simp="'+i+'">'+
+        pairOpts(p.pair||'')+   /* lot 43 (R1) */
         '</select></div>':'')+'</div>';
     if(needGap(p.tpl)&&!gapPossible(+p.step,+p.inc))
       s+='<p class="note" style="margin-top:6px;color:var(--warn)">Écart J1 / J3 : avec cet incrément et ce pas, tout écart fait rejouer au J3 des charges déjà faites en J1 '+
@@ -2720,7 +2842,7 @@ function simDiff(P,sv){
     if(Math.abs(p.inc-q.inc)>0.001)d.push(nm+'incr\u00e9ment '+F(q.inc)+' \u2192 '+F(p.inc)+' kg');
     if(Math.abs(p.step-q.step)>0.001)d.push(nm+'pas de lestage '+F(q.step)+' \u2192 '+F(p.step)+' kg');
     if(p.repMode!==q.repMode)d.push(nm+'fourchettes '+repModeName(q.repMode)+' \u2192 '+repModeName(p.repMode));
-    if((p.pair||'')!==(q.pair||''))d.push(nm+'rep range '+(q.pair||'fourchettes')+' \u2192 '+(p.pair||'fourchettes'));
+    if((p.pair||'')!==(q.pair||''))d.push(nm+'m\u00e9thode du run '+pairName(q.pair||'')+' \u2192 '+pairName(p.pair||''));
     if(p.hdl.join(',')!==q.hdl.join(','))d.push(nm+'deloads '+hdlName(q.hdl)+' \u2192 '+hdlName(p.hdl));
     if(p.accDays.join(',')!==q.accDays.join(','))d.push(nm+'jours '+q.accDays.join('/')+' \u2192 '+p.accDays.join('/'));
     if(+p.accLo!==+q.accLo||+p.accHi!==+q.accHi)d.push(nm+'fourchette '+q.accLo+'-'+q.accHi+' \u2192 '+p.accLo+'-'+p.accHi);
@@ -2739,7 +2861,7 @@ function runSim(){
     S.nwk=+P.nwk; S.bw=+P.bw; S.jours=P.jours;
     S.lifts.forEach(function(L,i){
       var p=P.lifts[i], Q=L.prog;
-      Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair||'';
+      Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair==='fr'?'':(p.pair||''); Q.fr=p.pair==='fr';   /* lot 43 */
       Q.hdl=p.hdl.slice(); Q.accDays=p.accDays.slice(); Q.accDay=p.accDays[0]||'J1';
       Q.accLo=+p.accLo; Q.accHi=+p.accHi;
       L.step=+p.step||L.step;
@@ -2798,7 +2920,7 @@ function simApply(P,sv,rmch){
   S.nwk=+P.nwk; S.bw=+P.bw; S.jours=P.jours;
   S.lifts.forEach(function(L,i){
     var p=P.lifts[i], Q=L.prog;
-    Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair||'';
+    Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair==='fr'?'':(p.pair||''); Q.fr=p.pair==='fr';   /* lot 43 */
     Q.hdl=p.hdl.slice(); Q.accDays=p.accDays.slice(); Q.accDay=p.accDays[0]||'J1';
     Q.accLo=+p.accLo; Q.accHi=+p.accHi;
     L.step=+p.step||L.step;
@@ -2866,7 +2988,7 @@ function renderAssign(){
     }
     var z=isZlat(P.tpl), ap=P.tpl==='advpeak';
     var h='<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
-      '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+'</div>'+
+      '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+tbLab(P,t)+'</div>'+
       '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>';
 
     /* variantes des séances secondaires */
@@ -2882,15 +3004,13 @@ function renderAssign(){
         '<div class="field md"><label>Back-off</label><select data-i="'+i+'" data-f="boMode">'+
         '<option value="recalc"'+(P.boMode!=='fixe'?' selected':'')+'>recalculés sur chaque top set</option>'+
         '<option value="fixe"'+(P.boMode==='fixe'?' selected':'')+'>écart fixe tout le bloc</option></select></div>':'')+
-      '<div class="field md"><label>Fourchettes de reps</label><select data-i="'+i+'" data-f="repMode">'+
+      '<div class="field md"><label>Application des fourchettes</label><select data-i="'+i+'" data-f="repMode">'+
         REPMODES.map(function(o){
           return '<option value="'+o[0]+'"'+((P.repMode||'range')===o[0]?' selected':'')+'>'+o[1]+'</option>';
         }).join('')+'</select></div>'+
       (t.days&&t.days.some(function(d){return d.offGap;})?gapField(L,P,i):'')+   /* lot 40 (Q1) */
-      (z&&t.ranges?'<div class="field sm"><label>Rep range</label><select data-i="'+i+'" data-f="pair">'+
-        PAIRS.map(function(p){var v=p[0]?p[0]+'/'+p[1]:'';
-          return '<option value="'+v+'"'+(P.pair===v?' selected':'')+'>'+(v||'fourchettes')+'</option>';}).join('')+'</select></div>':'')+
-    '</div>';
+      (z&&t.ranges?'<div class="field md"><label>Méthode du run</label><select data-i="'+i+'" data-f="pair">'+pairOpts(pairUi(P))+'</select></div>':'')+   /* lot 43 (R1) */
+    '</div>'+(z&&t.ranges?runRule(L,P,t):'');
 
     /* charge de départ */
     if(z){
@@ -2920,7 +3040,7 @@ function renderAssign(){
       h+='</div>'+startNotes(L,i,t);   /* lot 40 (Q5) */
       var fz0=fzOf(L), s0=fz0?fz0.s0:startLoad(L,t), target=P.pair?+P.pair.split('/')[0]:(t.refReps||5);
       var lastU=unitIndex(t,S.nwk-1,t.days[t.days.length-1].label,P);
-      var nAdj=(P.adj||[]).length, faE=fzAt(L,S.nwk-1,t.days[t.days.length-1].label), sEnd=(faE?faE.s0:s0)+P.inc*adjUnit(P,lastU);   /* B2 */
+      var nAdj=(P.adj||[]).length, faE=fzAt(L,S.nwk-1,t.days[t.days.length-1].label), sEnd=frOn(L)?rnd(frExact(L,i,lastU).ex,L.step):(faE?faE.s0:s0)+P.inc*adjUnit(P,lastU);   /* B2 ; lot 43 (R1) */
       var rir0=rirOf(L,s0,target), rirEnd=rirOf(L,sEnd,target);
       var wall=wallOf(i,L);
       h+='<p class="note">Départ <b>'+F(s0)+' kg</b> pour '+target+' reps, réserve implicite '+F(Math.round(rir0*10)/10)+
@@ -2936,7 +3056,7 @@ function renderAssign(){
            (Math.abs(g1-g0)>0.01?' : il grandit au fil du bloc, et un back-off peut répéter la charge de la séance précédente.':'.'))+'</p>';
       }
       if(nAdj)h+=hardFlag(nAdj+' charge'+(nAdj>1?'s':'')+' répétée'+(nAdj>1?'s':'')+' après échec',
-        'Tout ce qui suit a reculé d\'un cran : l\'arrivée en S'+S.nwk+' tombe à '+F(sEnd)+' kg au lieu de '+F(sEnd+P.inc*nAdj)+' kg. '+
+        'Tout ce qui suit a reculé d\'un cran : l\'arrivée en S'+S.nwk+' tombe à '+F(sEnd)+' kg'+(frOn(L)?'. ':' au lieu de '+F(sEnd+P.inc*nAdj)+' kg. ')+
         'Ajoutez '+nAdj+' semaine'+(nAdj>1?'s':'')+' si vous voulez retrouver la cible de départ.');
       if(wall.over)h+='<p class="note">Au-delà de votre référence à partir de <b>'+wall.over.lab+'</b> ('+wall.over.txt+
         ') : c\'est là que le mur est attendu. Chaque top set suivant qui passe est un record.</p>';
@@ -2985,7 +3105,7 @@ $('assign').addEventListener('input',function(e){
     /* lot 40 (Q1) : refus de l'increment (liste) retire */
     P.inc=nv; }
   else if(f==='repMode')P.repMode=v;
-  else if(f==='pair'){P.pair=v;P.top=null;P.prLoad=null;P.prBw=null;}
+  else if(f==='pair'){P.fr=(v==='fr');P.pair=(v==='fr')?'':v;P.top=null;P.prLoad=null;P.prBw=null;}   /* lot 43 (R1) */
   else if(f==='startMode')P.startMode=v;
   else if(f==='hStart')P.hStart=v;
   else if(f==='hMan'){ var hv=num(v,null); P.hMan=(hv==null?null:hv); }
@@ -3089,6 +3209,7 @@ function buildPlan(){
           var fa=fzAt(L,w,lab), u=unitIndex(t,w,lab,P), s0=fa?fa.s0:startLoad(L,t), ue=adjUnit(P,u), rep_=isRepeatUnit(P,u);
           var dOff=day0.offGap?-gapOf(P,L):(day0.off||0);
           var refAdd=s0+P.inc*ue+dOff, bz=fa?bwZ(L,fa.bw):bwZ(L), refSys=bz+refAdd;
+          if(frOn(L)){ var frx=frExact(L,o.i,u,zr); refAdd=frx.ex-(bz-bwZ(L,frx.bw))+dOff; refSys=bz+refAdd; }   /* lot 43 (R1) */
           day0.lines.forEach(function(li,li_i){
             var reps=li.reps;
             if(P.pair&&li.tag==='top')reps=P.pair.split('/')[0];
@@ -3232,7 +3353,7 @@ function lastPerfHTML(x){
   var dl=(d===null)?'':(Math.abs(d)<0.01?' \u00b7 m\u00eame lest':
     ' \u00b7 '+(d>0?'+':'\u2212')+F(Math.abs(d))+' kg');
   var rs=(e.rir==null)?' \u00b7 r\u00e9serve inconnue':(+e.rir?' \u00b7 r\u00e9serve '+F(e.rir):' \u00b7 \u00e0 l\u2019\u00e9chec');
-  return '<div class="lastp">derni\u00e8re : '+(e.date?frDate(e.date):'sans date')+' \u00b7 <b>'+
+  return '<div class="lastp lpd">derni\u00e8re : '+(e.date?frDate(e.date):'sans date')+' \u00b7 <b>'+
     loadLab(L,e.load)+' '+S.sep+' '+reps+'</b>'+tr+rs+dl+'</div>';
 }
 function lineState(key,date){
@@ -3253,7 +3374,7 @@ function renderPlan(into,weeks,pfx,scope){
     txt+='\n[Semaine '+(week.w+1)+']\n';
     week.days.forEach(function(day){
       var kd=pfx+'d'+week.w+'-'+day.label;
-      html+=(pfx==='t')?'<div class="day">':
+      html+=(pfx==='t')?'<div class="day dt">':
         '<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
         day.label+dayDate(week.w,day.label)+(!SIM&&S.done&&S.done[week.w+'|'+day.label]?' ✓':'')+'</div>';
       txt+=day.label+'\n';
@@ -3761,7 +3882,7 @@ function panelHTML(key){
   var sets=[]; for(var i=0;i<x.sets;i++){
     var tr=saisieOf(e), done=tr&&tr[i]!=null?tr[i]:null;
     var cls=done==null?'':(done>=repMin(x.reps)?'done':'short');
-    sets.push('<button class="pill set '+cls+'" data-set="'+i+'">'+(done==null?'S'+(i+1):done+' reps')+'</button>');
+    sets.push('<button class="pill set '+cls+'" data-set="'+i+'"'+atAttr(e,i)+'>'+(done==null?'S'+(i+1):done+' reps')+'</button>');
   }
   var nxt='';
   if(x.role==='acc'){
@@ -3798,7 +3919,7 @@ function panelHTML(key){
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
       (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Reps réussies par série — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
-        :'<div class="field sm"><label>Reps réussies</label><input data-fld="reps" class="numin" type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
+        :'<div class="field sm"><label>Reps réussies</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
     '</div>'+
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
@@ -3835,6 +3956,7 @@ function draftRead(p){
   el=p.querySelector('[data-fld=load]'); if(el)o.load=el.value;
   el=p.querySelector('[data-fld=reps]'); if(el)o.reps=el.value;
   o.sets=Array.prototype.map.call(p.querySelectorAll('[data-set]'),function(b){return b.textContent;});
+  o.at=atRead(p);   /* lot 43 (C2) */
   el=p.querySelector('[data-rireach]'); o.each=el?el.checked:null;
   o.rir={}; Array.prototype.forEach.call(p.querySelectorAll('[data-rirrow]'),function(r){
     o.rir[r.dataset.rirrow]=Array.prototype.map.call(r.querySelectorAll('[data-rir][aria-pressed=true]'),function(x){return x.dataset.rir;});
@@ -3848,6 +3970,7 @@ function draftApply(p,o){
   var el, f=findLine(p.dataset.panel), mn=f?repMin(f.line.reps):0;
   el=p.querySelector('[data-fld=load]'); if(el&&o.load!=null)el.value=o.load;
   el=p.querySelector('[data-fld=reps]'); if(el&&o.reps!=null)el.value=o.reps;
+  atWrite(p,o.at);   /* lot 43 (C2) */
   Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(b,i){
     var t=(o.sets||[])[i]; if(t==null)return;
     b.textContent=t; var m=/^(\d+) reps$/.exec(t);
@@ -3911,7 +4034,7 @@ function reopenPanel(where){
 }
 /* instantane avant le geste (le geste peut reconstruire la page) et apres (il a pu changer la saisie) */
 document.addEventListener('click',function(){ draftSnap(); setTimeout(function(){draftSnap();},0); },true);
-document.addEventListener('input',function(e){ if(e.target.closest&&e.target.closest('[data-panel]'))draftSnap(); },true);
+document.addEventListener('input',function(e){ if(e.target.closest&&e.target.closest('[data-panel]')){ if(e.target.dataset&&e.target.dataset.fld==='reps')atStamp(e.target); draftSnap(); } },true);   /* lot 43 (C2) */
 document.addEventListener('change',function(e){ if(e.target.closest&&e.target.closest('[data-panel]'))setTimeout(function(){draftSnap();},0); },true);
 function draftFlush(){ draftSnap(null,1); if(DRT)draftWrite(); }   /* B6 : synchrone, la page peut être tuée juste après */
 document.addEventListener('visibilitychange',function(){ if(document.hidden)draftFlush(); });
@@ -3946,15 +4069,15 @@ function panelClick(e){
     if(b.dataset.set!=null){
       var f=findLine(p.dataset.panel), min=repMin(f.line.reps), dft=repDflt(f.line.reps);   /* D2 : borne haute */
       if(b.classList.contains('done')||b.classList.contains('short')||dft==null)showPick(p,b,f.line);
-      else { b.textContent=dft+' reps'; b.className='pill set '+(dft>=min?'done':'short'); hidePick(p); }
+      else { b.textContent=dft+' reps'; b.className='pill set '+(dft>=min?'done':'short'); atStamp(b); hidePick(p); }   /* lot 43 (C2) */
       refreshV(p); e.stopPropagation(); return;
     }
     if(b.dataset.pick!=null){
       var sel=p.querySelector('[data-set][data-sel]');
       if(sel){
         var pv=b.dataset.pick, fl=findLine(p.dataset.panel), mn=repMin(fl.line.reps);
-        if(pv===''){ sel.textContent='S'+(+sel.dataset.set+1); sel.className='pill set'; }
-        else { sel.textContent=(+pv)+' reps'; sel.className='pill set '+((+pv)>=mn?'done':'short'); }
+        if(pv===''){ sel.textContent='S'+(+sel.dataset.set+1); sel.className='pill set'; sel.removeAttribute('data-at'); }
+        else { sel.textContent=(+pv)+' reps'; sel.className='pill set '+((+pv)>=mn?'done':'short'); atStamp(sel); }   /* lot 43 (C2) */
       }
       hidePick(p); refreshV(p); e.stopPropagation(); return;
     }
@@ -4061,6 +4184,7 @@ function saveLine(p,key){
     bw:kp?o0.bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
   if(rirs)e.rirs=rirs;
   if(valid)e.valid=valid;
+  var at=atSave(p,sets,kp?o0:null); if(at)e.at=at;   /* lot 43 (C2) */
   e.tries=sets.slice(); recount(e); if(!e.state)e.state=stateOf(e);
   if(/^[zh]\|/.test(key))fzEnsure(L);   /* B1 */
   var fAuto=failAuto(L,x,key,e);   /* B2 */
@@ -5152,7 +5276,7 @@ function renderData(){
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+   /* R12 */
         (e.role==='extra'?'<br><i>ajout ponctuel</i>':'')+
-        (vl?'<br>'+vl:'')+
+        (vl?'<br>'+vl:'')+atTxt(e)+   /* lot 43 (C2) */
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+
         (lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'">×</button></div>';
@@ -5849,11 +5973,11 @@ $('exportj').addEventListener('click',function(){
   renderBackup();
 });
 $('exportc').addEventListener('click',function(){
-  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','note'];
+  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','heures','note'];
   var VL={ko:'R',dt:'D',ok:'V',franc:'F'};
   var rows=[cols.join(';')].concat(S.log.map(function(e){
     return cols.map(function(c){
-      var v=e[c];
+      var v=c==='heures'?atList(e):e[c];   /* lot 43 (C2) */
       if(c==='valid'&&v)v=v.map(function(a){return (a||[]).map(function(q){return q?VL[q]:'-';}).join('');}).join('/');
       else if(Array.isArray(v))v=v.map(function(q){return q==null?'':q;}).join('/');
       if(v==null)v=''; return String(v).replace(/;/g,',');
