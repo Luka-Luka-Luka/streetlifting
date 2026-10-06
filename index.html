@@ -663,7 +663,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v38';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v39';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -724,6 +724,7 @@ function load(){
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(!S.fold)S.fold={};
     if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null; tbwStale();   /* lot 40 */
+    (S.lifts||[]).forEach(function(L){ var P=L&&L.prog; if(P&&P.prLoad!=null&&P.prBw==null)P.prBw=S.bw; });   /* lot 40 (Q3) */
     if(!S.done)S.done={}; if(S.tsel===undefined)S.tsel=null; if(!S.blockId)S.blockId=1;
     if(!S.blocks)S.blocks=[]; if(!S.verbo)S.verbo='norm'; if(!S.form)S.form={};
     if(!S.formOn)S.formOn={som:1,ene:1,cou:1,art:1,tra:1};
@@ -921,10 +922,34 @@ function gapRefuse(step,inc){
   alert('\u00c9cart J1 / J3 impossible : avec un incr\u00e9ment de '+F(inc)+' kg et un pas de lestage de '+F(step)+
     ' kg, toute valeur ferait rejouer au J3 une charge d\u00e9j\u00e0 faite en J1. Changez l\'incr\u00e9ment ou le pas.');
 }
+/* Lot 40 (Q1) : plus de refus. Tous les multiples du pas sont proposes ; ceux qui sont des multiples
+   de l'increment font rejouer au J3 une charge deja faite en J1 : marques « (repete des charges) »,
+   note orange. Les autres sont marques d'un ✓. Par defaut : le premier ecart sans repetition, sinon un pas. */
+function gapRep(g,P){var ci=Math.round((+P.inc||2.5)*100);return Math.round(g*100)%ci===0;}
+function gapAll(L,P){
+  var st=L.step||1.25, inc=+P.inc||2.5, o=gapOptions(L,P), hi=Math.max(o.length?o[o.length-1]:2*inc,inc), out=[], v=st;
+  while(v<=hi+1e-9&&out.length<12){ out.push(Math.round(v*100)/100); v+=st; }
+  return out;
+}
 function gapOf(P,L){
-  var o=gapOptions(L,P); if(!o.length)return 0;
-  var g=(P.gap==null?o[0]:+P.gap);
-  return o.indexOf(g)>=0?g:o[0];
+  var o=gapOptions(L,P), a=gapAll(L,P); if(!a.length)return 0;
+  var d=o.length?o[0]:a[0], g=(P.gap==null?d:+P.gap);
+  return a.indexOf(g)>=0?g:d;
+}
+function gapField(L,P,i){
+  var a=gapAll(L,P), gc=gapOf(P,L), sans=gapOptions(L,P).length>0;
+  var opt=function(g){return '<option value="'+g+'"'+(gc===g?' selected':'')+'>−'+F(g)+' kg'+(gapRep(g,P)?' (répète des charges)':' ✓')+'</option>';};
+  var ok=a.filter(function(g){return !gapRep(g,P);}), rep=a.filter(function(g){return gapRep(g,P);});
+  /* lot 40 (Q1, precision de Luka) : les ecarts sans repetition sont mis en tete, dans un groupe a part
+     (le gras n'est pas rendu dans le menu natif d'Android : groupe + ✓ a la place) */
+  var h='<div class="field md"><label>Écart J1 / J3</label><select data-i="'+i+'" data-f="gap">'+
+    (ok.length?'<optgroup label="✓ Charges toutes différentes">'+ok.map(opt).join('')+'</optgroup>':'')+
+    (rep.length?'<optgroup label="Répète des charges">'+rep.map(opt).join('')+'</optgroup>':'')+
+    '</select></div>';
+  if(gapRep(gc,P))h+='<div class="field w"><p class="note" style="margin:0;color:var(--warn)">Avec −'+F(gc)+' kg (multiple de l’incrément de '+F(P.inc)+
+    ' kg), le J3 rejoue des charges déjà faites en J1 quelques semaines plus tôt. C’est permis : simple avertissement. '+
+    (sans?'Les écarts marqués ✓ l’évitent.':'Avec un pas de '+F(L.step)+' kg, aucun écart ne l’évite : changez le pas ou l’incrément pour des charges toutes différentes.')+'</p></div>';
+  return h;
 }
 function incField(i,P){
   var free=INCS.indexOf(+P.inc)<0;
@@ -1846,7 +1871,7 @@ $('liftlist').addEventListener('input',function(e){
        ignor\u00e9e \u2014 la derni\u00e8re valide reste appliqu\u00e9e. L'alerte tombe \u00e0 la validation du champ
        (\u00e9v\u00e9nement change, plus bas), comme pour l'incr\u00e9ment libre : taper \u00ab 2,5 \u00bb en passant
        par \u00ab 2 \u00bb ne d\u00e9clenchait plus rien d'utile. */
-    if(needGap(L.prog&&L.prog.tpl)&&!gapPossible(sv,L.prog.inc))return;
+    /* lot 40 (Q1) : plus de refus ; un ecart qui repete des charges est signale dans l'onglet Programme */
     L.step=sv;}
   else if(f==='k')L.k=Math.max(0.001,num(v,0.025));
   else if(f==='rload'){L.ref.load=num(v,L.ref.load);L.ref.est=false;}
@@ -1909,7 +1934,7 @@ $('liftlist').addEventListener('change',function(e){
   var t=e.target, i=t.dataset?t.dataset.i:null;
   if(i==null||t.dataset.f!=='step')return;
   var L=S.lifts[+i], sv=num(t.value,L.step)||1.25;
-  if(needGap(L.prog&&L.prog.tpl)&&!gapPossible(sv,L.prog.inc)){gapRefuse(sv,L.prog.inc);renderLifts();return;}
+  /* lot 40 (Q1) : refus du pas de lestage retire */
   if(sv!==L.step){L.step=sv;save();generate();renderToday();}
 });
 $('liftlist').addEventListener('toggle',function(e){
@@ -2343,11 +2368,68 @@ function startLoad(L,t){
   var target=P.pair?+P.pair.split('/')[0]:(t.refReps||5);
   if(P.startMode==='libre')return P.top==null?rnd(loadAt(L,rmOf(L),target,3),L.step):P.top;
   if(P.startMode==='pr'){
-    var u=unitIndex(t,P.prWeek-1,P.prDay,P);
-    var pr=P.prLoad==null?rnd(loadAt(L,rmOf(L),target,0),L.step):P.prLoad;
-    return rnd(pr-P.inc*u,L.step);
+    var u=unitIndex(t,P.prWeek-1,P.prDay,P), pd=t.days.filter(function(d){return d.label===P.prDay;})[0];
+    var off=pd?(pd.offGap?-gapOf(P,L):(pd.off||0)):0;   /* lot 40 : un record vise en J3 tombait a « record - ecart » */
+    return rnd(prTarget(L,t).lest-P.inc*u-off,L.step);   /* lot 40 (Q3) */
   }
   return rnd(loadAt(L,rmOf(L),target,P.rir),L.step);
+}
+/* Lot 40 (Q3, Q4, Q5) : record vise. Mode (P.prInc) : 'est' = estimation a 0 en reserve (defaut d'avant),
+   '1.25' … '5' = record enregistre a ces reps + increment, 'precise' = lest tape (P.prLoad, PdC de la saisie P.prBw).
+   P.prSys (defaut oui) = « PdC inclus » : le record se compte en charge systeme et se relit au PdC d'en-tete (Q4) ;
+   sinon en lest seul. Arrondi au pas superieur pour un record + increment (sinon ce ne serait pas un record). */
+var PRINC=[['est','estimation (0 en réserve)'],['1.25','+1,25 kg'],['2.5','+2,5 kg'],['3.75','+3,75 kg'],['5','+5 kg'],['precise','charge précise']];
+function prMode(P){return P.prInc!=null?String(P.prInc):(P.prLoad!=null?'precise':'est');}
+function prRecOf(L,n){
+  var li=S.lifts.indexOf(L), s=li>=0?recBest(li,n,false):null, l=null;
+  if(li>=0)recSets(li).forEach(function(x){ if(x.reps===n&&(!l||x.load>l.load||(x.load===l.load&&x.sys>l.sys)))l=x; });
+  return {sys:s,lest:l};
+}
+function ceilStep(x,st){return Math.round(Math.ceil(x/st-1e-9)*st*100)/100;}
+function prTarget(L,t){
+  var P=L.prog, n=P.pair?+P.pair.split('/')[0]:(t.refReps||5), m=prMode(P), sys=P.prSys!==false&&!!L.useBw, bw=bwZ(L);
+  var est=rnd(loadAt(L,rmOf(L),n,0),L.step);
+  if(m==='est')return {lest:est,n:n,m:m};
+  if(m==='precise'){
+    var v=P.prLoad==null?est:+P.prLoad, b0=(P.prBw==null?null:+P.prBw);
+    if(sys&&b0!=null&&Math.abs(b0-bw)>1e-9)return {lest:rnd(v+b0-bw,L.step),n:n,m:m,saisi:v,bw0:b0,corr:true};
+    return {lest:v,n:n,m:m,saisi:v,bw0:b0};
+  }
+  var inc=+m||0, r=prRecOf(L,n);
+  if(sys&&r.sys)return {lest:ceilStep(r.sys.sys+inc-bw,L.step),n:n,m:m,inc:inc,rec:r.sys,sys:true};
+  if(!sys&&r.lest)return {lest:r.lest.load+inc,n:n,m:m,inc:inc,rec:r.lest};
+  return {lest:est+inc,n:n,m:m,inc:inc,sansRec:true};
+}
+function startNotes(L,i,t){
+  var P=L.prog, h='', bw=bwZ(L), W='<p class="note" style="color:var(--warn)">';
+  var bouton='<div class="btnrow"><button class="act ghost mini" onclick="prUse('+i+')">Utiliser ce lest</button></div>';
+  if(P.startMode==='pr'){
+    var r=prTarget(L,t), x='Record visé : <b>'+F(r.lest)+' kg × '+r.n+'</b> en S'+P.prWeek+' '+P.prDay;
+    if(r.rec)x+=' = ton record à '+r.n+' reps ('+recLine(L,r.rec)+') + '+F(r.inc)+' kg'+
+      (r.sys?' en charge système ('+F(Math.round((r.rec.sys+r.inc)*100)/100)+' kg), relu au PdC d’en-tête ('+F(bw)+' kg), arrondi au pas supérieur':' de lest');
+    else if(r.m==='est')x+=' : estimation de ta charge maximale à '+r.n+' reps (0 en réserve)';
+    else if(r.m==='precise')x+=r.corr?' : saisi '+F(r.saisi)+' kg à '+F(r.bw0)+' kg de PdC, relu à charge système égale au PdC d’en-tête ('+F(bw)+' kg)':' : lest saisi';
+    else x+=' : aucun record à '+r.n+' reps enregistré, estimation (0 en réserve) + '+F(r.inc)+' kg';
+    h+='<p class="note">'+x+'.</p>';
+    if(L.useBw&&r.rec&&Math.abs(r.rec.bw-bw)>=1)
+      h+=W+'Ton record ('+F(r.rec.load)+' kg × '+r.n+') a été fait à '+F(r.rec.bw)+' kg ; aujourd’hui '+F(bw)+' kg : à charge système égale, le lest est <b>'+
+        F(rnd(r.rec.load+r.rec.bw-bw,L.step))+' kg</b>.'+(r.sys?' Le record visé en tient compte.':' Le record visé ci-dessus compte en lest seul.')+'</p>'+(r.sys?'':bouton);
+    if(L.useBw&&r.m==='precise'&&r.bw0!=null&&Math.abs(r.bw0-bw)>=1)
+      h+=W+'Ton record visé ('+F(r.saisi)+' kg) a été saisi à '+F(r.bw0)+' kg ; aujourd’hui '+F(bw)+' kg : à charge système égale, le lest est <b>'+
+        F(rnd(r.saisi+r.bw0-bw,L.step))+' kg</b>.'+(r.corr?' Il est déjà corrigé.':'')+'</p>'+(r.corr?'':bouton);
+  }
+  if(L.useBw&&L.ref&&(P.startMode==='rir'||(P.startMode==='pr'&&prMode(P)==='est'))){
+    var rb=refBw(L.ref);
+    if(Math.abs(rb-bw)>=1)h+=W+'Ta référence ('+F(+L.ref.load)+' kg × '+L.ref.reps+') a été faite à '+F(rb)+' kg ; aujourd’hui '+F(bw)+
+      ' kg : à charge système égale, le lest est <b>'+F(rnd(+L.ref.load+rb-bw,L.step))+' kg</b>. Le départ est calculé en charge système : il en tient déjà compte.</p>';
+  }
+  return h;
+}
+function prUse(i){
+  var L=S.lifts[i]; if(!L)return; var P=L.prog, t=tplOf(P.tpl); if(!t)return;
+  if(prMode(P)==='precise'){ var r=prTarget(L,t); P.prLoad=rnd(r.saisi+(r.bw0==null?0:r.bw0-bwZ(L)),L.step); P.prBw=S.bw; }
+  else P.prSys=true;
+  save(); renderAssign(); generate();
 }
 /* Ecart fixe : calcule une fois, au pourcentage du gabarit, sur la charge de depart du
    bloc, puis garde tel quel. Le back-off monte alors exactement de l'increment du top set.
@@ -2539,8 +2621,8 @@ function renderSim(){
           return '<option value="'+v+'"'+(p.pair===v?' selected':'')+'>'+(v||'fourchettes')+'</option>';}).join('')+
         '</select></div>':'')+'</div>';
     if(needGap(p.tpl)&&!gapPossible(+p.step,+p.inc))
-      s+='<p class="note" style="margin-top:6px">\u00c9cart J1 / J3 impossible avec cet incr\u00e9ment et ce pas : '+
-        'toute valeur ferait rejouer au J3 une charge d\u00e9j\u00e0 faite en J1. Le plan simul\u00e9 met les deux jours \u00e0 la m\u00eame charge.</p>';
+      s+='<p class="note" style="margin-top:6px;color:var(--warn)">Écart J1 / J3 : avec cet incrément et ce pas, tout écart fait rejouer au J3 des charges déjà faites en J1 '+
+        '(permis : simple avertissement). Le plan simulé prend un écart d’un pas (−'+F(+p.step)+' kg).</p>';   /* lot 40 (Q1) */
     if(acc)
       s+='<div class="row" style="margin-top:8px">'+
         '<div class="field w" style="flex:1 1 100%"><label>Jours</label><div class="daypick">'+
@@ -2804,15 +2886,7 @@ function renderAssign(){
         REPMODES.map(function(o){
           return '<option value="'+o[0]+'"'+((P.repMode||'range')===o[0]?' selected':'')+'>'+o[1]+'</option>';
         }).join('')+'</select></div>'+
-      (t.days&&t.days.some(function(d){return d.offGap;})?(function(){
-        var go=gapOptions(L,P);
-        if(!go.length)return '<div class="field w"><label>\u00c9cart J1 / J3</label><div class="note" style="margin:0">'+
-          'Aucun \u00e9cart possible : avec un incr\u00e9ment de '+F(P.inc)+' kg et un pas de '+F(L.step)+' kg, '+
-          'toute valeur ferait rejouer au J3 une charge d\u00e9j\u00e0 faite en J1. Changez l\'incr\u00e9ment ou le pas de lestage.</div></div>';
-        return '<div class="field sm"><label>\u00c9cart J1 / J3</label><select data-i="'+i+'" data-f="gap">'+
-          go.map(function(g){return '<option value="'+g+'"'+(gapOf(P,L)===g?' selected':'')+'>\u2212'+F(g)+' kg</option>';}).join('')+
-          '</select></div>';
-      })():'')+
+      (t.days&&t.days.some(function(d){return d.offGap;})?gapField(L,P,i):'')+   /* lot 40 (Q1) */
       (z&&t.ranges?'<div class="field sm"><label>Rep range</label><select data-i="'+i+'" data-f="pair">'+
         PAIRS.map(function(p){var v=p[0]?p[0]+'/'+p[1]:'';
           return '<option value="'+v+'"'+(P.pair===v?' selected':'')+'>'+(v||'fourchettes')+'</option>';}).join('')+'</select></div>':'')+
@@ -2833,13 +2907,17 @@ function renderAssign(){
             Array.apply(null,{length:S.nwk}).map(function(_,k){return '<option value="'+(k+1)+'"'+(P.prWeek==k+1?' selected':'')+'>S'+(k+1)+'</option>';}).join('')+'</select></div>'+
           '<div class="field sm"><label>Jour</label><select data-i="'+i+'" data-f="prDay">'+
             t.days.map(function(d){return '<option value="'+d.label+'"'+(P.prDay===d.label?' selected':'')+'>'+d.label+'</option>';}).join('')+'</select></div>'+
-          '<div class="field sm"><label>Record visé</label><input data-i="'+i+'" data-f="prLoad" type="number" step="0.25" value="'+
-            (P.prLoad==null?rnd(loadAt(L,rmOf(L),P.pair?+P.pair.split('/')[0]:(t.refReps||5),0),L.step):P.prLoad)+'"></div>';
+          '<div class="field md"><label>Record visé</label><select data-i="'+i+'" data-f="prInc">'+
+            PRINC.map(function(o){return '<option value="'+o[0]+'"'+(prMode(P)===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>'+
+          (prMode(P)==='precise'?'<div class="field sm"><label>Lest visé</label><input data-i="'+i+'" data-f="prLoad" type="number" step="0.25" value="'+
+            (P.prLoad==null?prTarget(L,t).lest:P.prLoad)+'"></div>':'')+
+          (L.useBw?'<div class="field w"><label class="chk"><input type="checkbox" data-i="'+i+'" data-f="prSys"'+(P.prSys!==false?' checked':'')+
+            '> PdC inclus : record compté en charge système, relu au PdC d’en-tête</label></div>':'');   /* lot 40 (Q3) */
       }else{
         h+='<div class="field sm"><label>Départ, lest</label><input data-i="'+i+'" data-f="top" type="number" step="0.25" value="'+
           startLoad(L,t)+'"></div>';
       }
-      h+='</div>';
+      h+='</div>'+startNotes(L,i,t);   /* lot 40 (Q5) */
       var fz0=fzOf(L), s0=fz0?fz0.s0:startLoad(L,t), target=P.pair?+P.pair.split('/')[0]:(t.refReps||5);
       var lastU=unitIndex(t,S.nwk-1,t.days[t.days.length-1].label,P);
       var nAdj=(P.adj||[]).length, faE=fzAt(L,S.nwk-1,t.days[t.days.length-1].label), sEnd=(faE?faE.s0:s0)+P.inc*adjUnit(P,lastU);   /* B2 */
@@ -2897,24 +2975,26 @@ function renderAssign(){
 $('assign').addEventListener('input',function(e){
   var t=e.target, i=t.dataset.i; if(i==null)return; var L=S.lifts[+i], P=L.prog, f=t.dataset.f, v=t.value;
   if(f==='tpl'){
-    if(needGap(v)&&!gapPossible(L.step,P.inc)){gapRefuse(L.step,P.inc);renderAssign();return;}   /* D5 */
-    P.tpl=v;P.top=null;P.prLoad=null;P.pair='';P.hdl=[];
+    /* lot 40 (Q1) : refus du gabarit retire */
+    P.tpl=v;P.top=null;P.prLoad=null;P.prBw=null;P.pair='';P.hdl=[];
     if(ZRIR0[v]!=null)P.rir=ZRIR0[v];   /* D6 : r\u00e9serve de d\u00e9part par gabarit Zlat */
   }
   else if(f==='inc'){var iv=num(v,P.inc)||1.25;
-    if(!needGap(P.tpl)||gapPossible(L.step,iv))P.inc=iv;}   /* D5 : la frappe garde la derni\u00e8re valeur valide */
+    P.inc=iv;}   /* lot 40 (Q1) : plus de refus */
   else if(f==='incSel'){ var nv=(v==='libre')?((INCS.indexOf(+P.inc)>=0)?+P.inc+0.25:+P.inc):+v;
-    if(needGap(P.tpl)&&!gapPossible(L.step,nv)){gapRefuse(L.step,nv);renderAssign();return;}   /* D5 */
+    /* lot 40 (Q1) : refus de l'increment (liste) retire */
     P.inc=nv; }
   else if(f==='repMode')P.repMode=v;
-  else if(f==='pair'){P.pair=v;P.top=null;P.prLoad=null;}
+  else if(f==='pair'){P.pair=v;P.top=null;P.prLoad=null;P.prBw=null;}
   else if(f==='startMode')P.startMode=v;
   else if(f==='hStart')P.hStart=v;
   else if(f==='hMan'){ var hv=num(v,null); P.hMan=(hv==null?null:hv); }
   else if(f==='rir')P.rir=+v;
   else if(f==='prWeek')P.prWeek=+v;
   else if(f==='prDay')P.prDay=v;
-  else if(f==='prLoad')P.prLoad=+v||0;
+  else if(f==='prLoad'){P.prLoad=+v||0;P.prBw=S.bw;}   /* lot 40 (Q3) : PdC de la saisie retenu */
+  else if(f==='prInc'){var pv=prTarget(L,tplOf(P.tpl)).lest; P.prInc=v; if(v==='precise'){P.prLoad=pv;P.prBw=S.bw;}}
+  else if(f==='prSys')P.prSys=!!t.checked;
   else if(f==='top')P.top=+v||0;
   else if(f==='varMod')P.varMod=v;
   else if(f==='varTxt')P.varTxt=v;
@@ -2937,7 +3017,7 @@ $('assign').addEventListener('input',function(e){
   else if(f==='accMode')P.accMode=v;
   else if(f==='accEvery')P.accEvery=Math.max(1,+v||1);
   save();
-  if(['tpl','startMode','hStart','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0)renderAssign();
+  if(['tpl','startMode','prInc','prSys','hStart','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0)renderAssign();
   if(f==='refMode'){renderLifts();renderHead();generate();renderToday();}
   generate();
 });
@@ -2947,7 +3027,7 @@ $('assign').addEventListener('change',function(e){
   var t=e.target, i=t.dataset?t.dataset.i:null;
   if(i==null||t.dataset.f!=='inc')return;
   var L=S.lifts[+i], P=L.prog, iv=num(t.value,P.inc)||1.25;
-  if(needGap(P.tpl)&&!gapPossible(L.step,iv)){gapRefuse(L.step,iv);renderAssign();}
+  renderAssign();   /* lot 40 (Q1) : plus de refus, la note de l'ecart se met a jour */
 });
 ['nwk','sep','jours'].forEach(function(id){
   $(id).addEventListener('change',function(){
@@ -3204,6 +3284,52 @@ function weekTag(w){
     else if(!isZlat(L.prog.tpl)&&!t.acc){var hk=hWk(L,w); tags.push(hk.dl?'deload S4 après le cycle '+(hk.c+1):'cycle '+(hk.c+1)+', S'+(hk.ww+1));}   /* Q6 */
   });
   return tags.filter(function(v,i,a){return a.indexOf(v)===i;}).join(' · ');
+}
+/* Lot 40 (Q8) : l'app laisse a la page « Analyser les videos d'une seance » (meme site, meme stockage)
+   le resume des seances de tractions du bloc : date, semaine, seance, PdC, type, et par serie : type,
+   lest, reps, variante. Seance deja enregistree : ce qui a ete fait ; sinon : ce qui est prevu (reps = borne haute) ;
+   la date est alors celle de l'enregistrement.
+   Jour leger (J2) : toutes les series en « secondaire », variante du mouvement. */
+var PROLE={top:'top set',amrap:'top set',test:'top set',back:'back-off','var':'secondaire',deload:'secondaire',extra:'secondaire'};
+function dayISO(w,lab){
+  if(!S.start)return '';
+  var order=S.jours.split(','), k=order.indexOf(lab.toLowerCase()), idx=['J1','J2','J3','J4'].indexOf(lab);
+  if(idx<0&&k<0)return '';
+  var d=new Date(S.start+'T12:00:00'), base=new Date(d.getTime()+w*7*86400000);
+  var want=DAYN[(idx>=0)?order[Math.min(idx,order.length-1)]:lab.toLowerCase()]; if(want===undefined)return '';
+  var dt=new Date(base.getTime()+((want-base.getDay()+7)%7)*86400000), p=function(n){return (n<10?'0':'')+n;};
+  return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate());
+}
+function repHaut(r){var m=String(r==null?'':r).match(/\d+/g); return m?+m[m.length-1]:null;}
+function varPage(L,x,leger){
+  if(x.role!=='var'&&!leger)return '';
+  var m=String(L.prog.varMod||''); return m==='hautes'?'hautes':m==='bloquées'?'bloquées':/^stato/.test(m)?'stato':'';
+}
+function seancesPage(){
+  if(SIM)return null;
+  var li=-1; S.lifts.forEach(function(L,i){ if(li<0&&(L.catId==='pullup'||/traction/i.test(L.name||'')))li=i; });
+  var out=[];
+  if(li>=0)PLAN.forEach(function(wk){ wk.days.forEach(function(dd,di){
+    var L=S.lifts[li], leger=jourLeger(L,dd.label);   /* J2 de Zlat / Helms : toutes les series en « secondaire » */
+    var ty=function(x){return leger?'secondaire':(PROLE[x.role]||(x.role==='work'?'back-off':null));};
+    var xs=dd.lines.filter(function(x){return x.li===li&&ty(x);}); if(!xs.length)return;
+    var series=[], fait=false, pdc=null, dfait='';
+    xs.forEach(function(x){
+      var e=entryOf(x.key), ok=!!(e&&e.state!=='skip'&&e.sets&&e.sets.length), n=ok?e.sets.length:Math.max(1,+x.sets||1);
+      if(ok){ fait=true; if(pdc==null&&+e.bw>0)pdc=+e.bw; if(!dfait&&e.date)dfait=String(e.date).slice(0,10); }
+      for(var k=0;k<n;k++)series.push({type:ty(x),lest:ok?(e.load==null?0:+e.load):(x.load==null?0:+x.load),
+        reps:ok?(e.sets[k]==null?null:+e.sets[k]):repHaut(x.reps),variante:varPage(L,x,leger)});
+    });
+    /* series de travail sans top set (Helms) : la premiere tient lieu de top set */
+    if(!leger&&!series.some(function(s){return s.type==='top set';})&&series[0].type==='back-off')series[0].type='top set';
+    var date=dfait||dayISO(wk.w,dd.label), j=['J1','J2','J3','J4'].indexOf(dd.label);
+    out.push({date:date,semaine:wk.w+1,seance:j>=0?j+1:di+1,label:dd.label,
+      type:series.some(function(s){return s.type==='top set';})?'principale':'secondaire',
+      pdc:pdc!=null?pdc:(date===todayISO()&&S.tbw!=null?+S.tbw:+S.bw),fait:fait,series:series});
+  });});
+  var r={v:1,app:APPV,ecrit:todayISO(),mouvement:'tractions',seances:out};
+  try{ localStorage.setItem('cp-seances-page',JSON.stringify(r)); }catch(e){}
+  return r;
 }
 function dayDate(w,lab){
   if(!S.start)return '';
@@ -4272,6 +4398,7 @@ function renderToday(){
   applyOrder('today');
   if(document.body.classList.contains('reorg'))drawBars();
   xFill(null);
+  seancesPage();   /* lot 40 (Q8) */
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   /* la date prevue au programme, que l'en-tete de jour affichait avant d'etre retire de la seance */
   var dd=String(dayDate(wIdx,sel)||'').replace(/<[^>]*>/g,'').replace(/^[\s\u2014\u00b7,-]+/,'').trim();

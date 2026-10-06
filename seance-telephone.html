@@ -71,7 +71,7 @@ th:first-child,td:first-child{text-align:left}
 <body>
 <main>
 <header><h1>Analyse d'une séance</h1>
-<p class="sous">Outil · lot 37 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
+<p class="sous">Outil · lot 40 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
 
 <section class="carte"><h2>1. Les vidéos de la séance</h2>
 <input type="file" id="fichiers" multiple accept="video/mp4,video/*" aria-label="Vidéos de la séance">
@@ -81,14 +81,16 @@ th:first-child,td:first-child{text-align:left}
 
 <section class="carte" id="formulaire"><h2>2. La séance (une seule fois)</h2>
 <div class="grille">
-<label>Mouvement<select id="mouvement"><option value="tractions">Tractions</option><option value="dips">Dips</option></select></label>
+<label>Mouvement<select id="mouvement"><option value="tractions">Tractions</option></select></label>
 <label>Poids de corps (kg)<input id="pdc" inputmode="decimal" autocomplete="off" placeholder="88,1"></label>
 <label>Semaine<input id="semaine" inputmode="numeric" autocomplete="off" placeholder="3"></label>
 <label>Séance<input id="seance" inputmode="numeric" autocomplete="off" placeholder="1"></label>
 <label>Date de la séance<input id="date" type="date"></label>
 <label>Type de séance<select id="typeseance"><option value="principale">Principale</option><option value="secondaire">Secondaire</option></select></label>
+<label>Variante (toute la séance)<select id="variseance"><option value="">Aucune (normale)</option><option value="hautes">Hautes</option><option value="bloquées">Bloquées</option><option value="stato">Stato</option></select></label>
 </div>
-<p class="petit">Type de séance « Secondaire » (séance secondaire ou légère) met toutes les lignes en « Secondaire » (modifiable ligne par ligne). Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la vidéo la plus ancienne.</p></section>
+<p class="petit">Type de séance « Secondaire » (séance secondaire ou légère) met toutes les lignes en « Secondaire » (modifiable ligne par ligne). Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la vidéo la plus ancienne. « Variante (toute la séance) » met la même variante sur toutes les lignes (modifiable ligne par ligne). <b>Si l'app a été ouverte sur ce téléphone, la séance de tractions de la date des vidéos est pré-remplie</b> (prévue, ou telle qu'enregistrée) : vérifiez chaque ligne. Taper le lest ou les reps d'un back-off le recopie sur les back-offs suivants que vous n'avez pas tapés (de même pour les lignes « Secondaire »).</p>
+<p class="petit" id="prevu" role="status" style="color:var(--fg);font-weight:600"></p></section>
 
 <section class="carte"><h2>3. Analyser</h2>
 <button id="go" type="button" disabled>Analyser la séance</button>
@@ -4295,7 +4297,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 37","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"lot 40","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4612,6 +4614,101 @@ function afficher(vs, sortie) {
   $('res').style.display = 'grid'; $('res').scrollIntoView({ block: 'start' });
 }
 })();
+</script>
+<script>
+// <<< BLOC SEANCE40 - DEBUT >>>
+// Lot 40, partie B — page « Analyser les videos d'une seance » : pre-remplissage depuis l'app (Q8),
+// variante pour toute la seance (Q6, reponse B), recopie des back-offs et des lignes « Secondaire » (Q7).
+// Greffe par outils-lot40/faire-pages-lot40.mjs dans un <script> a part, APRES le script de la page :
+// ses ecouteurs passent donc apres ceux de la page (les lignes existent deja). N'expose qu'un nom : S40.
+// Ne touche ni au calcul ni au fichier de seance : il ne fait que remplir les champs que la page lit.
+// Partie logique sans DOM (testee dans Node), puis le branchement sur la page.
+(function () {
+  "use strict";
+  // ecrit par l'app (index.html, seancesPage) dans le stockage du site, a chaque affichage de la Seance du jour
+  const CLE = "cp-seances-page";
+  const TYPES = ["top set", "back-off", "secondaire", "echauffement", ""];
+  const VARIANTES = ["", "hautes", "bloquées", "stato"];
+
+  function lireResume(texte) {
+    try { const r = JSON.parse(texte); return r && Array.isArray(r.seances) ? r : null; } catch (e) { return null; }
+  }
+  function seanceA(resume, date) {
+    if (!resume || !date) return null;
+    const l = resume.seances.filter(function (s) { return s.date === date; });
+    return l.length ? l[0] : null;
+  }
+  const virg = function (v) { return v === null || v === undefined || v === "" ? "" : String(v).replace(".", ","); };
+  // ce qu'il faut mettre dans les champs : commun (une fois) et une ligne par video (null = video en trop)
+  function preRemplissage(seance, nb) {
+    const commun = { pdc: virg(seance.pdc), semaine: String(seance.semaine || ""), seance: String(seance.seance || ""),
+      typeseance: seance.type === "secondaire" ? "secondaire" : "principale" };
+    const vs = seance.series.map(function (s) { return VARIANTES.indexOf(s.variante || "") >= 0 ? (s.variante || "") : ""; });
+    commun.variseance = vs.length && vs.every(function (v) { return v === vs[0]; }) ? vs[0] : "";
+    const lignes = [];
+    for (let i = 0; i < nb; i++) {
+      const s = seance.series[i];
+      lignes.push(s ? { type_serie: TYPES.indexOf(s.type) >= 0 ? s.type : "", lest_kg: virg(s.lest),
+        reps_annoncees: s.reps === null || s.reps === undefined ? "" : String(s.reps), variante: vs[i] } : null);
+    }
+    return { commun: commun, lignes: lignes, ecart: nb - seance.series.length };
+  }
+  // Q7 : la ligne i (back-off ou secondaire) vient d'etre tapee : les lignes suivantes du meme type que
+  // l'utilisateur n'a pas tapees lui-meme prennent la meme valeur. tapees[j] = vrai si la ligne j a ete tapee.
+  function aRecopier(types, i, tapees) {
+    const t = types[i]; if (t !== "back-off" && t !== "secondaire") return [];
+    const out = [];
+    for (let j = i + 1; j < types.length; j++) if (types[j] === t && !tapees[j]) out.push(j);
+    return out;
+  }
+  const frDate = function (d) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ""); return m ? m[3] + "/" + m[2] : "?"; };
+  function message(r, date, s, pr) {
+    if (!r) return "Aucune séance de l'app sur ce téléphone : ouvrez l'app (même adresse) avant cette page, puis rechoisissez les vidéos. Saisie à la main en attendant.";
+    if (!date) return "";
+    if (!s) return "Aucune séance de tractions de l'app le " + frDate(date) + " (bloc en cours) : saisie à la main.";
+    let t = "Pré-rempli depuis l'app : semaine " + s.semaine + " · " + s.label + " du " + frDate(s.date) + " (" +
+      (s.fait ? "séance enregistrée dans l'app" : "séance prévue") + ", " + s.series.length + " série" + (s.series.length > 1 ? "s" : "") + ")";
+    if (pr && pr.ecart > 0) t += " ; " + pr.ecart + " vidéo" + (pr.ecart > 1 ? "s" : "") + " de plus que de séries : à remplir à la main";
+    if (pr && pr.ecart < 0) t += " ; " + (-pr.ecart) + " série" + (-pr.ecart > 1 ? "s" : "") + " sans vidéo, ignorée" + (-pr.ecart > 1 ? "s" : "");
+    return t + ". Vérifiez chaque ligne avant d'analyser.";
+  }
+  globalThis.S40 = { CLE: CLE, lireResume: lireResume, seanceA: seanceA, preRemplissage: preRemplissage, aRecopier: aRecopier, message: message };
+  if (typeof document === "undefined" || !document.getElementById("liste")) return;
+
+  // ---- branchement sur la page ----
+  const $ = function (i) { return document.getElementById(i); };
+  const tapes = {};   // identifiants des champs tapes par l'utilisateur (jamais ecrases)
+  const nbLignes = function () { return document.querySelectorAll("#liste .video").length; };
+  function remplir() {
+    let r = null; try { r = lireResume(localStorage.getItem(CLE)); } catch (e) { r = null; }
+    const date = $("date").value, s = seanceA(r, date), pr = s ? preRemplissage(s, nbLignes()) : null;
+    if (pr) {
+      for (const k of ["pdc", "semaine", "seance", "typeseance", "variseance"]) if (!tapes[k]) $(k).value = pr.commun[k];
+      pr.lignes.forEach(function (l, i) {
+        if (!l) return;
+        for (const k of ["type_serie", "lest_kg", "reps_annoncees", "variante"]) { const id = "v" + i + "-" + k; if (!tapes[id] && $(id)) $(id).value = l[k]; }
+      });
+    }
+    $("prevu").textContent = nbLignes() ? message(r, date, s, pr) : "";
+  }
+  document.addEventListener("input", function (e) {
+    const t = e.target; if (!t || !t.id) return;
+    tapes[t.id] = true;
+    const m = /^v(\d+)-(lest_kg|reps_annoncees)$/.exec(t.id); if (!m) return;
+    const n = nbLignes(), types = [], tapees = [];
+    for (let j = 0; j < n; j++) { types.push($("v" + j + "-type_serie").value); tapees.push(!!tapes["v" + j + "-" + m[2]]); }
+    for (const j of aRecopier(types, +m[1], tapees)) $("v" + j + "-" + m[2]).value = t.value;
+  });
+  $("variseance").addEventListener("change", function () {
+    for (let j = 0; j < nbLignes(); j++) { const id = "v" + j + "-variante"; if ($(id)) { $(id).value = $("variseance").value; delete tapes[id]; } }
+  });
+  $("fichiers").addEventListener("change", function () {
+    for (const k of Object.keys(tapes)) if (/^v\d+-/.test(k)) delete tapes[k];   // nouvelles lignes
+    remplir();
+  });
+  $("date").addEventListener("change", remplir);
+})();
+// <<< BLOC SEANCE40 - FIN >>>
 </script>
 </body>
 </html>
