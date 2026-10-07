@@ -320,6 +320,9 @@ body.reorg section.page.on .reobar{display:block;background:var(--ink);color:var
 .reobar .act.ghost{background:transparent;color:var(--surface)}
 footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:400 11.5px/1.55 var(--txt);color:var(--muted)}
 @media print{nav,.btnrow,.iconbtn,footer{display:none}body{background:#fff}.line{cursor:auto}}
+#cardsim{background:var(--hl)}   /* lot 45 : le brouillon se distingue du vrai programme */
+.lastp.descp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* lot 46 (R5) */
+.logrow .dcom{margin-top:6px}   /* lot 46 (R10) */
 </style>
 </head>
 <body>
@@ -419,21 +422,26 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div id="indout"></div>
   </div>
   <div class="card" id="cardsim">
-    <h2>Bac à sable <em>essayer un bloc sans rien changer</em></h2>
-    <p class="note" style="margin-top:0">Modifiez ce que vous voulez ci-dessous : le plan
-      simulé s'affiche en dessous et <b>rien n'est enregistré</b> — ni vos réglages, ni votre
-      programme, ni votre journal. Fermez l'application et il n'en reste rien.</p>
-    <p class="note">Ne se simulent pas ici : les fourchettes de reps écrites dans les gabarits
-      (3-5, 5-7…), l'ampleur d'un deload, et les deloads Zlat — qui viennent de vos échecs
-      enregistrés, pas d'un réglage.</p>
-    <div id="simctl"></div>
-    <div class="btnrow">
-      <button class="act" id="simrun">Simuler</button>
-      <button class="act ghost" id="simreset">Repartir de mes valeurs</button>
-      <button class="act ghost" id="simclear">Effacer</button>
-      <button class="act ghost" id="simclose">Clôturer puis appliquer</button>
+    <h2>Bac à sable <em>brouillon du programme</em></h2>
+    <p class="note" style="margin-top:0">Un <b>brouillon</b> de votre programme, calculé par le même code que « Réglages du bloc »
+      ci-dessus. Il reste sur ce téléphone, même après fermeture, mais à part : il ne change jamais votre programme, votre
+      journal ni vos réglages, et il n'est pas dans la sauvegarde. Il sert à comparer.</p>
+    <div class="row">
+      <div class="field sm"><label for="brnwk">Semaines</label><input type="number" id="brnwk" min="1" max="24" step="1"></div>
+      <div class="field md"><label for="brjours">Jours</label><select id="brjours"></select></div>
+      <div class="field sm"><label for="brbw">PdC d'essai</label><input id="brbw" class="numin" type="text" inputmode="decimal"></div>
     </div>
-    <p class="note" id="simclosenote"></p>
+    <div class="row" style="margin-top:8px">
+      <div class="field w"><label class="chk"><input type="checkbox" id="brcur">Simuler la suite du bloc en cours (sinon : le bloc suivant, départ neuf)</label></div>
+      <div class="field w"><label class="chk"><input type="checkbox" id="brsec">Inclure les mouvements secondaires</label></div>
+    </div>
+    <div class="row" id="brrm" style="margin-top:8px"></div>
+    <p class="note">Vides, le PdC et les 1RM d'essai valent vos vraies valeurs (PdC courant, référence de Charges).</p>
+    <div id="brassign"></div>
+    <div class="btnrow">
+      <button class="act" id="simrun">Recalculer</button>
+      <button class="act ghost" id="simreset">Repartir de mes valeurs</button>
+    </div>
     <div id="simout"></div>
   </div>
 </section>
@@ -660,9 +668,14 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
         <select id="catbw"><option value="0">ne compte pas</option><option value="1">compte</option></select></div>
       <div class="field md"><label for="catkeep">Dans la liste ensuite</label>
         <select id="catkeep"><option value="0">non, une seule fois</option><option value="1">oui, garder au catalogue</option></select></div>
+      <div class="field md"><label for="catunit">Se mesure en</label>
+        <select id="catunit"><option value="">reps</option><option value="m">mètres (carry)</option></select></div>
     </div>
     <div class="row" id="catanchor" style="margin-top:8px">
       <div class="field w"><label for="catfrom">Estimer la référence depuis</label><select id="catfrom"></select></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="field w"><label for="catdesc">Description d'exécution (facultatif)</label><input id="catdesc" type="text" placeholder="ex. prise pronation, tempo 2 s en bas"></div>
     </div>
     <p class="note" id="catnote"></p>
     <div class="btnrow"><button class="act" id="addlift">Ajouter</button></div>
@@ -704,7 +717,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v41';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v43';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -733,6 +746,7 @@ S.lifts[0].prog.varMod='hautes'; S.lifts[1].prog.varMod='pausées';
 
 var SAVEFAIL=false;
 function save(){
+  if(BRSWAP)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon */
   REFSTAMP++; REFC={};
   try{ localStorage.setItem('cp-state',JSON.stringify(S)); SAVEFAIL=false; }
   catch(e){
@@ -792,7 +806,7 @@ function load(){
     S.lifts.forEach(function(L){ if(!L.catId){ var g=catByName(L.name); if(g)L.catId=g.id; } });
     S.lifts.forEach(function(L){ if(L.prog&&!L.prog.accDays)L.prog.accDays=[L.prog.accDay||'J1']; });
     /* D8 (B17) : borne haute de la fourchette d'accessoire ramen\u00e9e dans [bas, 30] */
-    S.lifts.forEach(function(L){ var p=L.prog; if(!p)return;
+    S.lifts.forEach(function(L){ var p=L.prog; if(!p||isM(L))return;   /* lot 46 : carries en metres */
       var alo=+p.accLo||8, ahi=+p.accHi;
       if(ahi>30||(ahi&&ahi<alo)){ p.accHiWas=ahi; p.accHi=Math.min(30,Math.max(alo,ahi)); } });
     /* main lift : tractions et dips coches d'office, le reste non ; un choix deja fait n'est pas touche */
@@ -877,7 +891,7 @@ function rnd(v,st){return Math.round(v/st)*st;}
    relit pas a 88 kg, sinon la balance fabrique une progression qui n'a pas eu lieu. */
 var REFSTAMP=0, REFC={};
 function lastExploitable(L,best,bid){   /* D3 : bid = ne garder que les s\u00e9ries de ce bloc */
-  var i=S.lifts.indexOf(L);
+  var i=S.lifts.indexOf(L); if(isM(L))return null;   /* lot 46 */
   var es=S.log.filter(function(e){
     return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&
            e.sets&&e.sets.length&&e.sets[e.sets.length-1]&&
@@ -938,7 +952,89 @@ function colMap(){
   return out;
 }
 function col(i){var m=colMap(); return m[i]==null?0:m[i];}
-function cur(){return S.lifts[S.active]||S.lifts[0];}
+function cur(){var L=S.lifts[S.active]||S.lifts[0]; if(isM(L)){ for(var k=0;k<S.lifts.length;k++)if(!isM(S.lifts[k]))return S.lifts[k]; } return L;}   /* lot 46 : pas de carry dans Charges */
+/* ================= lot 46 =================
+   Carries (Q-46a) : un mouvement « se mesure en metres » (L.unit === 'm') : charge x distance, une distance par serie,
+   gabarit Accessoire seul ; il n'entre dans aucun calcul de 1RM (Charges, records, courbe, reference de cloture,
+   icone PR, tonnage). Description d'execution (R5) : permanente (L.desc) ou pour ce bloc (L.prog.desc, prioritaire). */
+var ACCMMAX=5000;
+function isM(L){return !!(L&&L.unit==='m');}
+function uRep(L){return isM(L)?' m':' reps';}
+function accStepOf(P){var s=Math.round(+(P&&P.accStep)||5); return s>=1?s:5;}
+function mInit(L){ var P=L.prog; L.unit='m'; P.accLo=20; P.accHi=40; P.accStep=5; if(P.tpl!=='acc')P.tpl='off'; }
+function hasLog(i){ return (S.log||[]).some(function(e){return e.li===i;}); }
+function setUnit(L,v){
+  var i=S.lifts.indexOf(L), P=L.prog; if(i<0||hasLog(i))return false;
+  if(v==='m'){ if(!isM(L))mInit(L); }
+  else if(isM(L)){ delete L.unit; delete P.accStep; P.accLo=Math.min(30,+P.accLo||8); P.accHi=Math.min(30,Math.max(P.accLo,+P.accHi||10)); }
+  return true;
+}
+function tplGroupsM(){
+  return '<optgroup label="Accessoires"><option value="acc">'+ACC.name+'</option></optgroup>'+
+    '<optgroup label="—"><option value="off">Ne pas programmer</option></optgroup>';
+}
+function descOf(L){
+  if(!L)return null;
+  var b=(L.prog&&L.prog.desc)?String(L.prog.desc).trim():'', d=L.desc?String(L.desc).trim():'';
+  return b?{t:b,src:'pour ce bloc'}:(d?{t:d,src:'fiche du mouvement'}:null);
+}
+function descHTML(L){ var d=descOf(L); return d?'<p class="note descf">Exécution ('+d.src+') : <b>'+esc(d.t)+'</b></p>':''; }
+function descLine(x,day){
+  var d=descOf(S.lifts[x.li]); if(!d)return '';
+  var first=day.lines.filter(function(l){return l.li===x.li;})[0];
+  return first===x?'<div class="lastp descp">'+esc(d.t)+'</div>':'';
+}
+function descField(L,i,P){
+  return '<div class="row" style="margin-top:8px"><div class="field w" style="flex:1 1 100%"><label>Exécution pour ce bloc — remplace la description de la fiche, vidée à la clôture</label>'+
+    '<input type="text" data-i="'+i+'" data-f="desc" value="'+esc(P.desc||'')+'" placeholder="'+esc(L.desc?'fiche : '+L.desc:'ex. tempo 3 s à la descente, prise serrée')+'"></div></div>';
+}
+function blockDescs(){
+  return S.lifts.filter(function(L){return L.prog&&L.prog.desc&&String(L.prog.desc).trim();})
+    .map(function(L){return {n:L.name,d:String(L.prog.desc).trim()};});
+}
+function blockDescHTML(b){
+  return (b.desc&&b.desc.length)?'<p class="note">Exécution pour ce bloc : '+b.desc.map(function(x){return '<b>'+esc(x.n)+'</b> : '+esc(x.d);}).join(' · ')+'</p>':'';
+}
+/* R10 : notes par serie dans Donnees, et commentaire depuis une ligne (DCOM = cle de la ligne dont l'editeur est ouvert) */
+var DCOM=null;
+function snHTML(e){
+  return (e.setNotes||[]).map(function(n,q){return n?'<br><i>S'+(q+1)+' : '+esc(n)+'</i>':'';}).join('');
+}
+function dcomHTML(e){
+  if(DCOM!==e.key)return '';
+  var n=(e.sets||[]).length, sn=e.setNotes||[];
+  var sel=n>1?'<div class="field md"><label>Série</label><select data-dcq>'+
+    Array.apply(null,{length:n}).map(function(_,q){return '<option value="'+q+'">Série '+(q+1)+'</option>';}).join('')+
+    '<option value="-1">Note générale</option></select></div>':'';
+  var v=n>1?(sn[0]||''):(e.note||'');
+  return '<div class="dcom" data-dcomk="'+esc(e.key)+'"><div class="row">'+sel+
+    '<div class="field w"><label>'+(n>1?'Commentaire':'Note')+'</label><input data-dctxt type="text" value="'+esc(v)+'" placeholder="exécution, sensation, repos"></div></div>'+
+    '<div class="btnrow"><button class="act mini" data-dcsave>Enregistrer</button><button class="act ghost mini" data-dccancel>Annuler</button></div></div>';
+}
+function dcomSave(){
+  var w=document.querySelector('#loglist .dcom'); if(!w)return;
+  var s=w.querySelector('[data-dcq]');
+  dcomApply(w.dataset.dcomk, s?+s.value:-1, w.querySelector('[data-dctxt]').value.trim());
+}
+/* q = -1 : note generale (e.note) ; sinon note de la serie q (e.setNotes[q]) */
+function dcomApply(key,q,v){
+  var e=S.log.filter(function(x){return x.key===key;})[0]; if(!e)return false;
+  if(q<0)e.note=v;
+  else { if(!e.setNotes)e.setNotes=[]; for(var k=0;k<q;k++)if(e.setNotes[k]==null)e.setNotes[k]=''; e.setNotes[q]=v; }
+  var d=DRAFTS[key];   /* saisie non enregistree de la meme seance : elle reprend le commentaire */
+  if(d){ if(q<0)d.note=v; else { if(!d.setNotes)d.setNotes=[]; d.setNotes[q]=v; } draftWrite(); }
+  DCOM=null; save(); renderData(); return true;
+}
+function dataRowClick(ev){
+  var t=ev.target, c=t.closest('[data-dcom]');
+  if(c){ DCOM=(DCOM===c.dataset.dcom)?null:c.dataset.dcom; renderData();
+    var inp=document.querySelector('#loglist .dcom [data-dctxt]'); if(inp)inp.focus(); return; }
+  if(t.closest('[data-dcsave]')){ dcomSave(); return; }
+  if(t.closest('[data-dccancel]')){ DCOM=null; renderData(); return; }
+  if(t.closest('button,select,input,textarea,a,.dcom'))return;
+  var r=t.closest('.logrow'); if(!r||!r.dataset.lk)return;
+  if(findLine(r.dataset.lk))openSession(r.dataset.lk);
+}
 /* Suffixe de bloc : sans lui, un second bloc batirait les memes cles que le premier
    et reprendrait ses series validees. Vide sur le bloc 1 pour ne rien casser. */
 function BK(){return (+S.blockId>1)?('|b'+S.blockId):'';}
@@ -1589,7 +1685,7 @@ function accDaysOf(P){
    d'une seance a la suivante, meme quand l'accessoire tombe plusieurs fois dans la semaine ;
    le calendrier, lui, compte en semaines. */
 function accPlan(L,i){
-  var P=L.prog, lo=+P.accLo||8, hi=Math.min(30,Math.max(lo,+P.accHi||10)), inc=+P.inc||2.5, days=accDaysOf(P);   /* D8 : borne haute born\u00e9e */
+  var P=L.prog, mm=isM(L), ast=mm?accStepOf(P):1, lo=+P.accLo||8, hi=Math.min(mm?ACCMMAX:30,Math.max(lo,+P.accHi||10)), inc=+P.inc||2.5, days=accDaysOf(P);   /* lot 46 : carries */   /* D8 : borne haute born\u00e9e */
   var load=+P.accLoad||0, reps=lo, miss=0, out=[];
   for(var w=0;w<S.nwk;w++){
     days.forEach(function(lab){
@@ -1603,7 +1699,7 @@ function accPlan(L,i){
         if(!sv.length)return;                            /* D1 : tout vide = comme saut\u00e9e */
         if(e.load!=null&&e.load>load+0.01){   /* lot 43 (R8) : charge montee = nouveau depart a cette charge, +1 rep sur ce qui est fait ; jamais un echec */
           var g=Math.min.apply(null,sv), full=sv.length>=(e.sets||[]).length; load=+e.load; miss=0;
-          if(g>=hi&&full){reps=lo;load+=inc;} else reps=Math.min(hi,Math.max(1,g+1));
+          if(g>=hi&&full){reps=lo;load+=inc;} else reps=Math.min(hi,Math.max(1,g+ast));
           return;
         }
         if(sv.some(function(v){return v<reps;})||(e.load!=null&&e.load<load-0.01))ok=false;   /* D1 : \u00e9chec prioritaire */
@@ -1611,17 +1707,18 @@ function accPlan(L,i){
       }
       if(ok){miss=0;
         var got=reps; if(sv&&sv.length)got=Math.max(reps,Math.min.apply(null,sv));
-        if(got>=hi){reps=lo;load+=inc;} else reps=got+1;}
+        if(got>=hi){reps=lo;load+=inc;} else reps=Math.min(hi,got+ast);}
       else {miss++; if(miss>=2){var bz=bwZ(L,bwOf(e));load=rnd((bz+load)*0.9-bz,L.step);reps=lo;miss=0;}}   /* D7 : \u221210 % de la charge syst\u00e8me */
     });
     if(P.accMode==='calendrier'&&(w+1)%(+P.accEvery||3)===0)load+=inc;
   }
   return out;
 }
-function accInfo(P){
+function accInfo(P,L){
   if(P.accMode==='maintien')return 'entretien';
   if(P.accMode==='calendrier')return '+'+F(P.inc)+' / '+(+P.accEvery||3)+' sem.';
-  var alo=+P.accLo||8; return 'double progression '+alo+'-'+Math.min(30,Math.max(alo,+P.accHi||10));
+  var alo=+P.accLo||8; if(isM(L))return 'double progression '+alo+'-'+Math.min(ACCMMAX,Math.max(alo,+P.accHi||10))+' m, +'+accStepOf(P)+' m';   /* lot 46 */
+  return 'double progression '+alo+'-'+Math.min(30,Math.max(alo,+P.accHi||10));
 }
 /* ================= catalogue de mouvements =================
    Rapports de 1RM entre exercices, en charge systeme, d'apres la matrice de Jovanovic
@@ -1699,7 +1796,7 @@ function isZlat(id){return !!ZLAT[id];}
 /* Une fourchette « 4-5 » n'a d'interet que si les deux bornes sont reellement jouees.
    Si vous faites toujours la borne haute, l'afficher franchement evite que la conformite
    et la charge cumulee soient calculees sur une valeur que vous ne faites jamais. */
-function repMax(r){var q=/(\d+)\s*$/.exec(String(r));return q?+q[1]:0;}
+function repMax(r){var q=/(\d+)\s*m?\s*$/.exec(String(r));return q?+q[1]:0;}   /* lot 46 : « 20 m » d'un carry */
 function repPick(r,P){
   var m=P&&P.repMode;
   if(!m||m==='range')return r;
@@ -1945,7 +2042,8 @@ $('theme').addEventListener('click',function(){
 /* ================= en-tête ================= */
 function fillSelects(){
   var o=S.lifts.map(function(L,i){return '<option value="'+i+'">'+L.name+'</option>';}).join('');
-  $('lift').innerHTML=o; $('lift').value=S.active; $('llift').innerHTML=o;
+  $('lift').innerHTML=S.lifts.map(function(L,i){return isM(L)?'':'<option value="'+i+'">'+L.name+'</option>';}).join('');   /* lot 46 : pas de carry dans Charges */
+  $('lift').value=S.lifts.indexOf(cur()); $('llift').innerHTML=o;
 }
 /* ================= lot 44 =================
    PdC courant : sa source (pesee datee ou saisie a la main), affichee en en-tete et dans Programme. */
@@ -2001,7 +2099,7 @@ function copyTxt(t,btn){
 /* R7 : PR prevu = charge systeme prevue (PdC du jour + lest) au-dessus du record a ce nombre de reps
    (meme record que la ligne « record a N reps », hors series de cette meme ligne). */
 function prPlanned(x,lab){
-  if(SIM)return null; var L=S.lifts[x.li]; if(!L)return null;
+  if(SIM)return null; var L=S.lifts[x.li]; if(!L||isM(L))return null;
   if(x.role==='var'||x.role==='deload'||jourLeger(L,lab))return null;
   var n=parseInt(x.reps,10); if(!(n>0)||x.load==null)return null;
   var sys=(L.useBw?(+(S.tbw!=null?S.tbw:S.bw)||0):0)+(+x.load), best=null;
@@ -2039,7 +2137,7 @@ function renderPesees(){
         (f?'bloc '+f.b+', S'+(+String(f.k).split('|')[0]+1)+' '+esc(String(f.k).split('|')[1]||''):'')+'</td></tr>'; }).join('')+
     '</tbody></table></div>':'<p class="note">Aucune pesée tapée ni PdC de fin de séance pour l\'instant.</p>';
 }
-function renderHead(){ withBw(chBw(),renderHead0); bwMen(); }
+function renderHead(){ if(BRSWAP)return; withBw(chBw(),renderHead0); bwMen(); }   /* lot 45 */
 function renderHead0(){
   var L=cur(), rm=rmOf(L), r=refOf(L);
   var age='';
@@ -2060,14 +2158,19 @@ function renderHead0(){
 /* etat ouvert/ferme des reglages avances, garde entre deux rendus de la liste */
 var ADVOPEN={};
 function renderLifts(){
+  if(BRSWAP)return;   /* lot 45 */
   $('liftlist').innerHTML=S.lifts.map(function(L,i){
     return '<div class="card liftcard c'+col(i)+'">'+
-      '<h2><span class="tagname n'+col(i)+'">'+esc(L.name)+'</span><em>'+(L.useBw?'poids de corps inclus':'charge seule')+'</em></h2>'+
+      '<h2><span class="tagname n'+col(i)+'">'+esc(L.name)+'</span><em>'+(isM(L)?'charge × mètres':(L.useBw?'poids de corps inclus':'charge seule'))+'</em></h2>'+
       '<div class="row">'+
         '<div class="field"><label>Nom</label><input type="text" data-i="'+i+'" data-f="name" value="'+esc(L.name)+'"></div>'+
         '<div class="field md"><label>Suivi</label><select data-i="'+i+'" data-f="main">'+
           '<option value="1"'+(L.main?' selected':'')+'>main lift</option><option value="0"'+(!L.main?' selected':'')+'>secondaire</option></select></div>'+
       '</div>'+
+      '<div class="row" style="margin-top:8px">'+
+        '<div class="field w" style="flex:1 1 100%"><label>Description d\'exécution — permanente</label><input type="text" data-i="'+i+'" data-f="desc" value="'+esc(L.desc||'')+'" placeholder="ex. prise pronation, largeur d\'épaules, tempo 2 s en bas"></div>'+
+      '</div>'+
+      (isM(L)?'<p class="note">Se mesure en <b>mètres</b> (charge × distance) : pas de 1RM ni de référence ; il se programme avec le gabarit Accessoire.</p>':
       '<div class="row" style="margin-top:8px">'+
         '<div class="field sm"><label>Réf. lest</label><input data-i="'+i+'" data-f="rload" type="number" step="0.25" value="'+L.ref.load+'"></div>'+
         '<div class="field sm"><label>Réf. reps</label><input data-i="'+i+'" data-f="rreps" type="number" step="1" min="1" value="'+L.ref.reps+'"></div>'+
@@ -2083,7 +2186,7 @@ function renderLifts(){
           (diff?'<p class="note"><b>Les trois champs ci-dessus ne servent pas dans ce mode.</b> Le calcul utilise '+
             F(r.load)+' kg × '+F(r.reps)+(r.rir?' à '+F(r.rir)+' en réserve':' à l\'échec')+
             (r.date?', du '+frDate(r.date):'')+' — '+r.src+'.</p>':'');
-      })()+
+      })())+   /* lot 46 : rien de tout cela pour un carry */
       '<details class="adv" data-adv="'+i+'"'+(ADVOPEN[i]?' open':'')+' style="margin-top:10px"><summary class="note">Réglages avancés</summary>'+
       '<div class="row" style="margin-top:8px">'+
         '<div class="field sm"><label>Pas de lestage</label><select data-i="'+i+'" data-f="step">'+
@@ -2109,6 +2212,11 @@ function renderLifts(){
             return '<option value="'+o[0]+'"'+((L.refMode||'fixe')===o[0]?' selected':'')+'>'+o[1]+'</option>';
           }).join('')+'</select></div>'+
       '</div>'+
+      '<div class="row" style="margin-top:8px">'+
+        '<div class="field md"><label>Se mesure en</label><select data-i="'+i+'" data-f="unit"'+(hasLog(i)?' disabled':'')+'>'+
+          '<option value=""'+(isM(L)?'':' selected')+'>reps</option><option value="m"'+(isM(L)?' selected':'')+'>mètres (carry)</option></select></div>'+
+      '</div>'+
+      (hasLog(i)?'<p class="note">Des séries sont enregistrées pour ce mouvement : l\'unité ne change plus (elles seraient mal relues).</p>':'')+
       '</details>'+
       (S.lifts.length>1?'<div class="btnrow"><button class="act ghost mini" data-del="'+i+'">Supprimer</button></div>':'')+
     '</div>';
@@ -2135,7 +2243,9 @@ $('liftlist').addEventListener('input',function(e){
   else if(f==='main')L.main=(v==='1');
   else if(f==='color'){L.color=(v===''?null:+v); save(); renderAll(); return;}
   else if(f==='catId')L.catId=v||null;
-  else if(f==='bareme'){L.bareme=v; save(); return;}   /* N2 : pas de re-rendu, la frappe garde le focus */
+  else if(f==='bareme'){L.bareme=v; save(); return;}
+  else if(f==='desc'){L.desc=v; save(); renderToday(); return;}   /* lot 46 (R5) : pas de re-rendu de la fiche, la frappe garde le focus */
+  else if(f==='unit'){ if(setUnit(L,v)){save(); renderAll();} return; }   /* lot 46 (Q-46a) */   /* N2 : pas de re-rendu, la frappe garde le focus */
   save(); fillSelects(); renderHead(); renderCharges(); renderAssign(); renderCatPick();
 });
 /* Les entrees du journal et les cles de programme designent un mouvement par son INDEX.
@@ -2293,9 +2403,10 @@ $('addlift').addEventListener('click',function(){
     var nm=($('catname').value||'').trim()||'Nouveau mouvement', bw=$('catbw').value==='1';
     L={name:nm,catId:null,useBw:bw,step:bw?1.25:2.5,k:kDefault(bw),
        ref:{load:bw?10:40,reps:5,rir:0,est:true},prog:newProg(bw?1.25:2.5)};
+    if($('catunit').value==='m')mInit(L);   /* lot 46 (Q-46a) */
     if($('catkeep').value==='1'){
       var id='u'+Date.now();
-      S.cat.push({id:id,g:'mine',r:null,bw:bw?1:0,n:nm});
+      S.cat.push({id:id,g:'mine',r:null,bw:bw?1:0,n:nm,unit:isM(L)?'m':undefined});
       L.catId=id;
     }
     $('catname').value='';
@@ -2304,9 +2415,11 @@ $('addlift').addEventListener('click',function(){
     L={name:e.n,catId:e.id,main:isMainDefault(e.id),useBw:!!e.bw,step:e.bw?1.25:2.5,k:kDefault(!!e.bw),
        ref:{load:e.bw?10:40,reps:5,rir:0,est:true,bw:S.bw},prog:newProg(e.bw?1.25:2.5)};
     var A=(from!==''&&S.lifts[+from])?S.lifts[+from]:null, lk=A?catLink(A.catId,sel):null;
+    if(e.unit==='m')mInit(L);   /* lot 46 : mouvement garde au catalogue en metres */
     if(lk)L.ref.load=Math.max(0,Math.round((rmOf(A)*lk.f/(1+L.k*4)-(L.useBw?S.bw*RC:0))*4)/4);
   }
   L.prog.tpl='off';   /* lot 40 (2a) : hors programme ; on le programme dans l'onglet Programme */
+  var dsc=($('catdesc').value||'').trim(); if(dsc)L.desc=dsc; $('catdesc').value='';   /* lot 46 (R5) */
   S.lifts.push(L); save(); renderAll();
 });
 
@@ -2798,301 +2911,179 @@ function tplGroups(){
     '<optgroup label="Accessoires"><option value="acc">'+ACC.name+'</option></optgroup>'+
     '<optgroup label="\u2014"><option value="off">Ne pas programmer</option></optgroup>';
 }
-/* ================= N5 : bac a sable =================
-   Repondre a « et si ? » sans payer le prix d'un essai reel. Le plan simule est calcule
-   par le MEME buildPlan que le vrai : on n'ecrit pas un second generateur, qui derivera.
-   On pose donc les valeurs d'essai dans S, on genere, on rend, puis on remet les valeurs
-   d'origine — champ par champ, jamais en remplacant S, pour ne pas laisser d'objets
-   orphelins derriere les references deja prises ailleurs. Rien n'appelle save() dans
-   l'intervalle, et la restauration a lieu meme si la generation echoue.
-   Le blocId n'est pas touche : les gabarits Helms lisent le journal du bloc en cours pour
-   decider de leur progression, et un blocId bidon changerait le plan qu'on veut observer.
-   C'est pourquoi l'affichage, lui, est mis en sourdine par SIM (etats, marques, brouillons).
-   La reference simulee est posee en mode 'fixe' a 1 rep : rmOf vaut alors exactement
-   poids de corps corrige + lest saisi, donc le champ « 1RM lest » veut dire ce qu'il dit.
-   Lot 8 : a gabarit et rep range inchanges, le gel du depart (P.fz) reste valide et c'est lui,
-   pas la reference, qui fixe le depart du bloc — le champ « 1RM lest » n'a alors aucun effet.
-   La case « depart neuf » met P.fz a null le temps de la generation ; fzEnsure n'est appele ni
-   par buildPlan ni par le rendu, donc rien ne le recree, et la restauration ci-dessous le remet
-   avec le reste du contenu de L.prog. */
-var SIMP=null;
-/* Lot 7 : les valeurs d'essai vivent dans SIMP, en memoire, jamais dans S ni dans l'export.
-   Un champ n'apparait que si le gabarit SIMULE s'en sert : increment et pas de lestage
-   partout, deloads S4 pour un gabarit Helms, paire de reps pour un Zlat a fourchettes,
-   jours et fourchette pour un accessoire. */
-function simDefaults(){
-  return {nwk:S.nwk, bw:S.bw, jours:S.jours, fresh:false,
-    lifts:S.lifts.map(function(L){
-      var P=L.prog, lo=Math.min(30,Math.max(1,+P.accLo||8));
-      return {tpl:P.tpl, rm:Math.round((rmOf(L)-eff(L))*4)/4,
-        inc:+P.inc||1.25, step:+L.step||1.25, repMode:P.repMode||'range', pair:pairUi(P),
-        hdl:(P.hdl||[]).slice(), accDays:accDaysOf(P), accLo:lo,
-        accHi:Math.min(30,Math.max(lo,+P.accHi||10))};
-    })};
+/* ================= lot 45 : bac a sable = brouillon du vrai programme (R16, R14, R15) =================
+   Le brouillon BR garde une COPIE des reglages du vrai panneau : S.nwk, S.jours et, pour chaque mouvement, L.prog sans
+   ses champs tires du journal (fz, adj, fl) ; plus un PdC et des 1RM lest d'essai (null = valeurs reelles). Il vit sous
+   sa propre cle du stockage (BRKEY), jamais dans S ni dans l'export, et survit au rafraichissement (R15).
+   brWith(fn) pose le brouillon dans S le temps de fn, puis remet tout, meme apres une erreur. Pendant ce temps BRSWAP
+   rend inertes save, generate et les rendus des autres onglets, et renderAssign dessine dans #brassign (ASGT) : le
+   panneau du brouillon est donc celui du vrai programme, meme code (R16), et les saisies passent par asgSet, la
+   fonction du vrai panneau. Les boutons a onclick du panneau (refiger, reajuster, recalculer au PdC, utiliser ce lest)
+   agissent sur le vrai programme : ils sont desactives dans le brouillon.
+   Bloc suivant (defaut) : comme closeBlock() — blocId + 1, seances faites et charges repetees remises a zero, gel du
+   depart leve, reference « cloture du bloc » reprise sur la meilleure serie du bloc en cours, deloads vides, depart
+   date d'aujourd'hui. Case « suite du bloc en cours » : journal du bloc (fz, adj, fl) repris tel quel.
+   R14 : seuls les main lifts sont dans le brouillon, sauf case « inclure les secondaires » ; un mouvement hors du
+   brouillon est « Ne pas programmer » le temps du calcul. Comparer seulement (Q-45a c) : rien n'ecrit le brouillon
+   dans le vrai programme. */
+var BRKEY='cp-prog-brouillon', BR=null, BRSWAP=0, ASGT='assign', ASGSKIP={};
+var BRJOURNAL=['fz','adj','fl'];
+function brCopy(o){return o==null?o:JSON.parse(JSON.stringify(o));}
+function brPut(o,k,v){ if(v===undefined)delete o[k]; else o[k]=v; }
+function brLift(L,next){
+  var p=brCopy(L.prog); BRJOURNAL.forEach(function(k){delete p[k];});
+  if(next){p.hdl=[]; delete p.desc;}   /* lot 46 : la description de bloc est videe par la cloture */   /* deloads choisis pour le bloc en cours : remis a zero par la cloture */
+  return {nm:L.name, prog:p, rm:null};
 }
-/* Vagues d'un gabarit Helms pour une configuration SIMULEE : hWk et hW0 — les memes
-   fonctions que le vrai panneau — appelees sur un faux mouvement {prog:{tpl,hdl}}.
-   Rien n'est reconstruit, rien n'est mute dans S. */
-function simWaves(tpl,hdl,nwk){
-  var t=tplOf(tpl);
-  if(!t||t.acc||t.special||isZlat(tpl)||!t.weeks)return [];
-  var X={prog:{tpl:tpl,hdl:hdl||[]}}, out=[], n=Math.max(1,+nwk||1);
-  for(var c=0;c<=hWk(X,n-1).c;c++){
-    var wd=hW0(X,c)+t.weeks;
-    if(wd>=n)break;
-    out.push({c:c,w:wd});
-  }
-  return out;
+function brNew(){
+  return {v:1, nwk:S.nwk, jours:S.jours, bw:null, cur:false, sec:false,
+    lifts:S.lifts.map(function(L){return brLift(L,true);})};
 }
-function simSync(){
-  if(!SIMP)SIMP=simDefaults();
-  if(SIMP.lifts.length!==S.lifts.length)SIMP=simDefaults();
-  return SIMP;
+function brLoad(){
+  try{ var o=JSON.parse(localStorage.getItem(BRKEY)||'null'); if(o&&o.v===1&&Array.isArray(o.lifts))return o; }catch(e){}
+  return null;
 }
-function renderSim(){
-  var P=simSync();
-  var h='<div class="row">'+
-    '<div class="field sm"><label for="simnwk">Semaines</label>'+
-      '<input type="number" id="simnwk" min="1" max="24" step="1" value="'+(+P.nwk)+'"></div>'+
-    '<div class="field sm"><label for="simbw">Poids de corps (kg)</label>'+
-      '<input type="number" id="simbw" step="0.1" min="20" value="'+String(P.bw)+'"></div>'+
-    '<div class="field md"><label for="simjours">Jours de la semaine</label><select id="simjours">'+
-      JOURSOPT.map(function(v){return '<option value="'+v+'"'+(P.jours===v?' selected':'')+'>'+
-        v.split(',').join(' / ')+'</option>';}).join('')+'</select></div>'+
-    '<div class="field w" style="flex:1 1 100%"><label class="chk"><input type="checkbox" id="simfresh" value="1"'+
-      (P.fresh?' checked':'')+'>Repartir d\u2019un d\u00e9part neuf</label>'+
-    '<p class="note" style="margin:4px 0 0">Le gel du d\u00e9part est lev\u00e9 pendant la simulation : le champ '+
-      '\u00ab\u00a01RM lest\u00a0\u00bb agit alors m\u00eame \u00e0 gabarit inchang\u00e9, comme au d\u00e9but d\u2019un bloc. '+
-      'En m\u00e9moire seulement : votre gel r\u00e9el n\u2019est pas touch\u00e9.</p></div></div>';
-  h+=S.lifts.map(function(L,i){
-    var p=P.lifts[i], t=tplOf(p.tpl), acc=!!(t&&t.acc), z=isZlat(p.tpl);
-    var s='<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-top:9px">'+
-      '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+esc(L.name)+'</div>'+
-      '<div class="row">'+
-        '<div class="field md"><label for="simt'+i+'">Gabarit</label>'+
-          '<select id="simt'+i+'" data-simt="'+i+'">'+tplGroups()+'</select></div>'+
-        '<div class="field sm"><label for="simr'+i+'">1RM lest (kg)</label>'+
-          '<input type="number" id="simr'+i+'" data-simr="'+i+'" step="0.25" value="'+String(p.rm)+'"></div></div>';
-    if(!t)return s+'</div>';
-    s+='<div class="row" style="margin-top:8px">'+
-      '<div class="field sm"><label for="simi'+i+'">Incr\u00e9ment (kg)</label>'+
-        '<input type="number" id="simi'+i+'" min="0.25" step="0.25" value="'+String(p.inc)+'"></div>'+
-      '<div class="field sm"><label for="sims'+i+'">Pas de lestage</label><select id="sims'+i+'">'+
-        STEPS.map(function(v){return '<option value="'+v+'"'+(+p.step===v?' selected':'')+'>'+F(v)+'</option>';}).join('')+
-        '</select></div>'+
-      (acc?'':'<div class="field md"><label for="simm'+i+'">Application des fourchettes</label><select id="simm'+i+'">'+
-        REPMODES.map(function(o){return '<option value="'+o[0]+'"'+(p.repMode===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+
-        '</select></div>')+
-      (z&&t.ranges?'<div class="field md"><label for="simp'+i+'">Méthode du run</label><select id="simp'+i+'" data-simp="'+i+'">'+
-        pairOpts(p.pair||'')+   /* lot 43 (R1) */
-        '</select></div>':'')+'</div>';
-    if(needGap(p.tpl)&&!gapPossible(+p.step,+p.inc))
-      s+='<p class="note" style="margin-top:6px;color:var(--warn)">Écart J1 / J3 : avec cet incrément et ce pas, tout écart fait rejouer au J3 des charges déjà faites en J1 '+
-        '(permis : simple avertissement). Le plan simulé prend un écart d’un pas (−'+F(+p.step)+' kg).</p>';   /* lot 40 (Q1) */
-    if(acc)
-      s+='<div class="row" style="margin-top:8px">'+
-        '<div class="field w" style="flex:1 1 100%"><label>Jours</label><div class="daypick">'+
-          ADAYS.map(function(d){var on=p.accDays.indexOf(d)>=0;
-            return '<label class="dchip'+(on?' on':'')+'"><input type="checkbox" id="simj'+i+'_'+d+'" value="'+d+'" data-simj="'+i+'" data-d="'+d+'"'+
-              (on?' checked':'')+'>'+d+'</label>';}).join('')+'</div></div>'+
-        '<div class="field sm"><label for="simlo'+i+'">Reps de</label>'+
-          '<input type="number" id="simlo'+i+'" min="1" step="1" value="'+(+p.accLo)+'"></div>'+
-        '<div class="field sm"><label for="simhi'+i+'">\u00e0</label>'+
-          '<input type="number" id="simhi'+i+'" min="1" step="1" value="'+(+p.accHi)+'"></div></div>';
-    var wv=simWaves(p.tpl,p.hdl,P.nwk);
-    if(wv.length)
-      s+='<p class="note" style="margin-top:6px">Deload S4 apr\u00e8s une vague : reps de la S'+t.weeks+
-        ' \u00e0 la charge de la S1, deux tiers des s\u00e9ries. La suite du bloc est d\u00e9cal\u00e9e d\'une semaine.</p><div class="btnrow">'+
-        wv.map(function(x){return '<label class="chk"><input type="checkbox" id="simd'+i+'_'+x.c+'" value="'+x.c+'" data-simd="'+i+'" data-c="'+x.c+'"'+
-          (p.hdl.indexOf(x.c)>=0?' checked':'')+'>apr\u00e8s la vague '+(x.c+1)+' (S'+(x.w+1)+')</label>';}).join(' ')+'</div>';
-    return s+'</div>';
-  }).join('');
-  $('simctl').innerHTML=h;
-  S.lifts.forEach(function(_,i){
-    var q=$('simt'+i); if(q)q.value=P.lifts[i].tpl;
-    var m=$('simm'+i); if(m)m.value=P.lifts[i].repMode;
-    var g=$('simp'+i); if(g)g.value=P.lifts[i].pair;
-    var e=$('sims'+i); if(e)e.value=String(P.lifts[i].step);
-    var j=$('simjours'); if(j)j.value=P.jours;
-  });
-  simCloseBtn();
+function brStore(){ try{ localStorage.setItem(BRKEY,JSON.stringify(BR)); }catch(e){} }
+function brSync(){
+  if(!BR)BR=brLoad()||brNew();
+  /* mouvement ajoute, renomme ou retire : alignement sur S.lifts par le nom ; un nouveau venu part du reel */
+  var by={}; BR.lifts.forEach(function(x){ if(x&&x.nm!=null&&x.prog)by[x.nm]=x; });
+  BR.lifts=S.lifts.map(function(L){return by[L.name]||brLift(L,!BR.cur);});
+  return BR;
 }
-/* Lot 9 : etat du bouton « Cloturer puis appliquer ». Le bouton vit hors de #simctl
-   (HTML statique), donc il est remis a jour ici et non reconstruit. */
-function simCloseBtn(){
-  var b=$('simclose'), n=$('simclosenote'); if(!b)return;
-  var why=simCloseReason();
-  b.disabled=!!why;
-  if(n)n.innerHTML=why?'<b>Cl\u00f4turer puis appliquer</b> est indisponible : '+esc(why)
-    :'<b>Cl\u00f4turer puis appliquer</b> cl\u00f4ture le bloc '+S.blockId+', puis \u00e9crit la configuration ci-dessus '+
-     'dans vos vrais r\u00e9glages, pour le bloc suivant. Le bloc en cours n\u2019est jamais d\u00e9plac\u00e9.';
-}
-/* Une case a cocher non rendue et une case decochee se ressemblent : on ne lit une case
-   que si elle porte son propre code en value, ce que seul le rendu ecrit. Meme precaution
-   que le « value!=='' » des champs texte. */
-function simChk(id){var c=$(id); return (c&&c.value!=='')?{on:!!c.checked}:null;}
-function simRead(){
-  var P=simSync();
-  var n=$('simnwk'), b=$('simbw'), j=$('simjours');
-  if(n&&n.value!=='')P.nwk=Math.max(1,Math.min(24,Math.round(+n.value||P.nwk)));
-  if(b&&b.value!=='')P.bw=Math.max(20,+b.value||P.bw);
-  if(j&&j.value&&JOURSOPT.indexOf(j.value)>=0)P.jours=j.value;
-  var fr=simChk('simfresh'); if(fr)P.fresh=fr.on;
-  S.lifts.forEach(function(_,i){
-    var p=P.lifts[i];
-    var s=$('simt'+i), r=$('simr'+i), ic=$('simi'+i), st=$('sims'+i), m=$('simm'+i), g=$('simp'+i);
-    if(s&&s.value)p.tpl=s.value;
-    if(r&&r.value!=='')p.rm=+r.value||0;
-    if(ic&&ic.value!=='')p.inc=Math.max(0.25,+ic.value||p.inc);
-    if(st&&st.value!=='')p.step=Math.max(0.25,+st.value||p.step);
-    if(m&&m.value)p.repMode=m.value;
-    if(g&&g.dataset&&g.dataset.simp!==undefined)p.pair=g.value||'';   /* '' est une valeur valide : on se fie au marqueur, pas au contenu */
-    var t=tplOf(p.tpl);
-    if(!(t&&t.ranges&&isZlat(p.tpl)))p.pair='';   /* comme le vrai panneau : la paire figee ne survit pas au changement de gabarit */
-    var lo=$('simlo'+i), hi=$('simhi'+i);
-    if(lo&&lo.value!=='')p.accLo=Math.min(30,Math.max(1,+lo.value||1));
-    if(hi&&hi.value!=='')p.accHi=+hi.value||p.accHi;
-    p.inc=Math.max(0.25,+p.inc||1.25);
-    p.step=Math.max(0.25,+p.step||1.25);
-    p.accLo=Math.min(30,Math.max(1,+p.accLo||8));
-    p.accHi=Math.min(30,Math.max(p.accLo,+p.accHi||10));
-    var ds=[], seen=false;
-    ADAYS.forEach(function(d){var c=simChk('simj'+i+'_'+d); if(!c)return; seen=true; if(c.on)ds.push(d);});
-    if(seen)p.accDays=ds.length?ds:p.accDays.slice(0,1);   /* au moins un jour, comme le vrai panneau */
-    var keep=[];
-    simWaves(p.tpl,p.hdl,P.nwk).forEach(function(x){
-      var c=simChk('simd'+i+'_'+x.c);
-      if(c?c.on:p.hdl.indexOf(x.c)>=0)keep.push(x.c);
+function brIn(L){return !!(L.main||(BR&&BR.sec));}
+function brWith(fn){
+  var B=brSync(), next=!B.cur, bid0=S.blockId;
+  var keep={nwk:S.nwk, jours:S.jours, bw:S.bw, bid:S.blockId, done:S.done, start:S.start,
+    lifts:S.lifts.map(function(L){return {prog:L.prog, refMode:L.refMode, ref:L.ref, refBlock:L.refBlock};})};
+  BRSWAP=1; ASGT='brassign'; ASGSKIP={};
+  try{
+    S.nwk=+B.nwk||S.nwk; S.jours=B.jours||S.jours;
+    if(B.bw!=null)S.bw=+B.bw;
+    if(next){ S.blockId=(+bid0||1)+1; S.done={}; S.start=todayISO(); }
+    S.lifts.forEach(function(L,i){
+      var k=keep.lifts[i], b=B.lifts[i];
+      if(!brIn(L)){ ASGSKIP[i]=1; L.prog=Object.assign({},k.prog,{tpl:'off'}); return; }
+      if(next){ var e=lastExploitable(L,true,bid0); if(e)L.refBlock=entryToRef(e); }
+      BRJOURNAL.forEach(function(f){ b.prog[f]=next?(f==='fz'?null:[]):brCopy(k.prog[f]); });
+      L.prog=b.prog;
+      if(b.rm!=null){ L.refMode='fixe'; L.ref={load:+b.rm,reps:1,rir:0,bw:S.bw,date:null,est:true}; }
     });
-    p.hdl=keep;   /* une vague qui n'existe plus (gabarit ou duree changes) perd son deload */
-  });
-  return P;
+    REFSTAMP++; REFC={};
+    return fn();
+  }finally{
+    S.nwk=keep.nwk; S.jours=keep.jours; S.bw=keep.bw; S.blockId=keep.bid; S.done=keep.done; brPut(S,'start',keep.start);
+    S.lifts.forEach(function(L,i){
+      var k=keep.lifts[i]; L.prog=k.prog; brPut(L,'refMode',k.refMode); L.ref=k.ref; brPut(L,'refBlock',k.refBlock);
+    });
+    B.lifts.forEach(function(b){ BRJOURNAL.forEach(function(f){delete b.prog[f];}); });
+    BRSWAP=0; ASGT='assign'; ASGSKIP={}; REFSTAMP++; REFC={};
+  }
 }
-function repModeName(m){var o=REPMODES.filter(function(x){return x[0]===m;})[0]; return o?o[1]:String(m);}
-function hdlName(a){return a&&a.length?'apr\u00e8s les vagues '+a.map(function(c){return c+1;}).join(', '):'aucun';}
-function simDiff(P,sv){
-  var d=[];
-  if(+P.nwk!==+sv.nwk)d.push('semaines '+sv.nwk+' \u2192 '+P.nwk);
-  if(Math.abs(+P.bw-+sv.bw)>0.001)d.push('poids de corps '+F(sv.bw)+' \u2192 '+F(P.bw)+' kg');
-  if(P.jours!==sv.jours)d.push('jours '+String(sv.jours).split(',').join('/')+' \u2192 '+String(P.jours).split(',').join('/'));
-  if(P.fresh)d.push('d\u00e9part neuf (gel du d\u00e9part lev\u00e9)');
+/* charge la plus lourde de la 1re et de la derniere semaine ou le mouvement figure, dans PLAN */
+function brTops(){
+  var o={};
+  PLAN.forEach(function(wk){ wk.days.forEach(function(d){ d.lines.forEach(function(x){
+    var t=o[x.li]||(o[x.li]={w0:wk.w,a:null,w1:wk.w,b:null});
+    if(wk.w===t.w0&&(t.a==null||x.load>t.a))t.a=x.load;
+    if(wk.w>t.w1){t.w1=wk.w;t.b=null;}
+    if(wk.w===t.w1&&(t.b==null||x.load>t.b))t.b=x.load;
+  }); }); });
+  return o;
+}
+var BRLAB={tpl:'gabarit',inc:'incrément',repMode:'application des fourchettes',pair:'méthode du run',
+  startMode:'charge de départ',rir:'réserve au 1er top set',prWeek:'semaine du record',prDay:'jour du record',
+  prInc:'record visé',prLoad:'lest visé',prSys:'PdC inclus',top:'départ, lest',varMod:'séances secondaires',
+  varTxt:'variante',cad:'décision de progression',boMode:'back-off',gap:'écart J1 / J3',hStart:'ancre du 1RM',
+  hMan:'1RM manuel',hdl:'deloads',accDays:'jours',accSets:'séries',accLo:'reps de',accHi:'reps à',
+  accLoad:'charge de départ',accMode:'progression',accEvery:'toutes les',intro:'single d’intro',jumps:'sauts',warm:'échauffement'};
+function brVal(k,v,P){
+  if(k==='tpl'){var t=tplOf(v); return t?t.name:'Ne pas programmer';}
+  if(k==='pair')return pairName(pairUi(P));
+  if(k==='hdl')return v&&v.length?'après les vagues '+v.map(function(c){return c+1;}).join(', '):'aucun';
+  if(v==null||v==='')return '—';
+  if(Array.isArray(v))return v.length?v.join('/'):'—';
+  if(typeof v==='boolean')return v?'oui':'non';
+  if(typeof v==='number')return F(v);
+  return String(v);
+}
+function brDiff(){
+  var B=brSync(), d=[];
+  if(+B.nwk!==+S.nwk)d.push('semaines '+S.nwk+' → '+B.nwk);
+  if(B.jours!==S.jours)d.push('jours '+String(S.jours).split(',').join('/')+' → '+String(B.jours).split(',').join('/'));
+  if(B.bw!=null&&Math.abs(+B.bw-S.bw)>0.001)d.push('PdC d’essai '+F(B.bw)+' kg (courant '+F(S.bw)+')');
   S.lifts.forEach(function(L,i){
-    var p=P.lifts[i], q=sv.lifts[i], nm=esc(L.name)+' : ';
-    if(p.tpl!==q.tpl){
-      var a=tplOf(q.tpl), b=tplOf(p.tpl);
-      d.push(nm+(a?a.name:'aucun gabarit')+' \u2192 '+(b?b.name:'aucun gabarit'));
-    }
-    if(Math.abs(p.rm-q.rm)>0.001)d.push(nm+'1RM '+F(q.rm)+' \u2192 '+F(p.rm)+' kg de lest');
-    if(Math.abs(p.inc-q.inc)>0.001)d.push(nm+'incr\u00e9ment '+F(q.inc)+' \u2192 '+F(p.inc)+' kg');
-    if(Math.abs(p.step-q.step)>0.001)d.push(nm+'pas de lestage '+F(q.step)+' \u2192 '+F(p.step)+' kg');
-    if(p.repMode!==q.repMode)d.push(nm+'fourchettes '+repModeName(q.repMode)+' \u2192 '+repModeName(p.repMode));
-    if((p.pair||'')!==(q.pair||''))d.push(nm+'m\u00e9thode du run '+pairName(q.pair||'')+' \u2192 '+pairName(p.pair||''));
-    if(p.hdl.join(',')!==q.hdl.join(','))d.push(nm+'deloads '+hdlName(q.hdl)+' \u2192 '+hdlName(p.hdl));
-    if(p.accDays.join(',')!==q.accDays.join(','))d.push(nm+'jours '+q.accDays.join('/')+' \u2192 '+p.accDays.join('/'));
-    if(+p.accLo!==+q.accLo||+p.accHi!==+q.accHi)d.push(nm+'fourchette '+q.accLo+'-'+q.accHi+' \u2192 '+p.accLo+'-'+p.accHi);
+    if(!brIn(L))return;
+    var b=B.lifts[i], p=b.prog, q=L.prog, nm=esc(L.name)+' : ';
+    if(b.rm!=null)d.push(nm+'1RM lest d’essai '+F(b.rm)+' kg');
+    Object.keys(BRLAB).forEach(function(k){
+      var a=(k==='hdl'&&!B.cur)?[]:q[k], c=p[k];
+      if(k==='pair'){ if(pairUi(q)===pairUi(p))return; }
+      else if(JSON.stringify(a==null?null:a)===JSON.stringify(c==null?null:c))return;
+      d.push(nm+BRLAB[k]+' '+esc(brVal(k,a,q))+' → '+esc(brVal(k,c,p)));
+    });
   });
   return d;
 }
-function runSim(){
-  var P=simRead();
-  /* sv a exactement la forme de P (c'est l'etat reel lu par simDefaults) : la comparaison
-     se fait champ par champ, et keep porte en plus de quoi tout remettre en place. */
-  var sv=simDefaults();
-  sv.keep=S.lifts.map(function(L){return {refMode:L.refMode, ref:L.ref, step:L.step,
-    prog:JSON.parse(JSON.stringify(L.prog))};});
-  var diff=simDiff(P,sv), err=null;
-  try{
-    S.nwk=+P.nwk; S.bw=+P.bw; S.jours=P.jours;
-    S.lifts.forEach(function(L,i){
-      var p=P.lifts[i], Q=L.prog;
-      Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair==='fr'?'':(p.pair||''); Q.fr=p.pair==='fr';   /* lot 43 */
-      Q.hdl=p.hdl.slice(); Q.accDays=p.accDays.slice(); Q.accDay=p.accDays[0]||'J1';
-      Q.accLo=+p.accLo; Q.accHi=+p.accHi;
-      L.step=+p.step||L.step;
-      L.refMode='fixe';
-      L.ref={load:+p.rm||0,reps:1,rir:0,bw:+P.bw,date:null,est:true};
-      if(P.fresh)Q.fz=null;   /* lot 8 : depart neuf, le temps de la simulation ; remis par la restauration */
-    });
-    REFSTAMP++; REFC={};
-    SIM=1; buildPlan();
-    renderPlan($('simout'),PLAN,'sb','week');
-  }catch(e){ err=e; }
-  /* restauration : toujours, y compris apres echec. On reecrit le CONTENU de L.prog
-     plutot que l'objet lui-meme, pour ne pas casser une reference prise ailleurs, et on
-     retire les cles que la generation aurait pu y ajouter au passage. */
-  SIM=0;
-  S.nwk=sv.nwk; S.bw=sv.bw; S.jours=sv.jours;
-  S.lifts.forEach(function(L,i){
-    var k0=sv.keep[i], p0=k0.prog;
-    Object.keys(L.prog).forEach(function(k){ if(!(k in p0))delete L.prog[k]; });
-    Object.keys(p0).forEach(function(k){ L.prog[k]=p0[k]; });
-    L.refMode=k0.refMode; L.ref=k0.ref; L.step=k0.step;
+function brControls(){
+  var B=brSync(), j=$('brjours');
+  if(j&&!j.dataset.ok){ j.innerHTML=JOURSOPT.map(function(v){return '<option value="'+v+'">'+v.split(',').join(' / ')+'</option>';}).join(''); j.dataset.ok='1'; }
+  $('brnwk').value=String(B.nwk); if(j)j.value=B.jours;
+  $('brbw').value=B.bw==null?'':F(B.bw); $('brbw').placeholder=F(S.bw);
+  $('brcur').checked=!!B.cur; $('brsec').checked=!!B.sec;
+  $('brrm').innerHTML=S.lifts.map(function(L,i){
+    if(!brIn(L)||L.prog.tpl==='off'&&B.lifts[i].prog.tpl==='off')return '';
+    var r=Math.round((rmOf(L)-eff(L))*4)/4, v=B.lifts[i].rm;
+    return '<div class="field sm"><label for="brrm'+i+'">1RM lest d’essai, '+esc(L.name)+'</label>'+
+      '<input id="brrm'+i+'" data-brrm="'+i+'" class="numin" type="text" inputmode="decimal" value="'+(v==null?'':F(v))+'" placeholder="'+F(r)+'"></div>';
+  }).join('');
+}
+function brPanel(){
+  try{ brWith(function(){ renderAssign(); }); }
+  finally{ buildPlan(); }
+  var a=$('brassign');
+  if(a&&a.querySelectorAll)Array.prototype.forEach.call(a.querySelectorAll('[onclick]'),function(b){
+    b.removeAttribute('onclick'); b.disabled=true; b.title='Agit sur le vrai programme : sans effet dans le brouillon';
   });
-  REFSTAMP++; REFC={};
+}
+function brPlan(){
+  var err=null, mine=null;
+  try{ brWith(function(){ SIM=1; try{ buildPlan(); renderPlan($('simout'),PLAN,'sb','week'); mine=brTops(); }finally{ SIM=0; } }); }
+  catch(e){ err=e; }
   buildPlan();
   if(err){
-    $('simout').innerHTML='<div class="flag"><b>La simulation a \u00e9chou\u00e9.</b> '+
-      esc(err.message||String(err))+' \u2014 votre programme n\u2019a pas boug\u00e9.</div>';
+    $('simout').innerHTML='<div class="flag"><b>Le calcul du brouillon a échoué.</b> '+esc(err.message||String(err))+
+      ' — votre programme n’a pas bougé.</div>';
     return;
   }
-  $('simout').insertAdjacentHTML('afterbegin','<div class="flag"><b>Bac \u00e0 sable.</b> '+
-    (diff.length?'Par rapport \u00e0 vos valeurs : '+diff.join(' \u00b7 ')+'. ':'Aucun \u00e9cart avec vos valeurs actuelles. ')+
-    'Rien n\u2019est enregistr\u00e9 : le programme, le journal et vos r\u00e9glages sont intacts.</div>');
-}
-/* ================= lot 9 : « cloturer puis appliquer » =================
-   Ecrire la configuration simulee directement dans les vrais reglages DEPLACE le bloc en
-   cours (gabarit 28 lignes de plan, rep range 30, semaines 30, increment 27, pas 14).
-   On cloture donc d'abord : le bloc suivant part vierge, et la configuration n'a plus rien
-   a deplacer. L'ordre est impose de toute facon, closeBlock() vidant prog.hdl.
-   Cloturable = au moins une seance cochee faite dans le bloc en cours (S.done est remis a
-   zero a chaque cloture, donc son contenu appartient toujours au bloc courant). Le bouton
-   « Cloturer le bloc » ordinaire, lui, n'est pas soumis a cette condition : il reste la
-   sortie de secours. */
-function simCloseReason(){
-  var n=Object.keys(S.done||{}).length;
-  if(!n)return 'aucune s\u00e9ance coch\u00e9e faite dans le bloc '+S.blockId+
-    '. La cl\u00f4ture archiverait un bilan vide et consommerait un num\u00e9ro de bloc. '+
-    'Le bouton \u00ab\u00a0Cl\u00f4turer le bloc\u00a0\u00bb en haut de l\u2019onglet reste disponible.';
-  return null;
-}
-/* La reference simulee est un artefact du bac a sable (mode 'fixe', 1 rep, pour que le
-   champ « 1RM lest » veuille dire ce qu'il dit). On ne l'ecrit donc que pour un mouvement
-   dont le 1RM a REELLEMENT ete modifie ; sinon le mode de reference reel est laisse intact.
-   Le depart neuf n'est pas applique : fzOk() exige z.b===S.blockId et closeBlock()
-   incremente blockId, donc la cloture leve deja le gel du depart. */
-function simApply(P,sv,rmch){
-  S.nwk=+P.nwk; S.bw=+P.bw; S.jours=P.jours;
+  var real=brTops(), B=brSync(), d=brDiff(), cmp=[];
   S.lifts.forEach(function(L,i){
-    var p=P.lifts[i], Q=L.prog;
-    Q.tpl=p.tpl; Q.inc=+p.inc; Q.repMode=p.repMode; Q.pair=p.pair==='fr'?'':(p.pair||''); Q.fr=p.pair==='fr';   /* lot 43 */
-    Q.hdl=p.hdl.slice(); Q.accDays=p.accDays.slice(); Q.accDay=p.accDays[0]||'J1';
-    Q.accLo=+p.accLo; Q.accHi=+p.accHi;
-    L.step=+p.step||L.step;
-    if(rmch[i]){ L.refMode='fixe'; L.ref={load:+p.rm||0,reps:1,rir:0,bw:+P.bw,date:null,est:true}; }
+    if(!brIn(L))return;
+    var m=mine[i], r=real[i];
+    if(!m&&!r)return;
+    var tx=function(t){return t?'S'+(t.w0+1)+' '+loadLab(L,t.a)+' → S'+(t.w1+1)+' '+loadLab(L,t.b)+' kg':'pas au programme';};
+    cmp.push(esc(L.name)+' : brouillon '+tx(m)+' · réel '+tx(r));
   });
-  REFSTAMP++; REFC={};
+  $('simout').insertAdjacentHTML('afterbegin','<div class="flag"><b>Brouillon ('+(B.cur?'suite du bloc en cours':'bloc suivant, départ neuf')+').</b> '+
+    (d.length?'Écarts avec votre programme : '+d.join(' · ')+'. ':'Mêmes réglages que votre programme. ')+
+    (cmp.length?'<br>Charge la plus lourde, première et dernière semaine : '+cmp.join(' ; ')+'. ':'')+
+    'Rien n’est écrit dans votre programme.</div>');
 }
-function simCloseApply(){
-  var why=simCloseReason(); if(why){ simCloseBtn(); return; }
-  /* sv est lu AVANT la cloture : closeBlock() met a jour refBlock, donc rmOf() et
-     simDefaults() ne donnent plus les memes valeurs apres. */
-  var P=simRead(), sv=simDefaults(), diff=simDiff(P,sv);
-  var rmch=S.lifts.map(function(_,i){return Math.abs(+P.lifts[i].rm-+sv.lifts[i].rm)>0.001;});
-  var nmch=S.lifts.filter(function(_,i){return rmch[i];}).map(function(L){return L.name;});
-  var msg='Cl\u00f4turer le bloc '+S.blockId+', puis appliquer la configuration du bac \u00e0 sable ?\n\n'+
-    (diff.length?'Ce qui change : '+diff.join(' \u00b7 ')+'.':'Aucun \u00e9cart avec vos valeurs actuelles.')+
-    '\n\nLe bilan du bloc est archiv\u00e9 comme avec \u00ab Cl\u00f4turer le bloc \u00bb, et la configuration s\'applique '+
-    'au bloc suivant, jamais au bloc clos.'+
-    (P.fresh?'\n\n\u00ab D\u00e9part neuf \u00bb est sans objet ici : la cl\u00f4ture l\u00e8ve d\u00e9j\u00e0 le gel du d\u00e9part.':'')+
-    (nmch.length?'\n\nLa r\u00e9f\u00e9rence de '+nmch.join(', ')+' passe en mode fixe, \u00e0 la valeur simul\u00e9e.':'');
-  closeBlock(function(){ simApply(P,sv,rmch); }, msg);
+function brRead(){
+  var B=brSync(), n=num($('brnwk').value,null), j=$('brjours').value, w=num($('brbw').value,null);
+  if(n!=null)B.nwk=Math.max(1,Math.min(24,Math.round(n)));
+  if(JOURSOPT.indexOf(j)>=0)B.jours=j;
+  B.bw=(w!=null&&w>=30&&w<=250)?Math.round(w*100)/100:null;
+  B.cur=!!$('brcur').checked; B.sec=!!$('brsec').checked;
 }
+function renderSim(){ brControls(); brPanel(); brPlan(); }
 function renderAssign(){
   buildPlan();
-  var groups=tplGroups();
+  var GRPS0=tplGroups();
 
-  $('assign').innerHTML=S.lifts.map(function(L,i){
-    var P=L.prog, t=tplOf(P.tpl);
+  $(ASGT).innerHTML=S.lifts.map(function(L,i){   /* lot 45 : #brassign pour le brouillon */
+    if(ASGSKIP[i])return '';
+    var P=L.prog, t=tplOf(P.tpl), groups=isM(L)?tplGroupsM():GRPS0;   /* lot 46 : carry = Accessoire seul */
     if(P.tpl==='off'||!t){
       return '<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
         '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+'</div>'+
@@ -3108,8 +3099,9 @@ function renderAssign(){
             ADAYS.map(function(d){var on=accDaysOf(P).indexOf(d)>=0;
               return '<label class="dchip'+(on?' on':'')+'"><input type="checkbox" data-i="'+i+'" data-f="accDayT" data-d="'+d+'"'+(on?' checked':'')+'>'+d+'</label>';}).join('')+'</div></div>'+
           '<div class="field sm"><label>Séries</label><input data-i="'+i+'" data-f="accSets" type="number" min="1" step="1" value="'+(+P.accSets||3)+'"></div>'+
-          '<div class="field sm"><label>Reps de</label><input data-i="'+i+'" data-f="accLo" type="number" min="1" step="1" value="'+(+P.accLo||8)+'"></div>'+
+          '<div class="field sm"><label>'+(isM(L)?'Mètres de':'Reps de')+'</label><input data-i="'+i+'" data-f="accLo" type="number" min="1" step="1" value="'+(+P.accLo||8)+'"></div>'+
           '<div class="field sm"><label>à</label><input data-i="'+i+'" data-f="accHi" type="number" min="1" step="1" value="'+(+P.accHi||10)+'"></div>'+
+          (isM(L)?'<div class="field sm"><label>Pas (m)</label><input data-i="'+i+'" data-f="accStep" type="number" min="1" step="1" value="'+accStepOf(P)+'"></div>':'')+
         '</div>'+
         '<div class="row" style="margin-top:8px">'+
           '<div class="field md"><label>Progression</label><select data-i="'+i+'" data-f="accMode">'+
@@ -3120,12 +3112,12 @@ function renderAssign(){
           incField(i,P)+
           (P.accMode==='calendrier'?'<div class="field sm"><label>Toutes les</label><input data-i="'+i+'" data-f="accEvery" type="number" min="1" step="1" value="'+(+P.accEvery||3)+'"></div>':'')+
         '</div>'+
-        '<p class="note">'+accDaysOf(P).length+' séance'+(accDaysOf(P).length>1?'s':'')+' par semaine, la progression avance à chaque séance. Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
-          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
+        '<p class="note">'+accDaysOf(P).length+' séance'+(accDaysOf(P).length>1?'s':'')+' par semaine, la progression avance à chaque séance. Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+(isM(L)?' m':'')+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
+          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+(isM(L)?' m':'')+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
         (P.accHiWas?hardFlag('Fourchette de reps corrigée',   /* D8 */
           'La borne haute était à '+F(P.accHiWas)+' reps, ce qui ne peut venir que d\'une saisie. Elle est ramenée à '+
           (+P.accHi||10)+' : au-delà de 30 reps la double progression ne monte jamais en charge.'):'')+
-        tipsFor(L,i,P,t)+
+        descField(L,i,P)+tipsFor(L,i,P,t)+   /* lot 46 (R5) */
         (S.verbo==='min'?'':'<details'+(S.verbo==='full'?' open':'')+'><summary class="note">Comment lire ce programme</summary>'+
           '<p class="note">'+t.note+' <b class="src">Source : '+t.src+'.</b></p>'+
           t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details>')+'</div>';
@@ -3226,19 +3218,22 @@ function renderAssign(){
       '<input type="text" data-i="'+i+'" data-f="warm" value="'+esc(P.warm||'')+'" placeholder="BW*5, 30%*3, 60%*2, 85%*1"></div></div>'+
       '<p class="note">Au poids du corps, le type s\'écrit après les reps : <b>BW*5 haut</b> (aussi haut et vite que possible), '+
       '<b>BW*5 prof</b> (amplitude profonde). Le jour même, chaque montée se modifie dans Séance du jour, pour cette séance seulement.</p>';
-    h+=volFlag(i,L)+tipsFor(L,i,P,t);   /* D12 */
+    h+=descField(L,i,P)+volFlag(i,L)+tipsFor(L,i,P,t);   /* lot 46 (R5) */   /* D12 */
     if(S.verbo!=='min')h+='<details'+(S.verbo==='full'?' open':'')+'><summary class="note">Comment lire ce programme</summary>'+
       '<p class="note">'+t.note+' <b class="src">Source : '+t.src+'.</b></p>'+
       t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details>';
     h+='</div>';
     return h;
   }).join('');
-  Array.prototype.forEach.call($('assign').querySelectorAll('[data-f=tpl]'),function(s){s.value=S.lifts[+s.dataset.i].prog.tpl;});
+  Array.prototype.forEach.call($(ASGT).querySelectorAll('[data-f=tpl]'),function(s){s.value=S.lifts[+s.dataset.i].prog.tpl;});
   applyFolds();
 }
-$('assign').addEventListener('input',function(e){
-  var t=e.target, i=t.dataset.i; if(i==null)return; var L=S.lifts[+i], P=L.prog, f=t.dataset.f, v=t.value;
+/* lot 45 : la saisie (asgSet) est separee de ses effets, pour servir aussi au panneau du brouillon. Elle rend
+   {f, ra : redessiner le panneau, today : redessiner la seance du jour}, ou null. */
+function asgSet(t){
+  var i=t.dataset.i; if(i==null)return null; var L=S.lifts[+i], P=L.prog, f=t.dataset.f, v=t.value;
   if(f==='tpl'){
+    if(isM(L)&&v!=='acc'&&v!=='off')return null;   /* lot 46 : carry = Accessoire seul */
     /* lot 40 (Q1) : refus du gabarit retire */
     P.tpl=v;P.top=null;P.prLoad=null;P.prBw=null;P.pair='';P.hdl=[];
     if(ZRIR0[v]!=null)P.rir=ZRIR0[v];   /* D6 : r\u00e9serve de d\u00e9part par gabarit Zlat */
@@ -3264,26 +3259,33 @@ $('assign').addEventListener('input',function(e){
   else if(f==='varTxt')P.varTxt=v;
   else if(f==='intro')P.intro=+v||0;
   else if(f.slice(0,4)==='jump'){if(!P.jumps)P.jumps=[5,2.5,2.5];P.jumps[+f.slice(4)]=+v;}
-  else if(f==='warm'){P.warm=v;save();generate();renderToday();return;}
+  else if(f==='warm'){P.warm=v;return {f:f,today:1};}
   else if(f==='hdl'){var hc=+t.dataset.c, hl=(P.hdl||[]).filter(function(x){return x!==hc;}); if(t.checked)hl.push(hc);
-    P.hdl=hl.sort(function(x,y){return x-y;}); save(); renderAssign(); generate(); renderToday(); return;}   /* Q6 */
+    P.hdl=hl.sort(function(x,y){return x-y;}); return {f:f,ra:1,today:1};}   /* Q6 */
   else if(f==='gap')P.gap=+v;
   else if(f==='cad')P.cad=v;
   else if(f==='boMode')P.boMode=v;
   else if(f==='accDayT'){var ds=accDaysOf(P), d=t.dataset.d, k=ds.indexOf(d);
     if(t.checked&&k<0)ds.push(d); else if(!t.checked&&k>=0&&ds.length>1)ds.splice(k,1);
-    P.accDays=ds; P.accDay=ds[0]; save(); renderAssign(); generate(); renderToday(); return;}
+    P.accDays=ds; P.accDay=ds[0]; return {f:f,ra:1,today:1};}
   else if(f==='accSets')P.accSets=Math.max(1,+v||1);
-  else if(f==='accLo'){P.accLo=Math.min(30,Math.max(1,+v||1));   /* D8 */
+  else if(f==='accLo'){P.accLo=Math.min(isM(L)?ACCMMAX:30,Math.max(1,+v||1));   /* D8 */
     if(+P.accHi<P.accLo)P.accHi=P.accLo;}
-  else if(f==='accHi')P.accHi=Math.min(30,Math.max(+P.accLo||8,+v||1));   /* D8 */
+  else if(f==='accHi')P.accHi=Math.min(isM(L)?ACCMMAX:30,Math.max(+P.accLo||8,+v||1));   /* D8 */
   else if(f==='accLoad')P.accLoad=+v||0;
+  else if(f==='accStep')P.accStep=Math.max(1,Math.round(+v||5));   /* lot 46 */
+  else if(f==='desc'){P.desc=v; return {f:f,today:1};}   /* lot 46 (R5) : pas de re-rendu du panneau, la frappe garde le focus */
   else if(f==='accMode')P.accMode=v;
   else if(f==='accEvery')P.accEvery=Math.max(1,+v||1);
+  return {f:f,ra:['tpl','startMode','prInc','prSys','hStart','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0};
+}
+$('assign').addEventListener('input',function(e){
+  var r=asgSet(e.target); if(!r)return;
   save();
-  if(['tpl','startMode','prInc','prSys','hStart','pair','varMod','cad','gap','accMode','incSel','repMode','boMode'].indexOf(f)>=0)renderAssign();
-  if(f==='refMode'){renderLifts();renderHead();generate();renderToday();}
+  if(r.ra)renderAssign();
+  if(r.f==='refMode'){renderLifts();renderHead();generate();renderToday();}
   generate();
+  if(r.today)renderToday();
 });
 /* D5 : incr\u00e9ment libre \u2014 pendant la frappe la derni\u00e8re valeur valide reste appliqu\u00e9e,
    l'alerte tombe \u00e0 la validation du champ. */
@@ -3333,8 +3335,8 @@ function buildPlan(){
         if(t.acc){
           if(accDaysOf(P).indexOf(lab)<0||w>=S.nwk)return;
           var st=(APC[o.i]||(APC[o.i]=accPlan(L,o.i))).filter(function(q){return q.w===w&&q.lab===lab;})[0]; if(!st)return;   /* R1 */
-          day.lines.push({li:o.i,name:L.name,role:'acc',sets:+P.accSets||3,reps:String(st.reps),
-            load:rnd(st.load,L.step),info:accInfo(P),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
+          day.lines.push({li:o.i,name:L.name,role:'acc',sets:+P.accSets||3,reps:String(st.reps)+(isM(L)?' m':''),
+            load:rnd(st.load,L.step),info:accInfo(P,L),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
           return;
         }
         var days=t.days;
@@ -3498,7 +3500,7 @@ function lastPerfHTML(x){
     ' \u00b7 '+(d>0?'+':'\u2212')+F(Math.abs(d))+' kg');
   var rs=(e.rir==null)?' \u00b7 r\u00e9serve inconnue':(+e.rir?' \u00b7 r\u00e9serve '+F(e.rir):' \u00b7 \u00e0 l\u2019\u00e9chec');
   return '<div class="lastp lpd">derni\u00e8re : '+(e.date?frDate(e.date):'sans date')+' \u00b7 <b>'+
-    loadLab(L,e.load)+' '+S.sep+' '+reps+'</b>'+tr+rs+dl+'</div>';
+    loadLab(L,e.load)+' '+S.sep+' '+reps+(isM(L)?' m':'')+'</b>'+tr+rs+dl+'</div>';
 }
 function lineState(key,date){
   if(SIM)return '';
@@ -3530,7 +3532,7 @@ function renderPlan(into,weeks,pfx,scope){
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
           '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
-          '<span class="in">'+x.info+'</span></div>'+(pfx==='t'?lastPerfHTML(x)+recordHTML(x,day.label):'');
+          '<span class="in">'+x.info+'</span></div>'+(pfx==='t'?descLine(x,day)+lastPerfHTML(x)+recordHTML(x,day.label):'');   /* lot 46 (R5) */
         txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
       if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
@@ -3687,6 +3689,7 @@ function trackHTML(){
   }).join('');
 }
 function generate(){
+  if(BRSWAP)return;   /* lot 45 */
   buildPlan();
   LASTTXT=renderPlan($('out'),PLAN);
   renderSync();
@@ -3714,15 +3717,27 @@ function renderSync(){
   $('sync').innerHTML=h;
 }
 $('gen').addEventListener('click',function(){generate();});
-$('simrun').addEventListener('click',function(){ runSim(); });
-$('simreset').addEventListener('click',function(){ SIMP=simDefaults(); renderSim(); $('simout').innerHTML=''; });
-$('simclear').addEventListener('click',function(){ $('simout').innerHTML=''; });
-$('simclose').addEventListener('click',function(){ simCloseApply(); });
-/* Changer le gabarit simule change la liste des champs qui ont un sens : on releve ce qui est
-   saisi, puis on redessine. Toujours en memoire, rien n'est enregistre. */
-$('simctl').addEventListener('change',function(e){
-  var t=e.target; if(!t||!t.dataset||t.dataset.simt===undefined)return;
-  simRead(); renderSim();
+$('simrun').addEventListener('click',function(){ renderSim(); });   /* lot 45 */
+$('simreset').addEventListener('click',function(){
+  if(!confirm('Repartir de vos valeurs ? Le brouillon actuel est remplacé par une copie de votre programme.'))return;
+  BR=brNew(); brStore(); renderSim();
+});
+['brnwk','brjours','brbw','brcur','brsec'].forEach(function(id){
+  $(id).addEventListener('change',function(){ brRead(); brStore(); renderSim(); });
+});
+$('brrm').addEventListener('change',function(e){
+  var t=e.target, i=t&&t.dataset?t.dataset.brrm:undefined; if(i===undefined)return;
+  var v=num(t.value,null); brSync().lifts[+i].rm=(v==null?null:Math.round(v*100)/100); brStore(); brPlan();
+});
+/* saisies du panneau du brouillon : la fonction du vrai panneau (asgSet), dans le brouillon */
+$('brassign').addEventListener('input',function(e){
+  var r=brWith(function(){ return asgSet(e.target); }); if(!r)return;
+  brStore();
+  if(r.ra)brPanel();
+  brPlan();
+});
+$('brassign').addEventListener('change',function(e){
+  var t=e.target; if(t&&t.dataset&&t.dataset.f==='inc')brPanel();
 });
 $('print').addEventListener('click',function(){window.print();});
 $('copy').addEventListener('click',function(){
@@ -3879,7 +3894,7 @@ function panelReps(p){
   var r=p.querySelector('[data-fld=reps]');
   if(r)return [r.value===''?null:Math.max(0,Math.round(+r.value||0))];
   return Array.prototype.map.call(p.querySelectorAll('[data-set]'),function(b){
-    var t=b.textContent.replace(' reps',''); return /^\d+$/.test(t)?+t:null;
+    var t=b.textContent.replace(/ (reps|m)$/,''); return /^\d+$/.test(t)?+t:null;
   });
 }
 function vCount(key,reps,st){
@@ -4026,14 +4041,14 @@ function panelHTML(key){
   var sets=[]; for(var i=0;i<x.sets;i++){
     var tr=saisieOf(e), done=tr&&tr[i]!=null?tr[i]:null;
     var cls=done==null?'':(done>=repMin(x.reps)?'done':'short');
-    sets.push('<button class="pill set '+cls+'" data-set="'+i+'"'+atAttr(e,i)+'>'+(done==null?'S'+(i+1):done+' reps')+'</button>');
+    sets.push('<button class="pill set '+cls+'" data-set="'+i+'"'+atAttr(e,i)+'>'+(done==null?'S'+(i+1):done+uRep(L))+'</button>');
   }
   var nxt='';
   if(x.role==='acc'){
     var pl=accPlan(L,x.li), ix=-1;
     pl.forEach(function(q,k){if(q.w===f.w&&q.lab===f.day)ix=k;});
     var n=ix>=0?pl[ix+1]:null;
-    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
+    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+(isM(L)?' m':'')+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
   var rirNow=e?(e.rir===null?null:e.rir):undefined;
@@ -4051,7 +4066,7 @@ function panelHTML(key){
         return '<div class="rirset" data-rirrow="'+q+'"><span>S'+(q+1)+'</span>'+rirPills(v)+'</div>';
       }).join('')+'</div>':'')+
     '</div></div>';
-  var validBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
+  var validBlock=isM(L)?'':'<div class="row" style="margin-top:10px"><div class="field w">'+   /* lot 46 : pas de validite rep par rep pour un carry */
     baremeHTML(L)+
     '<label>Validité — choisissez, puis touchez les reps (« S1 » = toute la série)</label>'+
     '<div class="pillrow" data-brushes>'+VJO.map(function(c){
@@ -4059,11 +4074,11 @@ function panelHTML(key){
     }).join('')+'</div>'+
     '<div data-vrows>'+validRows(key,repsNow)+vpropHTML(key)+countLine(repsNow)+'</div></div></div>';
   return '<div class="panel" data-panel="'+key+'">'+
-    '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+
+    '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+descHTML(L)+   /* lot 46 (R5) */
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
-      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>Reps réussies par série — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
-        :'<div class="field sm"><label>Reps réussies</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
+      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>'+(isM(L)?'Mètres par série':'Reps réussies par série')+' — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
+        :'<div class="field sm"><label>'+(isM(L)?'Mètres faits':'Reps réussies')+'</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
     '</div>'+
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
@@ -4189,13 +4204,13 @@ window.addEventListener('pagehide',draftFlush);
 function showPick(p,b,line){
   Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(x){x.removeAttribute('data-sel');});
   b.setAttribute('data-sel','1');
-  var mn=repMin(line.reps), hi=repMax(line.reps), list=[], v;
-  if(/^\d/.test(String(line.reps))){ for(v=Math.max(0,hi-4);v<=hi+4;v++)list.push(v); }
+  var mn=repMin(line.reps), hi=repMax(line.reps), list=[], v, Lp=S.lifts[line.li], sp=isM(Lp)?accStepOf(Lp.prog):1;   /* lot 46 */
+  if(/^\d/.test(String(line.reps))){ for(v=Math.max(0,hi-4*sp);v<=hi+4*sp;v+=sp)list.push(v); }
   else { for(v=1;v<=15;v++)list.push(v); }
   p.querySelector('[data-pickrow]').innerHTML=list.map(function(q){
     return '<button class="pill'+(q>=mn?'':' sub')+'" data-pick="'+q+'">'+q+'</button>';
   }).join('')+'<button class="pill sub" data-pick="">effacer</button>';
-  p.querySelector('[data-picklab]').textContent='Reps faites sur la s\u00e9rie '+(+b.dataset.set+1)+
+  p.querySelector('[data-picklab]').textContent=(isM(Lp)?'M\u00e8tres faits':'Reps faites')+' sur la s\u00e9rie '+(+b.dataset.set+1)+
     ' \u2014 prescrit '+line.reps;
   p.querySelector('[data-pickwrap]').style.display='';
 }
@@ -4213,7 +4228,7 @@ function panelClick(e){
     if(b.dataset.set!=null){
       var f=findLine(p.dataset.panel), min=repMin(f.line.reps), dft=repDflt(f.line.reps);   /* D2 : borne haute */
       if(b.classList.contains('done')||b.classList.contains('short')||dft==null)showPick(p,b,f.line);
-      else { b.textContent=dft+' reps'; b.className='pill set '+(dft>=min?'done':'short'); atStamp(b); hidePick(p); }   /* lot 43 (C2) */
+      else { b.textContent=dft+uRep(S.lifts[f.line.li]); b.className='pill set '+(dft>=min?'done':'short'); atStamp(b); hidePick(p); }   /* lot 43 (C2) */
       refreshV(p); e.stopPropagation(); return;
     }
     if(b.dataset.pick!=null){
@@ -4221,7 +4236,7 @@ function panelClick(e){
       if(sel){
         var pv=b.dataset.pick, fl=findLine(p.dataset.panel), mn=repMin(fl.line.reps);
         if(pv===''){ sel.textContent='S'+(+sel.dataset.set+1); sel.className='pill set'; sel.removeAttribute('data-at'); }
-        else { sel.textContent=(+pv)+' reps'; sel.className='pill set '+((+pv)>=mn?'done':'short'); atStamp(sel); }   /* lot 43 (C2) */
+        else { sel.textContent=(+pv)+uRep(S.lifts[fl.line.li]); sel.className='pill set '+((+pv)>=mn?'done':'short'); atStamp(sel); }   /* lot 43 (C2) */
       }
       hidePick(p); refreshV(p); e.stopPropagation(); return;
     }
@@ -4304,7 +4319,7 @@ function saveLine(p,key){
   var sets=[];
   if(repsEl)sets=[rr===''?null:Math.max(0,+rr)];   /* D1 : champ vide = s\u00e9rie pas faite */
   else Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(b){
-    var t=b.textContent.replace(' reps',''); sets.push(/^\d+$/.test(t)?+t:null);
+    var t=b.textContent.replace(/ (reps|m)$/,''); sets.push(/^\d+$/.test(t)?+t:null);
   });
   var chk=p.querySelector('[data-rireach]'), each=!!(chk&&chk.checked), rir, rirs=null;
   if(each){
@@ -4378,7 +4393,7 @@ function entryStats(e){
   var sys=(L.useBw?bwOf(e):0)+(+e.load||0), reps=0, sets=0;
   e.sets.forEach(function(r){ if(r!=null&&r>0){reps+=r; sets++;} });
   var rm=null; try{ var p=predRM(L,e); if(p!=null)rm=p-eff(L,bwOf(e)); }catch(x){}
-  return {sets:sets,reps:reps,ton:reps*sys,rm:rm};
+  return isM(L)?{sets:sets,reps:0,ton:0,rm:null}:{sets:sets,reps:reps,ton:reps*sys,rm:rm};   /* lot 46 */
 }
 function sessStats(w,lab){
   var wk=PLAN.filter(function(x){return x.w===w;})[0]; if(!wk)return null;
@@ -4483,7 +4498,7 @@ $('undoimport').addEventListener('click',function(){
   bkDrop(); load(); renderAll(); renderBackup();
 });
 
-function refreshPlans(){generate();renderToday();renderData();}
+function refreshPlans(){if(BRSWAP)return;generate();renderToday();renderData();}   /* lot 45 */
 $('out').addEventListener('click',panelClick);
 $('todayout').addEventListener('click',panelClick);
 function panelChange(ev){
@@ -4620,6 +4635,7 @@ $('tnext').addEventListener('click',function(){
 });
 
 function renderToday(){
+  if(BRSWAP)return;   /* lot 45 */
   /* la Forme et les Reglages sont deplaces dans #todayout apres chaque rendu : on les met a
      l'abri avant que le contenu de #todayout soit remplace */
   ['cardform','cardsess'].forEach(function(id){ var c=$(id); if(c&&c.parentNode===$('todayout'))$('p-today').insertBefore(c,$('tdone')); });
@@ -4872,7 +4888,7 @@ $('tfin').addEventListener('change',saveFin); $('tfinh').addEventListener('chang
 
 /* ================= Données ================= */
 function fitLift(li){
-  var L=S.lifts[li];
+  var L=S.lifts[li]; if(isM(L))return {k:0,n:0,d:0};   /* lot 46 */
   var pts=S.log.filter(function(e){
     if(e.li!==li||e.rir==null)return false;
     if(e.role&&['top','amrap','pr'].indexOf(e.role)<0)return false;
@@ -4918,7 +4934,7 @@ function rmSeries(i){
   }).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
 }
 function rmStats(i){
-  var pts=rmSeries(i); if(!pts.length)return null;
+  var pts=rmSeries(i); if(!pts.length||isM(S.lifts[i]))return null;
   var rec=null, cur=null, bid=(+S.blockId||1);
   pts.forEach(function(p){
     if(!rec||p.rm>rec.rm+1e-9)rec=p;
@@ -4960,7 +4976,7 @@ function rmLab(L,p){
     (L.useBw?', PdC '+F(bwOf(p.e))+' kg'+(hasBw(p.e)?'':' estim\u00e9'):'');
 }
 function renderRM(){
-  $('rm1').innerHTML=S.lifts.map(function(L,i){
+  $('rm1').innerHTML=S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){return !isM(o.L);}).map(function(o){ var L=o.L, i=o.i;   /* lot 46 */
     var st=rmStats(i), E=eff(L);
     var head='<p class="note" style="margin-top:0"><b class="n'+col(i)+'">'+esc(L.name)+'</b></p>';
     if(!st)return head+'<p class="note">Aucune s\u00e9rie exploitable au journal pour ce mouvement : '+
@@ -5011,7 +5027,7 @@ function recFresh(s){return s.role==='top'||s.role==='amrap'||s.role==='pr';}
    seule la note le dit. Le classement n'en tient pas compte (choix du 24/09), l'affichage si. */
 function recEst(e){ return !hasBw(e)||/PdC reconstitu/i.test(String((e&&e.note)||'')); }
 function recSets(li){
-  var L=S.lifts[li]; if(!L)return [];
+  var L=S.lifts[li]; if(!L||isM(L))return [];
   var out=[];
   (S.log||[]).forEach(function(e){
     if(e.li!==li||e.state==='skip')return;
@@ -5056,7 +5072,7 @@ function recLine(L,s){
 function renderRecords(){
   var q=dq(), top=!!q.rtop;
   $('rlift').value=q.rli; $('rtop').checked=top;
-  var idx=(q.rli==='')?S.lifts.map(function(_,i){return i;}):[+q.rli];
+  var idx=((q.rli==='')?S.lifts.map(function(_,i){return i;}):[+q.rli]).filter(function(i){return !isM(S.lifts[i]);});   /* lot 46 */
   $('recs').innerHTML=idx.map(function(i){
     var L=S.lifts[i]; if(!L)return '';
     var rows=recRank(i,top);
@@ -5153,7 +5169,7 @@ function blockStats(from,to){
     }).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
     var n=0,ok=0;
     es.forEach(function(e){ if(e.state&&e.state!=='skip'&&e.role!=='extra'){n++; if(e.state==='ok')ok++;} });
-    var us=es.filter(function(e){return ['top','amrap','pr'].indexOf(e.role)>=0&&predRM(L,e)!=null;});
+    var us=es.filter(function(e){return !isM(L)&&['top','amrap','pr'].indexOf(e.role)>=0&&predRM(L,e)!=null;});
     var best=null,bestD=null;
     us.forEach(function(e){var v=predRM(L,e); if(best===null||v>best){best=v;bestD=e.date;}});
     var bws=es.filter(function(e){return +e.bw;});
@@ -5211,7 +5227,7 @@ function renderBilan(){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
         ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+blockNotesHTML(b)+'</div>';
+        statsHTML(b.stats)+blockNotesHTML(b)+blockDescHTML(b)+'</div>';
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -5248,7 +5264,8 @@ function closeBlock(after,msg){   /* W2 : aussi appelée depuis le panneau d'éc
   S.blocks.push({id:S.blockId,from:S.start||null,to:todayISO(),sess:sess.length,doneN:nd,form:formStats(),
     tpl:S.lifts.map(function(L){var t=tplOf(L.prog.tpl); return L.name+' : '+(t?t.name:L.prog.tpl)+', +'+F(L.prog.inc)+' kg';}),
     stats:blockStats(S.start||null,todayISO()),
-    note:S.blockNote||'', dayNotes:JSON.parse(JSON.stringify(S.dayNotes||{})), formData:JSON.parse(JSON.stringify(S.form||{}))});   /* B21 */
+    note:S.blockNote||'', dayNotes:JSON.parse(JSON.stringify(S.dayNotes||{})), formData:JSON.parse(JSON.stringify(S.form||{}))});
+  var bd=blockDescs(); if(bd.length)S.blocks[S.blocks.length-1].desc=bd;   /* lot 46 (R5) */   /* B21 */
   S.lifts.forEach(function(L){
     var e=lastExploitable(L,true,S.blockId);   /* D3 : meilleure s\u00e9rie du bloc cl\u00f4tur\u00e9 ; aucune \u2192 refBlock inchang\u00e9 */
     if(e)L.refBlock=entryToRef(e);          /* Iterative : reprise de fin de phase */
@@ -5256,7 +5273,7 @@ function closeBlock(after,msg){   /* W2 : aussi appelée depuis le panneau d'éc
   });
   S.blockId=(+S.blockId||1)+1;
   S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.form={};
-  S.lifts.forEach(function(L){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];});   /* B2, Q6 */
+  S.lifts.forEach(function(L){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];delete L.prog.desc;});   /* lot 46 (R5) : desc */   /* B2, Q6 */
   draftPurge();   /* B7 : brouillons du bloc clôturé */
   S.start=todayISO();
   dq().view='bilan';
@@ -5381,7 +5398,7 @@ function renderData(){
       }).join('');
 
   /* courbe */
-  $('fit').innerHTML=S.lifts.map(function(L,i){
+  $('fit').innerHTML=S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){return !isM(o.L);}).map(function(o){ var L=o.L, i=o.i;   /* lot 46 */
     var f=fitLift(i);
     var head='<p class="note" style="margin-top:0"><b class="n'+col(i)+'">'+L.name+'</b> — coefficient actuel '+F(L.k*100)+' %, 1RM de référence '+F(rnd(rmOf(L)-eff(L),0.25))+' kg.</p>';
     if(!f.k)return head+'<p class="note">'+f.n+' série(s) exploitable(s) sur '+f.d+' nombre(s) de reps équivalentes différent(s). Il en faut trois de chaque pour ajuster quoi que ce soit. Seuls les top sets, séries maximales et performances hors programme à réserve connue comptent : une série de back-off est faussée par la fatigue de la précédente.</p>'+plotFit(L,f);
@@ -5403,34 +5420,38 @@ function renderData(){
       if(e.state==='skip')return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
         '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
-        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+'</span>'+
+        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+'<br><button class="linkbtn" data-dcom="'+esc(e.key)+'">commenter</button>'+dcomHTML(e)+'</span>'+   /* lot 46 (R10) */
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'" aria-label="Supprimer">\u00d7</button></div>';
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/')+
         (e.tries?' <i>(tentées '+e.tries.map(function(v){return v==null?'—':v;}).join('/')+')</i>':'');
       var vl=(e.valid||[]).map(function(a,st){
         return (a&&a.some(Boolean))?'S'+(st+1)+' '+a.map(function(c){return c?VJ[c].e:'\u00b7';}).join(''):'';
       }).filter(Boolean).join(' \u00b7 ');
-      var lk=[];
+      var lk=['<button class="linkbtn" data-dcom="'+esc(e.key)+'">commenter</button>'];   /* lot 46 (R10) */
       if(e.key&&findLine(e.key))lk.push('<button class="linkbtn" data-open="'+esc(e.key)+'">ouvrir la séance</button>');
       veloOfKey(e.key).forEach(function(v){lk.push('<button class="linkbtn" data-vgo="'+esc(v.id)+'">\ud83c\udfa5 vidéo S'+(v.lien.set+1)+'</button>');});
       return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
-        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+   /* R12 */
+        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+(isM(S.lifts[e.li])?' m':'')+   /* R12 */
         (e.rirs?' · réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue'))+
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+   /* R12 */
         (e.role==='extra'?'<br><i>ajout ponctuel</i>':'')+
         (vl?'<br>'+vl:'')+atTxt(e)+   /* lot 43 (C2) */
-        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+
-        (lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
+        (e.note?'<br><i>'+esc(e.note)+'</i>':'')+snHTML(e)+   /* lot 46 (R10) */
+        dcomHTML(e)+(lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'">×</button></div>';
     }).join('');
   }
 }
 $('loglist').addEventListener('click',function(e){
-  var b=e.target.closest('[data-rm]'); if(!b)return;
+  var b=e.target.closest('[data-rm]'); if(!b){ dataRowClick(e); return; }   /* lot 46 (R10) */
   S.log.forEach(function(x){ if(x.key===b.dataset.rm)keepJuge(x.key); });   /* B20 : par clé, unique ; l'id peut être périmé */
   flDropKey(b.dataset.rm,1);   /* série effacée : décision d'office retirée, comme dans le panneau */
   S.log=S.log.filter(function(x){return x.key!==b.dataset.rm;}); save(); refreshPlans();
+});
+$('loglist').addEventListener('change',function(ev){   /* lot 46 (R10) : le menu de serie reprend la note deja ecrite */
+  var s=ev.target.closest('[data-dcq]'); if(!s)return; var w=s.closest('.dcom'), e=S.log.filter(function(x){return x.key===w.dataset.dcomk;})[0]; if(!e)return;
+  w.querySelector('[data-dctxt]').value=(+s.value<0)?(e.note||''):((e.setNotes||[])[+s.value]||'');
 });
 $('applyfit').addEventListener('click',function(){
   var done=[];
@@ -5448,8 +5469,8 @@ $('addlog').addEventListener('click',function(){
      born\u00e9 \u00e0 \u00b1 500 kg. R\u00e9serve : d\u00e9j\u00e0 born\u00e9e par le s\u00e9lecteur. */
   var repsRaw=num($('lreps').value,null), loadRaw=num($('lload').value,null);
   if(repsRaw===null&&loadRaw===null){alert('Indiquez au moins le nombre de reps.');return;}
-  if(repsRaw===null||repsRaw<1||repsRaw>100||Math.round(repsRaw)!==repsRaw){
-    alert('Nombre de reps : un entier entre 1 et 100.');return;}
+  if(repsRaw===null||repsRaw<1||repsRaw>(isM(L)?ACCMMAX:100)||Math.round(repsRaw)!==repsRaw){
+    alert(isM(L)?'Distance : un entier de 1 à '+ACCMMAX+' m.':'Nombre de reps : un entier entre 1 et 100.');return;}
   if(loadRaw!==null&&Math.abs(loadRaw)>500){alert('Lest : au-del\u00e0 de 500 kg, c\u2019est une faute de frappe.');return;}
   var reps=repsRaw, load=loadRaw||0;
   S.log.push({v:SCHEMA,id:'pr'+Date.now(),key:'pr'+Date.now(),date:$('ldate').value||todayISO(),
