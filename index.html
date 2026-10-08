@@ -16,6 +16,7 @@
 :root{
   --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#48505B;
   --rule:#CFD4DB; --soft:#F3F5F7; --softer:#F8F9FA; --hl:#FBF3D6;
+  --sbx:#D6DBE2; --sbxr:#8A939E;   /* lot 56 B : bac à sable */
   --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00; --a5:#6B3FA0; --a6:#0F7C80; --a7:#B0337A; --a8:#5A5F66;
   --ok:#2E6B3F; --warn:#9C6200; --bad:#A3242E;
   --r:3px;
@@ -25,6 +26,7 @@
 [data-theme="dark"]{
   --bg:#14171C; --surface:#1C2026; --ink:#E7EAEE; --muted:#939CA8;
   --rule:#2E343C; --soft:#22272E; --softer:#1F242A; --hl:#33301F;
+  --sbx:#2A313A; --sbxr:#65707D;
   --a1:#F0728A; --a2:#74AEEA; --a3:#7DC28F; --a4:#D8A845; --a5:#B89AE8; --a6:#6CC9CC; --a7:#E58BC0; --a8:#A9AFB7;
   --ok:#7DC28F; --warn:#D8A845; --bad:#F0728A;
 }
@@ -151,7 +153,9 @@ td.bad{color:var(--bad);font-weight:600}
 .wkb{padding:2px 11px 8px}
 .day{padding:6px 0;border-bottom:1px dashed var(--rule)}
 .day:last-child{border-bottom:0}
-.dayn{font:600 12.5px/1 var(--txt);margin-bottom:4px;color:var(--muted)}
+.dayn{font:600 13px/1 var(--txt);margin-bottom:4px;color:var(--ink)}   /* lot 56 B : jour en encre, date en gris */
+.dayn .ddt{font-weight:400;color:var(--muted);margin-left:7px}
+.dayn .ddt::before{content:'· ';}
 .wk.folded .wkb{display:none}
 .folded>.cardbody{display:none}
 .card.folded>h2{margin-bottom:0;border-bottom:0;padding-bottom:0}
@@ -192,7 +196,10 @@ html,body{overflow-x:clip}
 .line .nm{font:600 12.5px/1.3 var(--txt);flex:1 1 auto}
 .line .nm em{font-style:normal;font-weight:400;color:var(--muted)}
 .line .pr{font:600 17px/1 var(--num);white-space:nowrap}
-.line .in{font:400 11px/1.3 var(--txt);color:var(--muted);flex:0 0 auto;text-align:right;min-width:72px}
+.line .in{font:400 11px/1.3 var(--txt);color:var(--muted);flex:0 1 auto;text-align:right;min-width:72px;max-width:50%;overflow-wrap:anywhere}
+/* lot 56 B : la precision d'une ligne longue passe dessous, sur toute la largeur */
+.line{flex-wrap:wrap}
+.line .inx{flex:1 1 100%;font:400 11px/1.35 var(--txt);color:var(--muted);margin-top:-3px;overflow-wrap:anywhere}
 .lastp{font:400 11px/1.35 var(--txt);color:var(--muted);margin:-3px 0 5px;padding-left:9px;
   border-left:3px solid transparent}
 .lastp b{font-weight:600;color:var(--ink)}
@@ -227,6 +234,10 @@ html,body{overflow-x:clip}
 .pill.set.short{background:var(--warn);border-color:var(--warn);color:#fff}
 .pill.half{min-width:34px}
 .pill.cat{min-width:auto;text-align:left;font:400 12px/1.3 var(--txt);padding:6px 8px}
+/* lot 56 B : forme T / C, les deux choix visibles, l'actif en noir */
+.pill.tc,.pill.tc[aria-pressed="true"]{background:var(--surface);color:var(--ink);border-color:var(--rule);padding:4px 5px;display:inline-flex;align-items:center;gap:3px}
+.pill.tc i{font-style:normal;min-width:26px;padding:5px 0;border-radius:2px;color:var(--muted);text-align:center}
+.pill.tc[aria-pressed="false"] .tcT,.pill.tc[aria-pressed="true"] .tcC{background:var(--ink);color:var(--surface)}
 
 .logrow{display:grid;grid-template-columns:58px 1fr auto;gap:8px;align-items:start;
   padding:6px 0;border-bottom:1px solid var(--rule);font-size:13px}
@@ -241,6 +252,7 @@ html,body{overflow-x:clip}
 .stat b{display:block;font:700 22px/1 var(--num)}
 .stat span{font:400 11px/1.3 var(--txt);color:var(--muted)}
 svg.plot{width:100%;height:190px;display:block;margin-top:8px}
+svg.plot.rkplot{height:auto;aspect-ratio:340/210;max-height:300px}   /* lot 56 B */
 .mk{font:400 12px/1 var(--txt);margin-left:4px;white-space:nowrap}
 .rirset{display:flex;gap:6px;align-items:center;margin-top:5px}
 .rirset>span{font:600 12px/1 var(--num);color:var(--muted);flex:0 0 22px}
@@ -320,7 +332,8 @@ body.reorg section.page.on .reobar{display:block;background:var(--ink);color:var
 .reobar .act.ghost{background:transparent;color:var(--surface)}
 footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:400 11.5px/1.55 var(--txt);color:var(--muted)}
 @media print{nav,.btnrow,.iconbtn,footer{display:none}body{background:#fff}.line{cursor:auto}}
-#cardsim{background:var(--hl)}   /* lot 45 : le brouillon se distingue du vrai programme */
+#cardsim{background:var(--sbx);border:1.5px dashed var(--sbxr)}   /* lot 45 ; lot 56 B : gris, plus le jaune */
+#cardsim .wkh{background:var(--soft)}
 .lastp.descp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* lot 46 (R5) */
 .logrow .dcom{margin-top:6px}   /* lot 46 (R10) */
 .wedit input.wtxt{width:8.5em;min-height:36px;padding:4px 6px}   /* lot 47 (echauffement, type « autre ») */
@@ -723,7 +736,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v52';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v54';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -1672,18 +1685,45 @@ function flNote(L,i){ /* décisions après échec, dans Programme */
 }
 /* Q6 : semaine w d'un gabarit Helms → vague c, semaine ww de la vague ; dl = semaine de deload S4,
    insérée à la demande après les vagues listées dans P.hdl. Sans deload : c = w / weeks, ww = w % weeks. */
-function hWk(L,w){
-  var t=tplOf(L.prog.tpl), n=(t&&t.weeks)||3, dl=(t&&t.lin)?[]:(L.prog.hdl||[]), c=0, ww=0, d=false, w0=0,   /* lot 51 : pas de deload en progression simple */
+function hWk(L,w){ return hWkG(L,w,hGdlFor(L)); }
+/* Lot 57 : G = semaines de deload de tous les mouvements (hGdl) ; état B (P.hBs, MSP-I1) : vague de 5 semaines,
+   deload d'office tous les 2 cycles (p. 244). fb : deload après une vague ratée ; fg : deload d'un autre mouvement. */
+function hWkG(L,w,G){
+  var t=tplOf(L.prog.tpl), n0=(t&&t.weeks)||3, dl=(t&&t.lin)?[]:(L.prog.hdl||[]), c=0, ww=0, d=false, w0=0,   /* lot 51 : pas de deload en progression simple */
       fw=(t&&t.fail==='inter')?flOf(L).filter(function(v){return v.m==='h';}).map(function(v){return v.w;}):[],   /* lot 51 : deload d'office après une vague ratée */
-      f3=!!(t&&t.inc), nd=0, y3=false;   /* lot 56 : deload d'office après 3 vagues d'affilée sans deload (p. 243) */
+      f3=!!(t&&t.inc), nd=0, y3=false, yf=false, yg=false,   /* lot 56 : deload d'office après 3 vagues d'affilée sans deload (p. 243) */
+      bs=(t&&t.inc)?(L.prog.hBs||[]):[], nOf=function(x){return hIsBs(bs,x)?5:n0;}, n=nOf(0);
   for(var k=0;k<w;k++){
-    if(d){d=false;c++;ww=0;w0=k+1;nd=0;}
+    if(d){d=false;c++;ww=0;w0=k+1;nd=0;n=nOf(c);}
     else if(ww<n-1)ww++;
-    else if(dl.indexOf(c)>=0||fw.some(function(x){return x>=w0&&x<=k;})){d=true;y3=false;}
-    else if(f3&&nd>=2){d=true;y3=true;}
-    else{c++;ww=0;w0=k+1;nd++;}
+    else if(dl.indexOf(c)>=0||fw.some(function(x){return x>=w0&&x<=k;})){d=true;y3=false;yg=false;yf=fw.some(function(x){return x>=w0&&x<=k;});}
+    else if(f3&&nd>=(n>n0?1:2)){d=true;y3=true;yf=false;yg=false;}
+    else if(G&&G[k+1]&&!(t&&t.lin)){d=true;y3=false;yf=false;yg=true;}
+    else{c++;ww=0;w0=k+1;nd++;n=nOf(c);}
   }
-  return {c:c,ww:d?n-1:ww,dl:d,f3:d&&y3};
+  return {c:c,ww:d?n-1:ww,dl:d,f3:d&&y3,fb:d&&yf,fg:d&&yg,n:n,B:n>n0};
+}
+function hIsBs(bs,c){ var n=0; for(var i=0;i<bs.length;i++)if(bs[i]<=c)n++; return n%2===1; }
+function hIsB(L,c){ var t=tplOf(L.prog.tpl); return !!(t&&t.inc)&&hIsBs(L.prog.hBs||[],c); }
+function hBsNext(L){ var t=tplOf(L.prog.tpl); if(!t||!t.inc||!(L.prog.hBs||[]).length)return []; return hIsB(L,hWk(L,Math.max(0,S.nwk-1)).c)?[0]:[]; }
+/* Lot 57 (réponse 8, p. 244) : semaine w → noms des mouvements dont le deload de blocage tombe cette semaine-là.
+   Point fixe : un deload de tous les mouvements décale aussi les vagues des mouvements bloqués. */
+var HGDL={sig:null,g:{}};
+function hGdlFor(L){ var t=tplOf(L.prog.tpl); return (t&&t.days&&!t.lin&&!isZlat(L.prog.tpl))?hGdl():null; }
+function hGdl(){
+  var src=S.lifts.filter(function(L){ var t=tplOf(L.prog.tpl); return L.prog.tpl!=='off'&&t&&t.inc; });
+  if(!src.length)return {};
+  var sig=S.blockId+'|'+S.nwk+'|'+src.map(function(L){ var P=L.prog; return L.name+'/'+P.tpl+'/'+(P.pair||'')+'/'+(P.hdl||[]).join(',')+'/'+(P.hBs||[]).join(',')+'/'+
+    flOf(L).filter(function(v){return v.m==='h';}).map(function(v){return v.w+v.d+v.n;}).join(','); }).join(';');
+  if(HGDL.sig===sig)return HGDL.g;
+  var g={};
+  src=src.filter(function(L){ return flOf(L).some(function(v){return v.m==='h';}); });
+  for(var it=0;src.length&&it<8;it++){
+    var ng={};
+    src.forEach(function(L){ for(var w=0;w<S.nwk;w++){ var k=hWkG(L,w,g); if(k.dl&&k.fb){ var a=ng[w]||(ng[w]=[]); if(a.indexOf(L.name)<0)a.push(L.name); } } });
+    var same=Object.keys(ng).join()===Object.keys(g).join(); g=ng; if(same)break;
+  }
+  HGDL={sig:sig,g:g}; return g;
 }
 function hW0(L,c){
   for(var w=0;w<200;w++){var k=hWk(L,w); if(k.c===c&&!k.dl)return w; if(k.c>c)break;}
@@ -1691,13 +1731,41 @@ function hW0(L,c){
 }
 /* Lot 51 : vague bloquée (règle intermédiaire, p. 244) = vague qui contient une décision « règle du livre ».
    Toute la vague du mouvement reçoit un deload S4 d'office ; le créneau qui a bloqué (jour, ligne) repart 7,5 % sous
-   ses charges de la vague bloquée, en charge système, au lieu de prendre l'incrément ; les autres créneaux montent. */
+   ses charges de la vague bloquée, en charge système, au lieu de prendre l'incrément ; les autres créneaux montent.
+   Lot 57 (MSP-I1) : reprise réglable (P.hRep : 5, 7,5 ou 10 %) ; après le cycle de reprise, chaque vague suivante
+   prend l'incrément réduit de moitié (p. 244), par exercice : le lift (J1, J2, J3) ou la variante. */
 function hBlkW(L,c,lab,n){ return flOf(L).some(function(v){ if(v.m!=='h'||(lab!=null&&(v.d!==lab||v.n!==n)))return false; var k=hWk(L,v.w); return k.c===c&&!k.dl; }); }
 function hWave(L,t,s,c0,cy,lab,n){
   if(t.fail!=='inter')return s+L.prog.inc*(cy-c0);
-  for(var c=c0+1;c<=cy;c++)s=hBlkW(L,c-1,lab,n)?s*0.925:s+L.prog.inc;
+  var p=t.inc?hRepOf(L.prog):7.5, fb=t.inc?hBlk1(L,lab,n):null, ir=hIncR(L.prog.inc);
+  for(var c=c0+1;c<=cy;c++)s=hBlkW(L,c-1,lab,n)?s*(1-p/100):s+((fb!=null&&fb<c-1)?ir:L.prog.inc);
   return s;
 }
+function hRepOf(P){ return [5,7.5,10].indexOf(+P.hRep)>=0?+P.hRep:7.5; }
+function hIncR(inc){ inc=+inc||0; return inc>0?Math.max(0.25,Math.floor(inc/2/0.25)*0.25):0; }   /* 1,25 → 0,5 ; 2,5 → 1,25 */
+function hLineVari(t,lab,n){ var d=(t&&t.days||[]).filter(function(x){return x.label===lab;})[0], l=d&&d.lines[n]; return !!(l&&l.vari); }
+function hBlk1(L,lab,n){   /* 1re vague bloquée de l'exercice de ce créneau (le lift, ou la variante) */
+  var t=tplL(L), vx=hLineVari(t,lab,n), c=null;
+  flOf(L).forEach(function(v){ if(v.m!=='h'||hLineVari(t,v.d,v.n)!==vx)return; var k=hWk(L,v.w); if(!k.dl&&(c==null||k.c<c))c=k.c; });
+  return c;
+}
+function hBlkList(L){   /* vagues bloquées du mouvement, tous créneaux */
+  var t=tplOf(L.prog.tpl), o=[]; if(!t||t.fail!=='inter')return o;
+  flOf(L).forEach(function(v){ if(v.m!=='h')return; var k=hWk(L,v.w); if(!k.dl&&o.indexOf(k.c)<0)o.push(k.c); });
+  return o.sort(function(a,b){return a-b;});
+}
+function hAdvAlert(){   /* p. 244-245 : nouveau blocage sur la plupart des main lifts → progression avancée */
+  var m=S.lifts.filter(function(L){return L.main&&L.prog.tpl!=='off'&&tplOf(L.prog.tpl);}); if(!m.length)return '';
+  var b=m.filter(function(L){return tplOf(L.prog.tpl).inc&&hBlkList(L).length>=2;});
+  if(b.length*2<=m.length)return '';
+  return 'Nouveau blocage malgré l\'incrément réduit sur la plupart de vos main lifts ('+b.map(function(L){return L.name;}).join(', ')+') : le livre conseille de passer à une progression avancée (p. 244-245), en jugeant sur les jours de force, jamais sur le J2.';
+}
+/* Lot 57 : lignes en état B. Reps : J1 10 à 6, J3 6 à 2, variante 9 à 5 ; J2 3-3-2-2-1, +1 incrément toutes les
+   2 semaines. S1 : la charge de l'état A ramenée à une rep de plus, à la même réserve (conjecture de l'outil). */
+function hRepW(li,ww,B){ if(!B)return li.reps[ww]; return li.tech?li.reps[[0,0,1,1,2][ww]]:li.reps[0]+1-ww; }
+function hStepW(li,ww,B){ return B&&li.tech?Math.floor(ww/2):ww; }
+function hR0(li,B){ return li.reps[0]+(B&&!li.tech?1:0); }
+function hFacB(L,li,B){ if(!B||li.tech)return 1; var q=li.rir[0]||0; return (1+L.k*(li.reps[0]+q-1))/(1+L.k*(li.reps[0]+q)); }
 /* Lot 51 (réponse 9) : lignes Helms et Accessoire arrondies au plus fin du pas du mouvement et de l'incrément. */
 function hGrain(L,inc){ inc=+inc; return inc>0&&inc<L.step?inc:L.step; }
 /* Lot 56 : MSP-I1 sur 3 jours. t.inc : la réserve ne règle que la S1 de chaque vague ; S2 et S3 = S1 + P.hinc par
@@ -1713,10 +1781,10 @@ function hB1(L,li,ha){   /* charge système de la S1 de la vague d'ancrage */
   var z=fzOf(L), rm0=z?z.rm:ha.rm, bw0=z?z.bw:ha.bw;   /* lest saisi au départ ; après un réancrage, même rapport au 1RM */
   return (v+eff(L,bw0))*ha.rm/rm0;
 }
-function hF3(L,c){   /* le deload après la vague c vient-il de la règle des 3 vagues ? */
+function hDlAt(L,c){ for(var w=0;w<400;w++){ var k=hWk(L,w); if(k.c>c)return null; if(k.c===c&&k.dl)return k; } return null; }   /* lot 57 */
+function hF3(L,c){   /* le deload après la vague c vient-il de la règle des 3 vagues (2 en état B) ? */
   var t=tplOf(L.prog.tpl); if(!t||!t.inc)return false;
-  for(var w=0;w<400;w++){ var k=hWk(L,w); if(k.c>c)return false; if(k.c===c&&k.dl)return k.f3; }
-  return false;
+  var k=hDlAt(L,c); return !!(k&&k.f3);
 }
 var TPLV={};
 function tplL(L){
@@ -1734,13 +1802,14 @@ function vlineHTML(L,i,P){
       [['J1','J1 (volume)'],['J2','J2 (technique)'],['J3','J3 (force)'],['J4','J4 ajouté']].map(function(o){
         return '<option value="'+o[0]+'"'+(vd===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>'+
     '<div class="field sm"><label>Incrément de vague (kg)</label><input data-i="'+i+'" data-f="hinc" type="number" min="0" step="0.25" value="'+hi+'"></div>'+
-    '<div class="field sm"><label>Lest de départ, variante</label><input data-i="'+i+'" data-f="vLest" type="number" step="0.25" placeholder="calculé" value="'+(vl==null?'':vl)+'"></div>'+
+    '<div class="field sm"><label>Lest de départ, variante</label><input data-i="'+i+'" data-f="vLest" type="number" step="0.25" placeholder="'+(P.varMod==='standard'?'calculé':'à saisir')+'" value="'+(vl==null?'':vl)+'"></div>'+
   '</div>';
   if(vd==='J2')h+=W('J2 est le jour technique, conçu pour rester loin de l\'échec et ne pas produire de fatigue (p. 242). Une variante à réserve 2 y annule cette fonction.');
   if(vd==='J1')h+=W('Le RPE 7 du J1 sert à limiter les dégâts musculaires qui déborderaient sur les jours suivants (p. 242). Une variante à réserve 2 le même jour réduit cet effet.');
   if(vd==='J4')h+='<p class="note">J4 ajouté : 4 séances par semaine, comme le livre. Le calendrier de l\'outil n\'a que 3 jours : le J4 tombe à la date du J3 tant qu\'il n\'y a pas de 4e jour.</p>';
   if(hi<2.5)h+=W('Helms déconseille le micro-chargement dans la vague : avec des reps qui baissent chaque semaine, un incrément plus petit rend les semaines suivantes trop faciles (p. 244).');
-  if(vl==null)h+='<p class="note">Lest de départ de la variante : vide, il est calculé depuis le 1RM du mouvement à 2 en réserve, souvent trop lourd pour une variante plus dure (hautes, pausées…). Saisissez celui de votre S1.</p>';
+  if(vl==null)h+=P.varMod==='standard'?'<p class="note">Lest de départ de la variante : vide, il est calculé depuis le 1RM du mouvement à 2 en réserve (« Séances secondaires » standard : la variante est le mouvement lui-même).</p>':   /* lot 57 (réponse 1) */
+    W('Lest de départ de la variante : à saisir. Tant qu\'il est vide, la ligne de la variante n\'a pas de charge : mettez le lest qui vous laisse 2 reps en réserve sur la 1re série de 8 de votre variante.');
   return h;
 }
 function dpIncOf(P){ return +P.dpInc>0?+P.dpInc:DPINC; }
@@ -2011,10 +2080,10 @@ var HELMS={
         "S1 : la charge qui donne la réserve visée à la 1re série (p. 242). S2 = S1 + 2,5 kg, S3 = S1 + 5 kg (p. 243). L'incrément de vague se règle par mouvement ; le livre déconseille de descendre en dessous (p. 244). En S2 et S3, la réserve affichée est une estimation, pas une consigne.",
         "Vague suivante : S1 + l'incrément du mouvement (votre choix Q-51d).",
         "Deload S4 à la demande (checklist p. 218) : reps de S3 à la charge de S1, 2 séries au lieu de 3 (table p. 243). D'office après une vague ratée (p. 244) et après 3 vagues d'affilée sans deload (p. 243).",
-        "Variante : même vague que le lift, sur le jour choisi (J1 par défaut ; J2, J3, ou un J4 ajouté comme dans le livre). Sa charge de S1 vient du 1RM du mouvement à 2 en réserve, ou du lest de départ saisi : conseillé, une variante plus dure que le lift serait sinon trop chargée. Ratée, elle suit la même règle que le lift.",
+        "Variante : même vague que le lift, sur le jour choisi (J1 par défaut ; J2, J3, ou un J4 ajouté comme dans le livre). Sa charge de S1 est le lest de départ saisi (2 en réserve sur la 1re série de 8 de la variante) ; tant qu'il est vide, la ligne n'a pas de charge. Seule une variante « standard » (le mouvement lui-même) est calculée depuis le 1RM à 2 en réserve (lot 57, réponse 1). Ratée, elle suit la même règle que le lift.",
         "Le J2 ne compte jamais comme échec : le livre interdit de juger un blocage sur le jour technique (p. 245).",
         "12 séries par semaine sur le mouvement, comme le programme du livre, sous les 13 à 15 qu'il recommande ailleurs (p. 216).",
-        "Pas encore dans l'outil (lot 57) : plages étendues quand les reps ne montent plus sans échec, et blocage de charge (p. 244)."],
+        "Depuis le lot 57. Plages étendues, à la demande (bouton dans Programme) quand les reps ne montent plus sans aller à l'échec : J1 10 à 6, J3 6 à 2, variante 9 à 5, J2 3-3-2-2-1 ; vague de 5 semaines, deload tous les 2 cycles (p. 244). Blocage (p. 244-245) : deload de tous les mouvements, reprise 5, 7,5 ou 10 % sous la charge ratée, puis incrément entre vagues réduit de moitié ; alerte « passer à l'avancé » si la plupart des main lifts bloquent de nouveau."],
   days:[{label:'J1',lines:[H(3,[9,8,7],[3,3,3])]},
         {label:'J2',lines:[HT(3,[3,2,1],[5,5,5])]},
         {label:'J3',lines:[H(3,[5,4,3],[2,2,2])]}],
@@ -2125,9 +2194,10 @@ function accDaysOf(P){
    le calendrier, lui, compte en semaines. */
 function accPlan(L,i){
   var P=L.prog, mm=isM(L), ast=mm?accStepOf(P):1, lo=+P.accLo||8, hi=Math.min(mm?ACCMMAX:30,Math.max(lo,+P.accHi||10)), inc=+P.inc||2.5, days=accDaysOf(P);   /* lot 46 : carries */   /* D8 : borne haute born\u00e9e */
-  var load=+P.accLoad||0, reps=lo, miss=0, out=[];
+  var load=+P.accLoad||0, reps=lo, miss=0, out=[], G=hGdl();
   for(var w=0;w<S.nwk;w++){
     days.forEach(function(lab){
+      if(G[w]){ out.push({w:w,lab:lab,load:load,reps:lo,wide:false,dl:G[w]}); return; }   /* lot 57 : deload de tous les mouvements (p. 244), la progression attend */
       out.push({w:w,lab:lab,load:load,reps:reps,wide:miss>=2});   /* lot 51 : 2 échecs d'affilée → proposer d'élargir */
       if(P.accMode==='maintien'||P.accMode==='calendrier')return;
       var e=S.log.filter(function(x){return x.key==='c|'+i+'|'+w+'|'+lab+'|0'+BK();})[0];
@@ -3116,12 +3186,34 @@ function hStartUI(L,i,P,t){
     if(rows.length)h+='<div class="btnrow">'+rows.join(' ')+'</div>';
   }
   var dls=[];   /* Q6 : deload S4 a la demande apres une vague */
-  for(var c2=0;!t.lin&&c2<=hWk(L,S.nwk-1).c;c2++){ var wd=hW0(L,c2)+t.weeks; if(wd>=S.nwk)break;   /* lot 51 : MSP-N sans deload */
-    var fo3=hF3(L,c2), fo=(t.fail==='inter'&&hBlkW(L,c2))||fo3;   /* lot 56 : 3 vagues sans deload */   /* lot 51 : deload d'office après une vague ratée */
+  for(var c2=0;!t.lin&&c2<=hWk(L,S.nwk-1).c;c2++){ var wd=hW0(L,c2)+(hIsB(L,c2)?5:t.weeks); if(wd>=S.nwk)break;   /* lot 51 : MSP-N sans deload */   /* lot 57 : vague de 5 semaines en état B */
+    var dk=hDlAt(L,c2), fog=!!(dk&&dk.fg), fo3=hF3(L,c2), fo=(t.fail==='inter'&&hBlkW(L,c2))||fo3||fog;   /* lot 56 : 3 vagues sans deload */   /* lot 51 : deload d'office après une vague ratée */
     dls.push('<label class="chk"><input type="checkbox" data-i="'+i+'" data-f="hdl" data-c="'+c2+'"'+((P.hdl||[]).indexOf(c2)>=0||fo?' checked':'')+(fo?' disabled':'')+
-      '>après la vague '+(c2+1)+' (S'+(wd+1)+')'+(fo?(fo3?' — d\'office (3 vagues sans deload, p. 243)':' — d\'office (échec, p. 244)'):'')+'</label>'); }
+      '>après la vague '+(c2+1)+' (S'+(wd+1)+')'+(fo?(fo3?(hIsB(L,c2)?' — d\'office (2 vagues sans deload en plages étendues, p. 244)':' — d\'office (3 vagues sans deload, p. 243)'):
+        (fog&&!hBlkW(L,c2))?' — d\'office (blocage de '+(hGdl()[wd]||[]).join(', ')+', deload de tous les mouvements, p. 244)':' — d\'office (échec, p. 244)'):'')+'</label>'); }
   if(dls.length)h+='<p class="note" style="margin-top:6px">Deload S4 à la demande (checklist du livre ; obligatoire tous les 3 cycles) : '+
     'reps de la S'+t.weeks+' à la charge de la S1, '+(t.inc?'2 séries au lieu de 3 (table p. 243)':'deux tiers des séries')+'. La suite du bloc est décalée d\'une semaine.</p><div class="btnrow">'+dls.join(' ')+'</div>';
+  if(t.inc)h+=hBcUI(L,i,P);   /* lot 57 */
+  return h;
+}
+/* Lot 57 : états B et C du MSP-I1 dans Programme. Le bouton des plages étendues agit sur la 1re vague non commencée ;
+   il en sort de la même façon, ou annule un choix pas encore commencé (réponses 3 et 4). */
+function hBcUI(L,i,P){
+  var nC=hWk(L,S.nwk-1).c+1, c0=null, bw=[];
+  for(var c=0;c<=nC;c++){ var w0=hW0(L,c); if(w0>=S.nwk)break; if(hIsB(L,c))bw.push(c+1);
+    if(c0==null&&!S.log.some(function(e){return e.li===i&&/^h\|/.test(String(e.key))&&inBlock(e.key)&&(+e.week-1)>=w0;}))c0=c; }
+  var bs=P.hBs||[], ir=hIncR(P.inc), bk=hBlkList(L), adv=hAdvAlert();
+  var h='<p class="note" style="margin-top:8px"><b>Plages étendues</b> (p. 244) : quand les reps ne montent plus sans aller à l\'échec, une rep de plus de chaque côté. '+
+    'J1 10 à 6, J3 6 à 2, variante 9 à 5, J2 3-3-2-2-1 ; vague de 5 semaines, deload d\'office tous les 2 cycles. '+
+    (bw.length?'Vague'+(bw.length>1?'s ':' ')+bw.join(', ')+' en plages étendues ; la charge de leur S1 est celle des plages normales ramenée à une rep de plus, à la même réserve (estimation de l\'outil, à corriger à la 1re séance).':'Plages normales sur tout le bloc.')+'</p>';
+  if(c0!=null){ var has=bs.indexOf(c0)>=0;
+    h+='<div class="btnrow"><button class="act ghost mini" data-i="'+i+'" data-f="hB" data-c="'+c0+'">'+
+      (has?'Annuler le changement de la vague '+(c0+1):(hIsB(L,c0)?'Revenir aux plages normales':'Étendre les plages')+' à partir de la vague '+(c0+1)+' (S'+(hW0(L,c0)+1)+')')+'</button></div>'; }
+  h+='<div class="row" style="margin-top:8px"><div class="field md"><label>Reprise après blocage, sous la charge ratée</label><select data-i="'+i+'" data-f="hRep">'+
+    [5,7.5,10].map(function(p){return '<option value="'+p+'"'+(hRepOf(P)===p?' selected':'')+'>'+F(p)+' %'+(p===7.5?' (défaut)':'')+'</option>';}).join('')+'</select></div></div>';
+  h+='<p class="note">Blocage (p. 244) : la vague se finit, deload de tous les mouvements, S1 suivante '+F(hRepOf(P))+' % sous la charge ratée sur le créneau qui a bloqué ; '+
+    'ensuite, incrément entre vagues réduit de moitié, '+F(ir)+' kg au lieu de '+F(P.inc)+' kg. '+(bk.length?'Vague'+(bk.length>1?'s':'')+' bloquée'+(bk.length>1?'s':'')+' : '+bk.map(function(c){return c+1;}).join(', ')+'.':'Aucun blocage dans ce bloc.')+'</p>';
+  if(adv)h+='<p class="note" style="color:var(--warn)">'+adv+'</p>';
   return h;
 }
 function hReanchor(i,c,undo){
@@ -3383,7 +3475,7 @@ function brCopy(o){return o==null?o:JSON.parse(JSON.stringify(o));}
 function brPut(o,k,v){ if(v===undefined)delete o[k]; else o[k]=v; }
 function brLift(L,next){
   var p=brCopy(L.prog); BRJOURNAL.forEach(function(k){delete p[k];});
-  if(next){p.hdl=[]; delete p.desc;}   /* lot 46 : la description de bloc est videe par la cloture */   /* deloads choisis pour le bloc en cours : remis a zero par la cloture */
+  if(next){p.hdl=[]; p.hBs=hBsNext(L); delete p.desc;}   /* lot 57 */   /* lot 46 : la description de bloc est videe par la cloture */   /* deloads choisis pour le bloc en cours : remis a zero par la cloture */
   return {nm:L.name, prog:p, rm:null};
 }
 function brNew(){
@@ -3436,6 +3528,7 @@ function brWith(fn){
 function brTops(){
   var o={};
   PLAN.forEach(function(wk){ wk.days.forEach(function(d){ d.lines.forEach(function(x){
+    if(x.load==null)return;   /* lot 57 */
     var t=o[x.li]||(o[x.li]={w0:wk.w,a:null,w1:wk.w,b:null});
     if(wk.w===t.w0&&(t.a==null||x.load>t.a))t.a=x.load;
     if(wk.w>t.w1){t.w1=wk.w;t.b=null;}
@@ -3726,6 +3819,9 @@ function asgSet(t){
   else if(f==='sqTop')P.sqTop=v;   /* lot 52 B */
   else if(f==='vDay'){ if(ADAYS.indexOf(v)>=0)P.vDay=v; }   /* lot 56 */
   else if(f==='hinc'){ var hv2=parseFloat(String(v).replace(',','.')); if(isFinite(hv2)&&hv2>=0)P.hinc=hv2; }
+  else if(f==='hB'){ var bc=+t.dataset.c, bl=(P.hBs||[]).slice(), bi=bl.indexOf(bc); if(bi>=0)bl.splice(bi,1); else bl.push(bc);   /* lot 57 : état B */
+    P.hBs=bl.sort(function(x,y){return x-y;}); return {f:f,ra:1,today:1}; }
+  else if(f==='hRep'){ if([5,7.5,10].indexOf(+v)>=0)P.hRep=+v; return {f:f,ra:1,today:1}; }   /* lot 57 : reprise après un blocage */
   else if(f==='vLest'){ var lv=String(v).trim()===''?null:parseFloat(String(v).replace(',','.')); P.vLest=(lv==null||isFinite(lv))?lv:P.vLest; }
   else if(f==='accDayT'){var ds=accDaysOf(P), d=t.dataset.d, k=ds.indexOf(d);
     if(t.checked&&k<0)ds.push(d); else if(!t.checked&&k>=0&&ds.length>1)ds.splice(k,1);
@@ -3803,8 +3899,8 @@ function buildPlan(){
         if(t.acc){
           if(accDaysOf(P).indexOf(lab)<0||w>=S.nwk)return;
           var st=(APC[o.i]||(APC[o.i]=accPlan(L,o.i))).filter(function(q){return q.w===w&&q.lab===lab;})[0]; if(!st)return;   /* R1 */
-          day.lines.push({li:o.i,name:L.name,role:'acc',sets:+P.accSets||3,reps:String(st.reps)+(isM(L)?' m':''),
-            load:rnd(st.load,hGrain(L,+P.inc||2.5)),info:accInfo(P,L)+(st.wide?' · bloque : élargir la fourchette (livre p. 113)':''),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
+          day.lines.push({li:o.i,name:L.name,role:'acc',sets:st.dl?Math.max(1,Math.round((+P.accSets||3)*2/3)):(+P.accSets||3),reps:String(st.reps)+(isM(L)?' m':''),   /* lot 57 */
+            load:rnd(st.load,hGrain(L,+P.inc||2.5)),info:(st.dl?'deload de tous les mouvements (blocage de '+st.dl.join(', ')+', p. 244) : bas de la fourchette, 2/3 des séries (p. 112) · ':'')+accInfo(P,L)+(st.wide?' · bloque : élargir la fourchette (livre p. 113)':''),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
           return;
         }
         var days=t.days;
@@ -3865,13 +3961,14 @@ function buildPlan(){
                 key:'h|'+o.i+'|'+w+'|'+lab+'|'+li_i+BK()});
               return;
             }
-            var r=li.reps[ww], q=li.rir[ww], sets=hSets(li,ww), role=li.vari?'var':'work', info=q+' en réserve', sysP, sys, tag='';
+            var hb=!!hk.B, r=hRepW(li,ww,hb), q=li.rir[Math.min(ww,li.rir.length-1)], sets=hSets(li,ww), role=li.vari?'var':'work', info=q+' en réserve', sysP, sys, tag='';   /* lot 57 : état B */
             if(lin&&li.vari)info+=' (livre : RPE 5, soit 4 à 6 reps de l\'échec, p. 241-242 ; l\'outil prend 5)';   /* lot 51 (Q-51a) */
             if(li.tech)info+=' (jour technique, livre : RPE 5, soit 4 à 6 reps de l\'échec, p. 242 ; l\'outil prend 5 ; jamais compté comme échec, p. 245)';   /* lot 56 */
-            var b1=t.inc?hB1(L,li,ha):0, hi=hIncOf(P);   /* lot 56 : charge de S1, incrément de vague */
+            var b1=t.inc?hB1(L,li,ha)*hFacB(L,li,hb):0, hi=hIncOf(P), vNo=!!(t.inc&&li.vari&&P.varMod!=='standard'&&vLestOf(P)==null);   /* lot 56 : charge de S1, incrément de vague */   /* lot 57 : S1 en état B ; variante sans lest de départ (réponse 1) */
             if(hk.dl){   /* Q6 : deload S4 = reps de la derniere semaine, charge de la S1, deux tiers des series */
               sysP=sys=hWave(L,t,t.inc?b1:rm/(1+L.k*(li.reps[0]+(li.rir[0]||0)-1)),ha.c,cy,lab,li_i); q=null; role='deload';
-              sets=hDlSets(t,hSets(li,ww,1)); info='deload S4 : reps de S'+t.weeks+', charge de S1, '+(t.inc?sets+' séries (table du livre, p. 243)':'2/3 des séries');   /* lot 56 */   /* D11 */
+              sets=hDlSets(t,hSets(li,ww,1)); info='deload S'+(hk.n+1)+' : reps de S'+hk.n+', charge de S1, '+(t.inc?sets+' séries (table du livre, p. 243)':'2/3 des séries')+
+                (hk.fg?' · deload de tous les mouvements après le blocage de '+(hGdl()[w]||[]).join(', ')+' (p. 244)':'');   /* lot 57 */   /* lot 56 */   /* D11 */
             }else if(lin){   /* lot 51 (E1) : progression simple, règle novice (p. 106, 109, 241) ; le J2 (variante) n'échoue jamais */
               var sk=o.i+'|'+lab+'|'+li_i, hs=HS[sk], m10=false, n10=hs?hs.n10:0, blk=hs?hs.blk:null;
               if(!hs)sys=sysP=rm/(1+L.k*(r+(q||0)-1))+dInc;
@@ -3886,7 +3983,7 @@ function buildPlan(){
               var fv=flAt(L,w,lab,li_i), fl=!li.vari&&!!(fv&&fv.m==='h');
               HS[sk]={sys:sys,f:fl,st:fl?((hs&&hs.f&&hs.st<2)?hs.st:0)+1:0,m10:m10,blk:blk,n10:n10,c:cy,w:w};
             }else{   /* B2 / Q3 : regle du livre, par creneau ; le decalage vaut jusqu'a la fin de la vague */
-              sysP=hWave(L,t,t.inc?b1+hi*ww:rm/(1+L.k*(r+(q||0)-1)),ha.c,cy,lab,li_i);   /* lot 56 : S2 et S3 = S1 + incrément */
+              sysP=hWave(L,t,t.inc?b1+hi*hStepW(li,ww,hb):rm/(1+L.k*(r+(q||0)-1)),ha.c,cy,lab,li_i);   /* lot 57 : J2 en état B, +1 incrément toutes les 2 semaines */   /* lot 56 : S2 et S3 = S1 + incrément */
               var sk=o.i+'|'+lab+'|'+li_i, hs=HS[sk], dd=(hs&&hs.c===cy)?hs.d:0, fx=(itr&&hs&&hs.c===cy)?hs.fx:null;
               sys=sysP+dd; if(dd<0)tag=' · décalée (échec)';
               if(itr){   /* lot 51 : règle intermédiaire (p. 244), la suite de la vague reste à la charge ratée */
@@ -3898,17 +3995,21 @@ function buildPlan(){
               var fv=flAt(L,w,lab,li_i), fl=!li.tech&&!!(fv&&fv.m==='h');   /* lot 56 : le J2 n'est jamais un échec */
               HS[sk]={sys:sys,f:fl,st:fl?((hs&&hs.f&&hs.st<2)?hs.st:0)+1:0,d:sys-sysP,c:cy,w:w,fx:fl?sys:fx};
               if(t.inc&&ww>0){   /* lot 56 : réserve estimée depuis le 1RM implicite de la S1, indicative */
-                var s1=hWave(L,t,b1,ha.c,cy,lab,li_i), qe=(s1*(1+L.k*(li.reps[0]+(li.rir[0]||0)-1))/sys-1)/L.k+1-r;
+                var s1=hWave(L,t,b1,ha.c,cy,lab,li_i), qe=(s1*(1+L.k*(hR0(li,hb)+(li.rir[0]||0)-1))/sys-1)/L.k+1-r;
                 q=Math.max(0,Math.round(qe*2)/2);
-                info='≈ '+F(q)+' en réserve (estimation : en S'+(ww+1)+', la charge vient de S1 + '+F(hi*ww)+' kg, p. 243)'+(li.tech?' ; jour technique, jamais compté comme échec (p. 245)':'');
+                info='≈ '+F(q)+' en réserve (estimation : en S'+(ww+1)+', la charge vient de S1 + '+F(hi*hStepW(li,ww,hb))+' kg, p. 243)'+(li.tech?' ; jour technique, jamais compté comme échec (p. 245)':'');
               }
             }
             day.lines.push({li:o.i,name:li.vari?varName(L):L.name,role:role,tech:li.tech?1:undefined,
-              sets:sets,reps:String(r),rir:q,load:rnd(sys-eff(L,ha.bw),L.step),info:info+tag,
+              sets:sets,reps:String(r),rir:q,load:vNo?null:rnd(sys-eff(L,ha.bw),L.step),
+              info:vNo?(hk.dl?'deload, ':'')+'lest de départ à saisir ('+(li.rir[0]||0)+' en réserve sur '+hR0(li,hb)+' ; Programme, « Lest de départ, variante »)':info+(hb&&!hk.dl?' · plages étendues, p. 244':'')+tag,
               key:'h|'+o.i+'|'+w+'|'+lab+'|'+li_i+BK()});
           });
         }
       });
+      var gw=hGdl()[w];   /* lot 57 : semaine de deload de tous les mouvements ; les gabarits qui ne le font pas d'eux-mêmes le signalent */
+      if(gw)day.lines.forEach(function(x){ if(x.role==='deload'||x.role==='extra'||/deload/.test(String(x.info)))return;
+        x.info+=' · deload de tous les mouvements cette semaine (blocage de '+gw.join(', ')+', p. 244) : non prévu par ce gabarit, allégez si besoin'; });
       if(day.lines.length){
         /* ajouts ponctuels : rattaches a une seance precise du bloc, rien d'autre ne bouge */
         (S.extra[w+'|'+lab+BK()]||[]).forEach(function(xa){
@@ -4030,13 +4131,13 @@ function renderPlan(into,weeks,pfx,scope){
       var hid=0;
       day.lines.forEach(function(x){
         if(pfx==='p'&&!S.showAcc&&S.lifts[x.li]&&!S.lifts[x.li].main){ hid++;
-          txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n'; return; }
+          txt+='  '+x.name+' '+planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n'; return; }
         var st=lineState(x.key);
         html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
           '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
-          '<span class="pr">'+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
-          '<span class="in">'+x.info+'</span></div>'+(pfx==='t'?descLine(x,day)+lastPerfHTML(x)+recordHTML(x,day.label):'');   /* lot 46 (R5) */
-        txt+='  '+x.name+' '+loadLab(S.lifts[x.li],x.load)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
+          '<span class="pr">'+planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+'</span>'+
+          infoHTML(x.info)+'</div>'+(pfx==='t'?descLine(x,day)+lastPerfHTML(x)+recordHTML(x,day.label):'');   /* lot 46 (R5) */
+        txt+='  '+x.name+' '+planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n';
       });
       if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
       html+='</div>';
@@ -4045,6 +4146,14 @@ function renderPlan(into,weeks,pfx,scope){
   });
   into.innerHTML=html||'<div class="card"><p class="note">Aucun mouvement programmé.</p></div>';
   return txt;
+}
+/* Lot 56 B : une précision longue (« ≈ 3 en réserve (estimation : …) ») ne tient pas à droite de la ligne sur un
+   téléphone : la partie entre parenthèses passe sous la ligne, sur toute la largeur. */
+function planLoad(x){ return x.load==null?'lest à saisir':loadLab(S.lifts[x.li],x.load); }   /* lot 57 : variante sans lest de départ */
+function infoHTML(s){
+  s=String(s==null?'':s); var k=s.indexOf(' (');
+  if(s.length<=30||k<1)return '<span class="in">'+s+'</span>';
+  return '<span class="in">'+s.slice(0,k)+'</span><span class="inx">'+s.slice(k+1)+'</span>';
 }
 function weekTag(w){
   var tags=[];
@@ -4061,13 +4170,20 @@ function weekTag(w){
    la date est alors celle de l'enregistrement.
    Jour leger (J2) : toutes les series en « secondaire », variante du mouvement. */
 var PROLE={top:'top set',amrap:'top set',test:'top set',back:'back-off','var':'secondaire',deload:'secondaire',extra:'secondaire'};
-function dayISO(w,lab){
-  if(!S.start)return '';
+/* Lot 57 (réponse 12) : J1 au premier de ses jours à partir du début de la semaine du bloc, puis J2, J3, J4 chacun
+   au premier de ses jours à partir du jour d'avant : les jours suivent l'ordre même si le bloc ne commence pas un J1. */
+function dayDt(w,lab){
+  if(!S.start)return null;
   var order=S.jours.split(','), k=order.indexOf(lab.toLowerCase()), idx=['J1','J2','J3','J4'].indexOf(lab);
-  if(idx<0&&k<0)return '';
-  var d=new Date(S.start+'T12:00:00'), base=new Date(d.getTime()+w*7*86400000);
-  var want=DAYN[(idx>=0)?order[Math.min(idx,order.length-1)]:lab.toLowerCase()]; if(want===undefined)return '';
-  var dt=new Date(base.getTime()+((want-base.getDay()+7)%7)*86400000), p=function(n){return (n<10?'0':'')+n;};
+  if(idx<0&&k<0)return null;
+  var base=new Date(new Date(S.start+'T12:00:00').getTime()+w*7*86400000);
+  var nx=function(from,key){ var want=DAYN[key]; return want===undefined?null:new Date(from.getTime()+((want-from.getDay()+7)%7)*86400000); };
+  if(idx<0)return nx(base,lab.toLowerCase());
+  var dt=base; for(var j=0;j<=idx&&dt;j++)dt=nx(dt,order[Math.min(j,order.length-1)]);
+  return dt;
+}
+function dayISO(w,lab){
+  var dt=dayDt(w,lab), p=function(n){return (n<10?'0':'')+n;}; if(!dt)return '';
   return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate());
 }
 function repHaut(r){var m=String(r==null?'':r).match(/\d+/g); return m?+m[m.length-1]:null;}
@@ -4102,17 +4218,8 @@ function seancesPage(){
   return r;
 }
 function dayDate(w,lab){
-  if(!S.start)return '';
-  var order=S.jours.split(','), k=order.indexOf(lab.toLowerCase());
-  var idx=['J1','J2','J3','J4'].indexOf(lab);
-  if(idx<0&&k<0)return '';
-  var d=new Date(S.start+'T12:00:00');
-  var base=new Date(d.getTime()+w*7*86400000);
-  var dayKey=(idx>=0)?order[Math.min(idx,order.length-1)]:lab.toLowerCase();
-  var want=DAYN[dayKey]; if(want===undefined)return '';
-  var delta=(want-base.getDay()+7)%7;
-  var dt=new Date(base.getTime()+delta*86400000);
-  return ' <em style="font-style:normal;font-weight:400;color:var(--muted)">'+dt.getDate()+'/'+(dt.getMonth()+1)+'</em>';
+  var dt=dayDt(w,lab); if(!dt)return '';   /* lot 57 */
+  return ' <em class="ddt" style="font-style:normal">'+dt.getDate()+'/'+(dt.getMonth()+1)+'</em>';   /* lot 56 B */
 }
 /* ================= suivi des main lifts =================
    Trois questions par main lift, rien d'autre :
@@ -4247,11 +4354,11 @@ $('brassign').addEventListener('change',function(e){
 });
 /* lot 47 : « + montee » et « x » du modele d'echauffement, dans le vrai panneau et dans le brouillon */
 $('assign').addEventListener('click',function(e){
-  var b=e.target.closest?e.target.closest('[data-wm]'):null; if(!b)return;
-  var r=asgSet(b); if(!r)return; save(); renderAssign(); renderToday();
+  var b=e.target.closest?e.target.closest('[data-wm],[data-f="hB"]'):null; if(!b)return;   /* lot 57 : bouton des plages étendues */
+  var r=asgSet(b); if(!r)return; save(); renderAssign(); if(r.f==='hB')generate(); renderToday();
 });
 $('brassign').addEventListener('click',function(e){
-  var b=e.target.closest?e.target.closest('[data-wm]'):null; if(!b)return;
+  var b=e.target.closest?e.target.closest('[data-wm],[data-f="hB"]'):null; if(!b)return;
   var r=brWith(function(){ return asgSet(b); }); if(!r)return; brStore(); brPanel(); brPlan();
 });
 $('print').addEventListener('click',function(){window.print();});
@@ -4589,7 +4696,7 @@ function panelHTML(key){
     }).join('')+'</div>'+
     '<div data-vrows>'+validRows(key,repsNow)+vpropHTML(key)+countLine(repsNow)+'</div></div></div>';
   return '<div class="panel" data-panel="'+key+'">'+
-    '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+F(x.load)+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+descHTML(L)+   /* lot 46 (R5) */
+    '<h4 class="n'+col(x.li)+'">'+x.name+' — prescrit '+(x.load==null?'lest à saisir':F(x.load))+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+descHTML(L)+   /* lot 46 (R5) */
     '<div class="row">'+
       '<div class="field sm"><label>Charge faite</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
       (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>'+(isM(L)?'Mètres par série':'Reps réussies par série')+' — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
@@ -4663,7 +4770,7 @@ function draftApply(p,o){
   el=p.querySelector('[data-fld=note]'); if(el&&o.note!=null)el.value=o.note;
   Array.prototype.forEach.call(p.querySelectorAll('[data-setnote]'),function(x,i){ if((o.setNotes||[])[i]!=null)x.value=o.setNotes[i]; });
   Array.prototype.forEach.call(p.querySelectorAll('[data-frm]'),function(b,i){ var v=(o.frm||[])[i]; if(v==null)return;   /* lot 48 */
-    b.setAttribute('aria-pressed',v); b.textContent=b.textContent.replace(/[TC]$/,v?'C':'T'); });
+    b.setAttribute('aria-pressed',v); });   /* lot 56 B */
   el=p.querySelector('[data-lim]'); if(el&&o.lim!=null){ el.setAttribute('aria-pressed',o.lim); el.textContent=o.lim?el.dataset.on:el.dataset.off; }   /* lot 52 */
   PV=o.pv||[]; refreshV(p);
   var h=p.querySelector('h4');
@@ -4765,7 +4872,7 @@ function panelClick(e){
       e.stopPropagation(); return;
     }
     if(b.dataset.frm!=null){   /* lot 48 (R12) : T / C */
-      var fon=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',fon); b.textContent=b.textContent.replace(/[TC]$/,fon?'C':'T');
+      var tci=e.target&&e.target.closest?e.target.closest('i'):null, fon=tci?tci.className==='tcC':b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',fon);   /* lot 56 B : T ou C touché */
       e.stopPropagation(); return;
     }
     if(b.dataset.brush){
@@ -5240,7 +5347,7 @@ $('tdone').addEventListener('click',function(){
 function warmCard(weeks){
   if(!weeks.length||!weeks[0].days.length)return '';
   var day=weeks[0].days[0], top={};
-  day.lines.forEach(function(x){if(!top[x.li]||x.load>top[x.li].load)top[x.li]=x;});
+  day.lines.forEach(function(x){if(x.load==null)return; if(!top[x.li]||x.load>top[x.li].load)top[x.li]=x;});   /* lot 57 */
   var body=Object.keys(top).map(function(k){
     var x=top[k], L=S.lifts[x.li], wo=warmOf(L,x.li,x.load), st=wo.steps, kinds=warmKinds(L);
     var kf='warm'+x.li;
@@ -5288,7 +5395,7 @@ function extraCard(k){
 function xGuess(li){
   var k=S.tsel||'0|', w=+k.split('|')[0], best=null;
   PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){
-    if(x.li!==li||x.role==='extra')return;
+    if(x.li!==li||x.role==='extra'||x.load==null)return;   /* lot 57 */
     var dist=Math.abs(wk.w-w);
     if(!best||dist<best.dist)best={dist:dist,x:x,src:'S'+(wk.w+1)+' '+d.label};
   });});});
@@ -5581,7 +5688,7 @@ function rkCellHTML(L,i,o){
   var s=o.sys, l=o.load, u=L.useBw;
   var h='<details class="recd"><summary><b class="rn">'+o.n+' rep'+(o.n>1?'s':'')+'</b>'+
     '<b class="n'+col(i)+'">'+(u?(s.est?'≈':'')+F(s.sys)+' kg':loadKg(L,l.load))+'</b>'+
-    '<span>'+(u?'système'+(s.fd===0?' (trichée)':'')+' · lest <b>'+loadKg(L,l.load)+'</b>'+(l.fd===0?' (trichée)':''):rkSrc(L,l))+'</span></summary>';
+    '<span>'+(u?'système'+(l!==s?rkPdc(s):'')+(s.fd===0?' (trichée)':'')+' · lest <b>'+loadKg(L,l.load)+'</b>'+rkPdc(l)+(l.fd===0?' (trichée)':''):rkSrc(L,l))+'</span></summary>';   /* lot 56 B : PdC */
   if(u)h+='<p class="note">Système : '+rkSrc(L,s)+'<br>Lest : '+rkSrc(L,l)+(l===s?' (même série)':'')+'</p>';
   ['sys','load'].forEach(function(m){
     var nt=o[m+'Nt']; if(!nt||(!u&&m==='sys'))return;
@@ -5598,33 +5705,51 @@ function rkCellHTML(L,i,o){
     '<p class="note">Le tableau liste les séries faites à exactement '+o.n+' rep'+(o.n>1?'s':'')+' ; le record compte aussi les séries '+
     'de plus de reps (dominance).</p></details>';
 }
+function rkPdc(x){ return ' (@'+(x.est?'≈':'')+F(x.bw)+' PdC)'; }   /* lot 56 B */
+/* Lot 56 B : graduations (lest en kg, dates), proportions gardées (plus d'étirement du texte). */
+function rkTicks(a,b,n){   /* le plus grand pas rond qui donne au moins n graduations entre a et b */
+  var L=[100,50,25,20,10,5,2.5,2,1,0.5,0.25], o=[];
+  for(var j=0;j<L.length;j++){ o=[]; for(var v=Math.ceil(a/L[j]-1e-9)*L[j];v<=b+1e-9;v+=L[j])o.push(+v.toFixed(2)); if(o.length>=n)break; }
+  return o;
+}
 function rkPlot(L,st){
   var pts=st.pts.filter(function(p){return /^\d{4}-\d{2}-\d{2}/.test(p.date);});
   if(pts.length<2)return '';
-  var W=320,H=160,mx=34,my=16, E0=eff(L);
+  var W=340,H=210,mx=40,mr=12,mt=22,mb=24, E0=eff(L), DJ=86400000;
   var T=function(p){return new Date(p.date+'T12:00:00').getTime();};
   var xs=pts.map(T), ys=pts.map(function(p){return p.rm-E0;});
-  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs); if(x1<=x0)x1=x0+1;
+  ys.push(st.rec.rm-E0);
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs); if(x1<=x0)x1=x0+DJ;
   var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
-  var pad=Math.max(0.5,(y1-y0)*0.18); y0-=pad; y1+=pad;
-  var X=function(v){return mx+(v-x0)/(x1-x0)*(W-mx-8);};
-  var Y=function(v){return H-my-(v-y0)/(y1-y0)*(H-my-10);};
-  var s='<svg class="plot" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">';
-  s+='<line x1="'+mx+'" y1="'+(H-my)+'" x2="'+(W-4)+'" y2="'+(H-my)+'" stroke="currentColor" opacity=".3"/>';
-  s+='<line x1="'+mx+'" y1="10" x2="'+mx+'" y2="'+(H-my)+'" stroke="currentColor" opacity=".3"/>';
-  s+='<line x1="'+mx+'" y1="'+Y(st.rec.rm-E0).toFixed(1)+'" x2="'+(W-4)+'" y2="'+Y(st.rec.rm-E0).toFixed(1)+
-     '" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>';
-  var d='';
-  pts.forEach(function(p,j){ d+=(j?'L':'M')+X(T(p)).toFixed(1)+' '+Y(p.rm-E0).toFixed(1)+' '; });
-  s+='<path d="'+d+'" fill="none" stroke="var(--a1)" stroke-width="1.2" opacity=".6"/>';
+  var pad=Math.max(0.5,(y1-y0)*0.12); y0-=pad; y1+=pad;
+  var yt=rkTicks(y0,y1,4); if(yt.length){ y0=Math.min(y0,yt[0]); y1=Math.max(y1,yt[yt.length-1]); }
+  var X=function(v){return mx+(v-x0)/(x1-x0)*(W-mx-mr);};
+  var Y=function(v){return H-mb-(v-y0)/(y1-y0)*(H-mb-mt);};
+  var tx=function(x,y,s,a){return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-size="10.5" fill="currentColor" opacity=".75"'+(a?' text-anchor="'+a+'"':'')+'>'+s+'</text>';};
+  var s='<svg class="plot rkplot" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="1RM estimé en lest, par date">';
+  yt.forEach(function(v){ var y=Y(v);
+    s+='<line x1="'+mx+'" y1="'+y.toFixed(1)+'" x2="'+(W-mr)+'" y2="'+y.toFixed(1)+'" stroke="currentColor" opacity=".13"/>';
+    s+=tx(mx-5,y+3.5,F(v),'end'); });
+  var nd=(x1-x0)/DJ, sd=[1,2,3,7,14,28,56,91,182,365].filter(function(d){return d>=nd/4;})[0]||365;
+  var yr=new Date(x0).getFullYear()!==new Date(x1).getFullYear();
+  for(var t=x0;t<=x1+DJ/2;t+=sd*DJ){
+    var d=new Date(t), x=X(t);
+    s+='<line x1="'+x.toFixed(1)+'" y1="'+(H-mb)+'" x2="'+x.toFixed(1)+'" y2="'+(H-mb+4)+'" stroke="currentColor" opacity=".5"/>';
+    s+=tx(x,H-mb+15,d.getDate()+'/'+(d.getMonth()+1)+(yr?'/'+String(d.getFullYear()).slice(2):''),t===x0?'start':(t+sd*DJ>x1+DJ/2?'end':'middle'));
+  }
+  s+='<line x1="'+mx+'" y1="'+(H-mb)+'" x2="'+(W-mr)+'" y2="'+(H-mb)+'" stroke="currentColor" opacity=".45"/>';
+  s+='<line x1="'+mx+'" y1="'+mt+'" x2="'+mx+'" y2="'+(H-mb)+'" stroke="currentColor" opacity=".45"/>';
+  s+='<line x1="'+mx+'" y1="'+Y(st.rec.rm-E0).toFixed(1)+'" x2="'+(W-mr)+'" y2="'+Y(st.rec.rm-E0).toFixed(1)+
+     '" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/>';
+  var d2='';
+  pts.forEach(function(p,j){ d2+=(j?'L':'M')+X(T(p)).toFixed(1)+' '+Y(p.rm-E0).toFixed(1)+' '; });
+  s+='<path d="'+d2+'" fill="none" stroke="var(--a1)" stroke-width="1.2" opacity=".6"/>';
   pts.forEach(function(p){
     var ech=!(p.s.rir>0), tr=p.s.fd===0;
     s+='<circle class="'+(ech?'rkf':'rkr')+(tr?' rkt':'')+'" cx="'+X(T(p)).toFixed(1)+'" cy="'+Y(p.rm-E0).toFixed(1)+'" r="3.2" fill="'+
       (ech?'var(--a1)':'var(--surface)')+'" stroke="'+(tr?'var(--warn)':'var(--a1)')+'" stroke-width="'+(tr?2:1.4)+'"/>';
   });
-  s+='<text x="4" y="14" font-size="9" fill="currentColor" opacity=".6">lest kg</text>';
-  s+='<text x="'+mx+'" y="'+(H-4)+'" font-size="9" fill="currentColor" opacity=".6">'+frDate(pts[0].date)+'</text>';
-  s+='<text x="'+(W-46)+'" y="'+(H-4)+'" font-size="9" fill="currentColor" opacity=".6">'+frDate(pts[pts.length-1].date)+'</text>';
+  s+=tx(4,13,'1RM estimé, lest (kg)');
   return s+'</svg>';
 }
 function rkLab(L,s){
@@ -5853,10 +5978,10 @@ function rkMarkTxt(e){ var a=RKEV[e.key]; return a&&a.length?'<br><span class="r
 function frmHTML(x,L,e){
   if(isM(L))return '';
   var n=Math.max(1,+x.sets||1);
-  return '<div class="row" style="margin-top:10px"><div class="field w"><label>Forme — T = training (par défaut), '+
-    'C = clean (jambes gainées)</label><div class="pillrow" data-forms>'+
+  return '<div class="row" style="margin-top:10px"><div class="field w"><label>Forme — touchez T (training, par défaut) '+
+    'ou C (clean, jambes gainées)</label><div class="pillrow" data-forms>'+
     Array.apply(null,{length:n}).map(function(_,q){ var c=!!(e&&e.form&&e.form[q]==='c');
-      return '<button class="pill" data-frm="'+q+'" aria-pressed="'+c+'">'+(n>1?'S'+(q+1)+' ':'')+(c?'C':'T')+'</button>';
+      return '<button class="pill tc" data-frm="'+q+'" aria-pressed="'+c+'">'+(n>1?'S'+(q+1)+' ':'')+'<i class="tcT">T</i><i class="tcC">C</i></button>';   /* lot 56 B */
     }).join('')+'</div></div></div>';
 }
 /* lot 52 (3x6) : séance « à la limite » (RPE 10, plus aucune rep en réserve) → +0,5 kg à la séance lourde suivante (PDF) */
@@ -6257,9 +6382,10 @@ function closeBlock(after,msg){   /* W2 : aussi appelée depuis le panneau d'éc
     if(e)L.refBlock=entryToRef(e);          /* Iterative : reprise de fin de phase */
     if(e&&(L.refMode||'fixe')==='fixe')askRefTake(L,e);   /* D4 */
   });
+  var hbn=S.lifts.map(hBsNext);   /* lot 57 : l'état B continue au bloc suivant, on n'en sort que par le bouton */
   S.blockId=(+S.blockId||1)+1;
   S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.blockGoal=''; S.form={};
-  S.lifts.forEach(function(L){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];delete L.prog.desc;delete L.prog.goal;});   /* lot 46 (R5) : desc */   /* B2, Q6 */
+  S.lifts.forEach(function(L,i){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];L.prog.hBs=hbn[i];delete L.prog.desc;delete L.prog.goal;});   /* lot 46 (R5) : desc */   /* B2, Q6 */
   draftPurge();   /* B7 : brouillons du bloc clôturé */
   S.start=todayISO();
   dq().view='bilan';
@@ -6620,7 +6746,12 @@ function setLien(v,lien){
 /* Rattachement automatique : meme date, meme mouvement. Parmi les series de ce jour-la,
    on retient celle dont le nombre de reps egale celui de la video et, a egalite, celle
    dont le role correspond au type annonce (top set, back-off). Si deux candidats restent
-   ex aequo, on ne devine pas : le choix est laisse dans la carte. */
+   ex aequo, on ne devine pas : le choix est laisse dans la carte.
+   Lot 57 (reponse 11) : des ex aequo sont departages par l'heure, celle de la video (tiree de son nom, VID_AAAAMMJJ_HHMMSS)
+   contre l'heure notee de chaque serie (lot 43) : la serie validee le plus tot apres le debut de la video, dans les
+   VTMAX minutes, si la suivante est au moins VTGAP plus loin ; une serie deja rattachee a une autre video est ecartee. */
+var VTMAX=20*60000, VTGAP=60000;
+function veloT(v){ var m=/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/.exec(String(v.id||'')); return m?new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime():null; }
 function veloAuto(v){
   if(v.lien)return false;
   if(/chauf|warm/i.test(String(v.type_serie||'')))return false;
@@ -6634,6 +6765,12 @@ function veloAuto(v){
   });});
   c.sort(function(a,b){return b.m-a.m;});
   if(c.length===1||(c[0].m>0&&c[1].m<c[0].m)){ setLien(v,{key:c[0].e.key,set:c[0].s,auto:1}); return true; }
+  var tv=veloT(v); if(tv==null||!(c[0].m>0))return false;   /* lot 57 */
+  var pris=function(x){ return (S.velo||[]).some(function(o){return o!==v&&o.lien&&o.lien.key===x.e.key&&o.lien.set===x.s;}); };
+  var tie=c.filter(function(x){return x.m===c[0].m&&!pris(x);}).map(function(x){ var a=x.e.at&&x.e.at[x.s]; return {x:x,d:a?(+a-tv):null}; });
+  if(!tie.length||tie.some(function(y){return y.d==null;}))return false;
+  tie=tie.filter(function(y){return y.d>=-60000&&y.d<=VTMAX;}).sort(function(a,b){return a.d-b.d;});
+  if(tie.length&&(tie.length===1||tie[1].d-tie[0].d>=VTGAP)){ setLien(v,{key:tie[0].x.e.key,set:tie[0].x.s,auto:1,h:1}); return true; }
   return false;
 }
 function veloAutoAll(){
