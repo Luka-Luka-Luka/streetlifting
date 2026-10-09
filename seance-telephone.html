@@ -87,7 +87,7 @@ th:first-child,td:first-child{text-align:left}
 <label>Séance<input id="seance" inputmode="numeric" autocomplete="off" placeholder="1"></label>
 <label>Date de la séance<input id="date" type="date"></label>
 <label>Type de séance<select id="typeseance"><option value="principale">Principale</option><option value="secondaire">Secondaire</option></select></label>
-<label>Variante (toute la séance)<select id="variseance"><option value="">Aucune (normale)</option><option value="hautes">Hautes</option><option value="bloquées">Bloquées</option><option value="stato">Stato</option></select></label>
+<label>Variante (toute la séance)<select id="variseance"><option value="">Aucune (normale)</option><option value="hautes">Hautes</option><option value="bloquées">Bloquées</option><option value="stato">Stato</option><option value="pausées">Pausées (en bas)</option><option value="tempo">Tempo</option></select></label>
 </div>
 <p class="petit">Type de séance « Secondaire » (séance secondaire ou légère) met toutes les lignes en « Secondaire » (modifiable ligne par ligne). Semaine, séance et date peuvent rester vides. La date est proposée d'après le nom de la vidéo la plus ancienne. « Variante (toute la séance) » met la même variante sur toutes les lignes (modifiable ligne par ligne). <b>Si l'app a été ouverte sur ce téléphone, la séance de tractions de la date des vidéos est pré-remplie</b> (prévue, ou telle qu'enregistrée) : vérifiez chaque ligne. Taper le lest ou les reps d'un back-off le recopie sur les back-offs suivants que vous n'avez pas tapés (de même pour les lignes « Secondaire »).</p>
 <p class="petit" id="prevu" role="status" style="color:var(--fg);font-weight:600"></p></section>
@@ -4192,7 +4192,7 @@ function demuxerMaison(buf) {
   // serie et l'app l'affiche apres le titre (« … · stato »). Sans secondaire ni variante, rien
   // ne change : meme objet que S34.lireSaisieSeance, fichier au bit.
   const SECONDAIRE = "secondaire";
-  const VARIANTES = ["hautes", "bloquées", "stato"];
+  const VARIANTES = ["hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
   const PAR_VIDEO = S34.PAR_VIDEO.concat(["variante"]);
   function lireSaisieSeance(s) {
     const vids = (s && s.videos) || [];
@@ -4297,7 +4297,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 40","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"lot R3","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4339,7 +4339,7 @@ function ligneVideo(f, i) {
   const lr = el('label', {}, 'Reps ann.'); lr.appendChild(el('input', { id: 'v' + i + '-reps_annoncees', inputmode: 'numeric', autocomplete: 'off', placeholder: '7' })); g.appendChild(lr);
   d.appendChild(g);
   const lv = el('label', { class: 'variante' }, 'Variante'); const sv = el('select', { id: 'v' + i + '-variante' });
-  for (const [v, t] of [['', 'Aucune (normale)'], ['hautes', 'Hautes'], ['bloquées', 'Bloquées'], ['stato', 'Stato']]) sv.appendChild(el('option', { value: v }, t));
+  for (const [v, t] of [['', 'Aucune (normale)'], ['hautes', 'Hautes'], ['bloquées', 'Bloquées'], ['stato', 'Stato'], ['pausées', 'Pausées (en bas)'], ['tempo', 'Tempo']]) sv.appendChild(el('option', { value: v }, t));
   lv.appendChild(sv); d.appendChild(lv);
   return d;
 }
@@ -4602,10 +4602,12 @@ function afficher(vs, sortie) {
     if (v.analysee) {
       d.appendChild(el('p', {}, v.nb_reps + ' reps · perte ' + (v.perte_v_moy_pct === null ? '—' : virgule(v.perte_v_moy_pct, 1) + ' %') + ' · hauteur mini ' + virgule(v.hauteur_mini_cm, 1) + ' cm'));
       const t = el('table'); const th = el('thead'); const h = el('tr');
-      for (const x of ['Rep', 'Hauteur cm', 'V. moy. m/s', 'Pointe m/s']) h.appendChild(el('th', {}, x));
+      const sr = (sortie.series[iv] && sortie.series[iv].reps) || [], du = SR3.durees(sr, va);   // lot R3
+      for (const x of ['Rep', 'Hauteur cm', 'V. moy. m/s', 'Pointe m/s'].concat(du.cols.map((c) => c.lab))) h.appendChild(el('th', {}, x));
       th.appendChild(h); t.appendChild(th); const b = el('tbody');
-      for (const r of v.reps) { const l = el('tr'); for (const x of [String(r.rep), virgule(r.hauteur_cm, 1) + (r.tentative_ratee ? ' \u274c non comptée' : ''), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)]) l.appendChild(el('td', {}, x)); b.appendChild(l); }
+      for (const r of v.reps) { const l = el('tr'); for (const x of [String(r.rep), virgule(r.hauteur_cm, 1) + (r.tentative_ratee ? ' \u274c non comptée' : ''), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)].concat(du.cols.map((c) => SR3.cellule(sr, r.rep, c.k)))) l.appendChild(el('td', {}, x)); b.appendChild(l); }
       t.appendChild(b); d.appendChild(t);
+      if (du.resume) d.appendChild(el('p', {}, du.resume));   // lot R3
       d.appendChild(el('p', { class: 'petit' }, 'Charge système ' + virgule(v.charge_systeme_kg, 1) + ' kg · échelle ' + virgule(v.px_par_cm, 3) + ' px/cm · marque suivie sur ' + Math.round(100 * v.taux_detection) + ' % des images.'));
     }
     zone.appendChild(d);
@@ -4628,7 +4630,7 @@ function afficher(vs, sortie) {
   // ecrit par l'app (index.html, seancesPage) dans le stockage du site, a chaque affichage de la Seance du jour
   const CLE = "cp-seances-page";
   const TYPES = ["top set", "back-off", "secondaire", "echauffement", ""];
-  const VARIANTES = ["", "hautes", "bloquées", "stato"];
+  const VARIANTES = ["", "hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
 
   function lireResume(texte) {
     try { const r = JSON.parse(texte); return r && Array.isArray(r.seances) ? r : null; } catch (e) { return null; }
@@ -4709,6 +4711,35 @@ function afficher(vs, sortie) {
   $("date").addEventListener("change", remplir);
 })();
 // <<< BLOC SEANCE40 - FIN >>>
+</script>
+<script>
+// <<< BLOC R3 - DEBUT >>>
+// Lot R3 (09/10/2026, réponse R0-3) : durées des séries en variante, lues dans les mesures DÉJÀ faites par mesurer
+// (montee_s, descente_s, pause_sommet_s, pause_apres_s) : rien n'est recalculé, le fichier de séance ne change pas.
+// tempo : montée et descente ; bloquées : pause au sommet ; pausées : pause en bas, entre la fin de la descente et la
+// rep suivante (pause_apres_s ; la dernière rep n'en a pas). Sans variante (ou hautes, stato) : rien. Expose : SR3.
+(function () {
+  "use strict";
+  const COLS = {
+    "tempo": [{ k: "montee_s", lab: "Montée s", nom: "montée" }, { k: "descente_s", lab: "Descente s", nom: "descente" }],
+    "bloquées": [{ k: "pause_sommet_s", lab: "Pause haut s", nom: "pause en haut" }],
+    "pausées": [{ k: "pause_apres_s", lab: "Pause bas s", nom: "pause en bas" }],
+  };
+  const v1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(".", ",");
+  function valeurs(reps, k) { return (reps || []).filter((r) => !r.tentative_ratee && typeof r[k] === "number").map((r) => r[k]); }
+  function cellule(reps, rep, k) { const r = (reps || []).filter((x) => x.rep === rep)[0]; return r && typeof r[k] === "number" ? v1(r[k]) : "—"; }
+  function durees(reps, va) {
+    const cols = COLS[String(va || "")] || [];
+    const res = cols.map((c) => {
+      const xs = valeurs(reps, c.k); if (!xs.length) return null;
+      const mo = xs.reduce((a, b) => a + b, 0) / xs.length;
+      return c.nom + " " + (xs.length > 1 ? "de " + v1(Math.min(...xs)) + " à " + v1(Math.max(...xs)) + " s, moyenne " + v1(mo) + " s" : v1(xs[0]) + " s");
+    }).filter(Boolean);
+    return { cols: cols, resume: res.length ? "Durées (" + va + ") : " + res.join(" ; ") + "." : "" };
+  }
+  globalThis.SR3 = { COLS: COLS, durees: durees, cellule: cellule, valeurs: valeurs };
+})();
+// <<< BLOC R3 - FIN >>>
 </script>
 </body>
 </html>
