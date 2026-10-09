@@ -13,22 +13,40 @@
       onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"></noscript>
 <style>
+/* Lot 57 B : deux palettes (S.pal, bouton 🎨 de l'en-tête), chacune en clair et en sombre (S.theme).
+   Palette 1 « Ardoise renforcée » : l'identité d'avant, contrastes poussés. Palette 2 « Piste de nuit » : cyan et vert
+   acidulé, sombre d'abord. --onok = texte sur --ok / --warn. Contrastes : outils-lot57b/palettes.py (AA partout). */
 :root{
-  --bg:#E9EBEE; --surface:#FFFFFF; --ink:#14171C; --muted:#48505B;
-  --rule:#CFD4DB; --soft:#F3F5F7; --softer:#F8F9FA; --hl:#FBF3D6;
-  --sbx:#D6DBE2; --sbxr:#8A939E;   /* lot 56 B : bac à sable */
-  --a1:#C8102E; --a2:#1F5FA8; --a3:#2E6B3F; --a4:#8A5A00; --a5:#6B3FA0; --a6:#0F7C80; --a7:#B0337A; --a8:#5A5F66;
-  --ok:#2E6B3F; --warn:#9C6200; --bad:#A3242E;
+  --bg:#E4E7EB; --surface:#FFFFFF; --ink:#0B0D10; --muted:#3B434D;
+  --rule:#BFC6CF; --soft:#EEF1F4; --softer:#F6F7F9; --hl:#FBF0C8;
+  --sbx:#D3D9E0; --sbxr:#7B8591;   /* lot 56 B : bac à sable */
+  --a1:#B50D27; --a2:#1550A0; --a3:#1F6B39; --a4:#7A4E00; --a5:#5E2F96; --a6:#00666B; --a7:#9C2469; --a8:#4A4F56;
+  --ok:#1F6B39; --warn:#805000; --bad:#9A1B26; --onok:#FFFFFF;
   --r:3px;
   --num:'Barlow Condensed','Arial Narrow','Helvetica Neue Condensed',system-ui,sans-serif;
   --txt:Archivo,system-ui,-apple-system,sans-serif;
 }
 [data-theme="dark"]{
-  --bg:#14171C; --surface:#1C2026; --ink:#E7EAEE; --muted:#939CA8;
-  --rule:#2E343C; --soft:#22272E; --softer:#1F242A; --hl:#33301F;
-  --sbx:#2A313A; --sbxr:#65707D;
-  --a1:#F0728A; --a2:#74AEEA; --a3:#7DC28F; --a4:#D8A845; --a5:#B89AE8; --a6:#6CC9CC; --a7:#E58BC0; --a8:#A9AFB7;
-  --ok:#7DC28F; --warn:#D8A845; --bad:#F0728A;
+  --bg:#0D0F12; --surface:#181C21; --ink:#F2F4F7; --muted:#AAB3BE;
+  --rule:#353C45; --soft:#20252C; --softer:#1C2026; --hl:#3A3520;
+  --sbx:#262D36; --sbxr:#6A7684;
+  --a1:#FF7F96; --a2:#86BCFF; --a3:#8AD9A0; --a4:#E8B95A; --a5:#C6A8F5; --a6:#72D6D9; --a7:#F29ACB; --a8:#B8BEC6;
+  --ok:#8AD9A0; --warn:#E8B95A; --bad:#FF7F96; --onok:#0D0F12;
+  color-scheme:dark;
+}
+[data-pal="2"]{
+  --bg:#E6F0F5; --surface:#FFFFFF; --ink:#06202B; --muted:#33505C;
+  --rule:#A9CBD9; --soft:#DDF0F7; --softer:#EEF6FA; --hl:#F6F2C8;
+  --sbx:#D7E6EC; --sbxr:#5F8A9A;
+  --a1:#00669C; --a2:#436A00; --a3:#B0306A; --a4:#8A5A00; --a5:#6A3FC0; --a6:#A34200; --a7:#962EA4; --a8:#4F6470;
+  --ok:#007444; --warn:#8A5A00; --bad:#B3203A; --onok:#FFFFFF;
+}
+[data-pal="2"][data-theme="dark"]{
+  --bg:#070B10; --surface:#0F1620; --ink:#E9F6FF; --muted:#8FB0C4;
+  --rule:#1F3446; --soft:#13202C; --softer:#111B26; --hl:#2E2C10;
+  --sbx:#14212D; --sbxr:#3B6A86;
+  --a1:#3FD3FF; --a2:#C6F28A; --a3:#FF8FB8; --a4:#FFD166; --a5:#B79CFF; --a6:#FF9F6B; --a7:#E58BFF; --a8:#A9BCC9;
+  --ok:#7EE8B0; --warn:#FFD166; --bad:#FF6B81; --onok:#04140A;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
@@ -230,8 +248,8 @@ html,body{overflow-x:clip}
   background:var(--surface);color:var(--ink);cursor:pointer;text-align:center}
 .pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .pill.set{min-width:52px}
-.pill.set.done{background:var(--ok);border-color:var(--ok);color:#fff}
-.pill.set.short{background:var(--warn);border-color:var(--warn);color:#fff}
+.pill.set.done{background:var(--ok);border-color:var(--ok);color:var(--onok)}
+.pill.set.short{background:var(--warn);border-color:var(--warn);color:var(--onok)}
 .pill.half{min-width:34px}
 .pill.cat{min-width:auto;text-align:left;font:400 12px/1.3 var(--txt);padding:6px 8px}
 /* lot 56 B : forme T / C, les deux choix visibles, l'actif en noir */
@@ -354,6 +372,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div class="field sm" id="bwedit" style="display:none;flex:0 0 84px"><label for="bw">PdC, correction</label><input id="bw" class="numin" type="text" inputmode="decimal" value="86"></div>
     <button class="iconbtn sq" id="reorg" title="Réorganiser cet onglet" aria-label="Réorganiser cet onglet">⇅</button>
     <button class="iconbtn sq" id="foldall" title="Tout replier" aria-label="Tout replier">▾</button>
+    <button class="iconbtn sq" id="pal" title="Palette" aria-label="Palette">🎨</button>
     <button class="iconbtn sq" id="theme" title="Thème" aria-label="Thème">☀️</button>
   </div>
 </header>
@@ -736,7 +755,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v55';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v56';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -750,7 +769,7 @@ function newProg(inc){return {tpl:'novice',inc:inc,startMode:'rir',rir:3,top:nul
   cad:'sess',boMode:'recalc',
   accDay:'J1',accDays:['J1'],accSets:3,accLo:8,accHi:10,accLoad:60,accMode:'double',accEvery:3};}
 var S={
-  v:SCHEMA, theme:'auto', bw:86, active:0, nwk:6, sep:'*', jours:'dim,mar,jeu', start:'',
+  v:SCHEMA, theme:'auto', pal:'1', bw:86, active:0, nwk:6, sep:'*', jours:'dim,mar,jeu', start:'',
   blockNote:'', blockGoal:'', dayNotes:{}, fold:{},
   lifts:[
     {name:'Tractions',catId:'pullup',main:true,useBw:true,step:1.25,k:0.025,refMode:'fixe',ref:{load:35,reps:7,rir:0,bw:null,date:null},prog:newProg(1.25)},
@@ -796,7 +815,7 @@ function load(){
     }
     S.v=SCHEMA; S.vFrom=from;
     if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
-    if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto';
+    if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto'; if(S.pal!=='2')S.pal='1';   /* lot 57 B */
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(S.blockGoal==null)S.blockGoal=''; if(!S.fold)S.fold={};
     if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null; tbwStale();   /* lot 40 */
     (S.lifts||[]).forEach(function(L){ var P=L&&L.prog; if(P&&P.prLoad!=null&&P.prBw==null)P.prBw=S.bw; });   /* lot 40 (Q3) */
@@ -2550,7 +2569,17 @@ function applyTheme(){
   $('theme').textContent=S.theme==='auto'?'\ud83c\udf13':(S.theme==='dark'?'\ud83c\udf19':'\u2600\ufe0f');
   var lbl=S.theme==='auto'?'Thème automatique':(S.theme==='dark'?'Thème sombre':'Thème clair');
   $('theme').title=lbl; $('theme').setAttribute('aria-label',lbl);
+  /* lot 57 B : palette 1 ou 2, et la barre du navigateur suit le fond */
+  document.documentElement.setAttribute('data-pal',S.pal==='2'?'2':'1');
+  var pl=S.pal==='2'?'Palette 2, Piste de nuit : toucher pour la palette 1':'Palette 1, Ardoise : toucher pour la palette 2';
+  $('pal').title=pl; $('pal').setAttribute('aria-label',pl);
+  var mt=document.querySelector&&document.querySelector('meta[name="theme-color"]');
+  if(mt&&window.getComputedStyle){ var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg'); if(bg)mt.setAttribute('content',String(bg).trim()); }
 }
+$('pal').addEventListener('click',function(){   /* lot 57 B */
+  S.pal=S.pal==='2'?'1':'2';
+  save(); applyTheme(); renderData();
+});
 $('theme').addEventListener('click',function(){
   S.theme=S.theme==='auto'?'light':(S.theme==='light'?'dark':'auto');
   save(); applyTheme(); renderData();
