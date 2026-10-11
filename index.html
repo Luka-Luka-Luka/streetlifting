@@ -150,6 +150,9 @@ details.flag summary:before{content:'\25b8  ';color:var(--muted)}
 details.flag[open] summary:before{content:'\25be  '}
 details.flag p{margin:6px 0 0}
 .flag.tip{border-left-color:var(--rule)}
+.fask,.rirq{color:var(--warn);margin:0 0 6px}   /* lot 59 */
+.rirask{outline:2px solid var(--warn);outline-offset:3px;border-radius:8px}
+.bedit summary{cursor:pointer}
 .act.mini{padding:7px 10px;font-size:12px}
 .src{color:var(--muted)}
 details{margin-top:9px;border-top:1px solid var(--rule);padding-top:7px}
@@ -417,6 +420,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   </div>
   <div id="todayout"></div>
   <button class="act donebtn" id="tdone">Marquer la séance comme faite</button>
+  <button class="act ghost donebtn" id="tskip">Séance sautée</button>
   <div class="card" id="cardsess">
     <h2>Réglages de la séance <em>date du bloc, poids du jour</em></h2>
     <div class="row">
@@ -455,6 +459,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <button class="act ghost" id="print">Imprimer</button>
       <button class="act ghost" id="newblock">Clôturer le bloc</button>
     </div>
+    <div id="closebox"></div>
     <div id="sync"></div>
   </div>
   <div id="progplan">
@@ -760,7 +765,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v60';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v61';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -1651,11 +1656,11 @@ function failAuto(L,x,key,e){
 }
 function failTxt(L,id,m){
   var fq=String(id).split('|'), fv=m==='rep'?flAt(L,+fq[0],fq[1],+fq[2]):null;
-  if(fv&&fv.w2)return 'Premier échec au dernier jour lourd de la semaine (W2) : charge reprise d\'office à la séance lourde suivante, tout ce qui suit recule d\'un cran. Si la reprise rate, la règle Zlat s\'applique d\'office. Autre choix : « Clôturer le bloc ».';
+  if(fv&&fv.w2)return 'Premier échec au dernier jour lourd de la semaine (W2) : charge reprise d\'office à la séance lourde suivante, tout ce qui suit recule d\'un cran. Si la reprise rate, la règle Zlat s\'applique d\'office. Autre choix : « Fin du run » (plus rien pour ce mouvement ; le deload vient avec la clôture du bloc, dans Programme).';
   if(fv&&fv.s36&&(tplOf(L.prog.tpl)||{}).sq)return '3 × 6 raté (PDF squat) : même charge le dimanche suivant, tout ce qui suit recule d\'un cran. Second échec d\'affilée : reset (deload le dimanche d\'après, puis nouveau run à 3 en réserve).';   /* lot 52 B */
   if(fv&&fv.s36)return '3 × 6 raté (PDF) : même charge à la séance lourde suivante, tout ce qui suit recule d\'un cran. Second échec d\'affilée : reset (deload 2 × 5 au J3, mouvement principal, 10 kg sous la dernière séance légère, puis nouveau run à 3 en réserve).';   /* lot 52 */
   if(m==='rep')return 'Charge répétée à la séance lourde suivante, tout ce qui suit recule d\'un cran (hors Zlat : le top set est répété).';
-  if(m==='stop')return 'Arrêt : plus rien de programmé pour ce mouvement après cette séance.';
+  if(m==='stop')return 'Fin du run : plus rien de programmé pour ce mouvement après cette séance. Le deload vient avec la clôture du bloc (Programme, « Clôturer le bloc »).';   /* lot 59 */
   if(m==='h'&&(tplOf(L.prog.tpl)||{}).lin)return 'Règle novice (livre p. 109, 241) : même charge la semaine suivante ; deux échecs d\'affilée : −10 % de la charge système, puis retour à la charge de blocage la séance d\'après. Blocage répété : incrément réduit de moitié, puis passage à l\'intermédiaire.';   /* lot 51 */
   if(m==='h'&&(tplOf(L.prog.tpl)||{}).fail==='inter')return 'Règle intermédiaire (livre p. 244) : la suite de la vague reste à cette charge (baissez si besoin pour faire toutes les reps, et saisissez ce que vous faites), deload S4 ajouté d\'office, puis, pour ce jour, vague suivante 7,5 % plus bas.';   /* lot 51 */
   if(m==='h')return 'Semaine suivante : même charge, avec les reps de sa semaine (vague conservée). Deux échecs d\'affilée : −10 % de la charge système.';
@@ -1664,7 +1669,7 @@ function failTxt(L,id,m){
   if(o.k==='stall')return 'Règle Zlat : semaine de stall '+o.n+'/3 (≤ 4 reps au max out). Fin du run à la 3e d\'affilée. La semaine suivante monte quand même de 0,5 kg (barème du PDF).';
   if(o.k==='stall3')return o.od?'Règle Zlat : 3e stall d\'affilée, fin du run. Comme le PDF : J1 et J2 sautés, test du 7-8RM en S'+(o.od.w+1)+' '+o.od.lab+
     ' (proposé à '+loadKg(L,o.dl)+', 0 rep en réserve)'+(o.on?', puis nouveau run depuis le lest du test ('+loadKg(L,o.s)+') dès S'+(o.on.w+1)+' '+o.on.lab:'')+
-    '. Sans test : « Arrêter le run ».':'Règle Zlat : 3e stall d\'affilée, fin du run. Le PDF : sauter J1 et J2 la semaine suivante, tester un nouveau 7-8RM au J3, qui sert de départ.';
+    '. Sans test : « Fin du run ».':'Règle Zlat : 3e stall d\'affilée, fin du run. Le PDF : sauter J1 et J2 la semaine suivante, tester un nouveau 7-8RM au J3, qui sert de départ.';
   if(o.k==='end')return 'Règle Zlat : single raté, fin du run. Le PDF : ne pas relancer le même programme, repasser à du volume en 3-6 reps.';
   if(o.k==='stop')return failTxt(L,id,'stop');
   if((tplOf(L.prog.tpl)||{}).sq)return (m==='dl'?'Fin du run, votre choix':'Reset (PDF squat)')+'. Le jeudi reste une séance légère ; deload'+(o.od?' en S'+(o.od.w+1)+' '+o.od.lab:' après le bloc')+
@@ -1725,8 +1730,10 @@ function failUI(key,x,L){
     'Confirmez-la, choisissez une autre r\u00e8gle ci-dessous, ou marquez « Pas un \u00e9chec ». '+
     '<button class="act ghost mini" data-fcf="'+key+'">Confirmer</button></p>';
   var w2=!!(v&&v.w2);   /* W2 : ni règle Zlat ni fin du run ; clôture du bloc proposée */
-  h+='<div class="btnrow">'+(zl?(zz&&!w2?B('z',t.s36||t.sq?'Reset (PDF)':'Règle Zlat'):'')+(t.calc!=='offset'&&!P.pair&&!w2&&!t.s36&&!t.sq?B('dl','Fin du run'):'')+B('rep','Répéter la charge')+(w2?B('close','Clôturer le bloc'):'')+B('stop','Arrêter le run')
-    :B('h','Règle du livre')+B('stop','Arrêter'))+(cur&&cur!=='no'?B('no','Pas un échec'):'')+'</div>';
+  /* lot 59 (réponse 11) : une seule question — répéter, règle du programme, fin du run ; la clôture se fait depuis Programme */
+  var fdl=zl&&t.calc!=='offset'&&!P.pair&&!w2&&!t.s36&&!t.sq;
+  h+='<p class="note" style="margin:6px 0 0">Que faire après cet échec ?</p><div class="btnrow">'+(zl?B('rep','Répéter la charge')+(zz&&!w2?B('z','Règle du programme'):'')+(fdl?B('dl','Fin du run'):B('stop','Fin du run'))
+    :B('h','Règle du programme')+B('stop','Fin du run'))+(cur&&cur!=='no'?B('no','Pas un échec'):'')+'</div>';
   var zo=((cur==='z'||cur==='dl')&&v)?(zRuns(L).out[id]||{}):{};
   if(zo.on&&(zo.k==='reset'||zo.k==='stall3')){
     h+='<div class="field sm" style="margin-top:6px"><label>Départ du nouveau run, lest</label><input data-frs="'+key+
@@ -1909,12 +1916,12 @@ function hLastBlk(L){   /* lot 51 (Q-51b) : meilleur e1RM du bloc le plus récen
    sous le poids du corps et ne veut rien dire). Type sur toutes les lignes, lestees comprises ; « autre » porte un texte.
    L'ancien texte code (P.warm, « BW*5 haut, 30%*3, 60%*2 ») est converti une fois par warmMig, sans perte : une partie
    non reconnue est gardee dans P.warmOld et signalee dans le panneau. */
-var WKIND={norm:'Normale',haut:'Haute',bloq:'Bloquée',stato:'Stato',prof:'Profonde',paus:'Pausée',autre:'Autre'};
+var WKIND={norm:'Normale',haut:'Haute',bloq:'Bloquée',stato:'Stato',prof:'Profonde',paus:'Pausée',rep:'Repère (à filmer)',autre:'Autre'};   /* lot 59 : repère à charge fixe */
 function warmKinds(L){
   if(!L.useBw)return ['norm','autre'];
   var id=String(L.catId||''), c=catOf(id);
   if(/dip/.test(id))return ['norm','prof','paus','stato','autre'];
-  if(c&&c.g==='pull')return ['norm','haut','bloq','stato','autre'];
+  if(c&&c.g==='pull')return ['norm','haut','bloq','stato','rep','autre'];   /* lot 59 */
   return ['norm','haut','prof','autre'];
 }
 /* suffixe de l'ancien texte (« haut », « prof », …) -> type ; un mot non reconnu ou hors des types du mouvement
@@ -1950,6 +1957,7 @@ function warmSteps(L,topLoad){
   return L.prog.warmL.map(function(w){
     var o, reps=isFinite(+w.reps)?+w.reps:1;
     if(w.bw)o={lab:L.useBw?'sans lest':'barre seule',load:null,reps:reps,kind:w.kind||'norm'};
+    else if(w.kg!=null)o={lab:F(+w.kg)+' kg fixe',load:+w.kg,reps:reps,kind:w.kind||'norm'};   /* lot 59 */
     else { var pc=+w.pct||0; o={lab:F(pc)+' % du lest',load:Math.max(0,rnd(topLoad*pc/100,L.step)),reps:reps,kind:w.kind||'norm'}; }
     if(w.kind==='autre'&&w.txt)o.txt=w.txt;
     return o;
@@ -1957,7 +1965,7 @@ function warmSteps(L,topLoad){
 }
 function warmTxt(W){
   return (W||[]).map(function(w){
-    return (w.bw?'PdC':F(+w.pct||0)+' %')+'×'+w.reps+(w.kind&&w.kind!=='norm'?' '+(w.kind==='autre'?(w.txt||'autre'):WKIND[w.kind].toLowerCase()):'');
+    return (w.bw?'PdC':w.kg!=null?F(+w.kg)+' kg':F(+w.pct||0)+' %')+'×'+w.reps+(w.kind&&w.kind!=='norm'?' '+(w.kind==='autre'?(w.txt||'autre'):WKIND[w.kind].toLowerCase()):'');
   }).join(', ')||'aucune montée';
 }
 /* editeur du modele (Reglages du bloc et brouillon) : saisies par asgSet (f = 'wm'), boutons par le clic du panneau */
@@ -1968,8 +1976,9 @@ function warmEditor(L,i,P){
     var a=' data-i="'+i+'" data-f="wm" data-q="'+q+'"';
     return '<div class="line wrow wmrow"><span class="nm">Montée '+(q+1)+'</span><span class="wedit">'+
       '<select'+a+' data-k="bw" aria-label="PdC ou lest"><option value="1"'+(w.bw?' selected':'')+'>'+(L.useBw?'PdC':'barre seule')+'</option>'+
-        '<option value="0"'+(w.bw?'':' selected')+'>% du lest</option></select>'+
-      (w.bw?'':' <input class="numin wn"'+a+' data-k="pct" inputmode="decimal" value="'+F(+w.pct||0)+'" aria-label="% du lest du top set"> %')+
+        '<option value="0"'+(w.bw||w.kg!=null?'':' selected')+'>% du lest</option><option value="2"'+(!w.bw&&w.kg!=null?' selected':'')+'>lest fixe</option></select>'+   /* lot 59 */
+      (w.bw?'':w.kg!=null?' <input class="numin wn"'+a+' data-k="kg" inputmode="decimal" value="'+F(+w.kg)+'" aria-label="lest fixe"> kg'
+        :' <input class="numin wn"'+a+' data-k="pct" inputmode="decimal" value="'+F(+w.pct||0)+'" aria-label="% du lest du top set"> %')+
       ' '+S.sep+' <input class="numin wn"'+a+' data-k="reps" inputmode="numeric" value="'+w.reps+'" aria-label="reps">'+
       (ks.length>1?' <select'+a+' data-k="kind" aria-label="type">'+ks.map(function(k){
         return '<option value="'+k+'"'+((w.kind||'norm')===k?' selected':'')+'>'+WKIND[k]+'</option>';}).join('')+'</select>':'')+
@@ -1988,7 +1997,8 @@ function warmSet(L,P,t){
   if(d.wm==='add'){ var last=W[W.length-1]; W.push(last?JSON.parse(JSON.stringify(last)):{bw:true,reps:5,kind:'norm'}); return {f:'wm',ra:1,today:1}; }
   if(d.wm==='del'){ if(w)W.splice(q,1); return w?{f:'wm',ra:1,today:1}:null; }
   if(!w)return null;
-  if(k==='bw'){ w.bw=(v==='1'); if(w.bw)delete w.pct; else if(w.pct==null)w.pct=50; return {f:'wm',ra:1,today:1}; }
+  if(k==='bw'){ w.bw=(v==='1'); if(w.bw){delete w.pct; delete w.kg;} else if(v==='2'){ delete w.pct; if(w.kg==null)w.kg=20; } else { delete w.kg; if(w.pct==null)w.pct=50; } return {f:'wm',ra:1,today:1}; }   /* lot 59 : lest fixe */
+  if(k==='kg'){ var g=num(v,null); if(g!=null&&g>=0&&g<=300)w.kg=g; return {f:'wm',today:1}; }
   if(k==='pct'){ var p=num(v,null); if(p!=null&&p>=0&&p<=200)w.pct=p; return {f:'wm',today:1}; }
   if(k==='reps'){ var r=num(v,null); if(r!=null&&r>=0&&r<=100)w.reps=Math.round(r); return {f:'wm',today:1}; }
   if(k==='kind'){ w.kind=v; if(v!=='autre')delete w.txt; else if(w.txt==null)w.txt=''; return {f:'wm',ra:1,today:1}; }
@@ -3871,7 +3881,7 @@ function brWith(fn){
 /* charge la plus lourde de la 1re et de la derniere semaine ou le mouvement figure, dans PLAN */
 function brTops(){
   var o={};
-  PLAN.forEach(function(wk){ wk.days.forEach(function(d){ d.lines.forEach(function(x){
+  PLAN.forEach(function(wk){ if(wk.dl)return; wk.days.forEach(function(d){ d.lines.forEach(function(x){   /* lot 59 */
     if(x.load==null)return;   /* lot 57 */
     var t=o[x.li]||(o[x.li]={w0:wk.w,a:null,w1:wk.w,b:null});
     if(wk.w===t.w0&&(t.a==null||x.load>t.a))t.a=x.load;
@@ -4238,6 +4248,7 @@ var PLAN=[], LASTTXT='';
 function buildPlan(){
   PLAN=[]; var HS={}, DPC={}, APC={};   /* Q3 : creneaux Helms (jour, ligne) d'une semaine a l'autre ; DPC : suites de double progression (D10) ; APC : accPlan, une fois par mouvement (R1) */
   var active=S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){return o.L.prog.tpl!=='off'&&tplOf(o.L.prog.tpl);});
+  var DLW=dlWeek(); if(DLW)PLAN.push(DLW);   /* lot 59 : deload entre deux blocs, avant la semaine 1 */
   if(!active.length)return;
   var nw=S.nwk, maxW=0;
   active.forEach(function(o){
@@ -4501,8 +4512,8 @@ function renderPlan(into,weeks,pfx,scope){
     /* en seance, l'en-tete de page dit deja quelle semaine et quel jour : pas de repetition */
     html+=(pfx==='t')?'<div class="wk tsess"><div class="wkb">':
       '<div class="wk'+(fold(kw)?' folded':'')+(rbSep(week.w)?' rbsep':'')+'"><div class="wkh" data-fold="'+kw+'">'+chev(kw)+
-      '<b>Semaine '+(week.w+1)+'</b><span>'+weekTag(week.w)+'</span></div><div class="wkb">';
-    txt+='\n[Semaine '+(week.w+1)+']\n';
+      '<b>'+wLab(week.w)+'</b><span>'+(week.dl?'une séance, mouvements principaux, avant la semaine 1':weekTag(week.w))+'</span></div><div class="wkb">';   /* lot 59 */
+    txt+='\n['+wLab(week.w)+']\n';
     week.days.forEach(function(day){
       var kd=pfx+'d'+week.w+'-'+day.label;
       html+=(pfx==='t')?'<div class="day dt">':
@@ -4556,6 +4567,7 @@ var PROLE={top:'top set',amrap:'top set',test:'top set',back:'back-off','var':'s
 /* Lot 57 (réponse 12) : J1 au premier de ses jours à partir du début de la semaine du bloc, puis J2, J3, J4 chacun
    au premier de ses jours à partir du jour d'avant : les jours suivent l'ordre même si le bloc ne commence pas un J1. */
 function dayDt(w,lab){
+  if(w<0)return (S.dload&&S.dload.d)?new Date(S.dload.d+'T12:00:00'):null;   /* lot 59 */
   if(!S.start)return null;
   var order=S.jours.split(','), k=order.indexOf(lab.toLowerCase()), idx=['J1','J2','J3','J4'].indexOf(lab);
   if(idx<0&&k<0)return null;
@@ -4578,7 +4590,7 @@ function seancesPage(){
   if(SIM)return null;
   var li=-1; S.lifts.forEach(function(L,i){ if(li<0&&(L.catId==='pullup'||/traction/i.test(L.name||'')))li=i; });
   var out=[];
-  if(li>=0)PLAN.forEach(function(wk){ wk.days.forEach(function(dd,di){
+  if(li>=0)PLAN.forEach(function(wk){ if(wk.dl)return; wk.days.forEach(function(dd,di){   /* lot 59 */
     var L=S.lifts[li], leger=jourLeger(L,dd.label);   /* J2 de Zlat / Helms : toutes les series en « secondaire » */
     var ty=function(x){return leger?'secondaire':(PROLE[x.role]||(x.role==='work'?'back-off':null));};
     var xs=dd.lines.filter(function(x){return x.li===li&&ty(x);}); if(!xs.length)return;
@@ -4687,7 +4699,7 @@ function generate(){
   if(BRSWAP)return;   /* lot 45 */
   buildPlan();
   LASTTXT=renderPlan($('out'),PLAN);
-  renderSync();
+  renderSync(); renderCloseBox();   /* lot 59 */
   $('indout').innerHTML=trackHTML();
   reopenPanel('out');
 }
@@ -4822,7 +4834,7 @@ function panelValid(key,e){
 /* Le critere par defaut n'est PAS ecrit dans l'etat : il est lu a la volee. Un champ de
    plus dans l'etat exporte pour une valeur que personne n'a saisie, c'est du bruit dans
    les comparaisons d'import ; et le jour ou Luka ecrit le sien, c'est le sien qui vaut. */
-var BAR_DEF=[[/traction|pull|chin/i,'Le menton touche la barre. Touche : valide. Ne touche pas : rat\u00e9e.']];
+var BAR_DEF=[[/traction|pull|chin/i,'Le menton touche la barre : valide. Le menton passe au-dessus : franche. Ne touche pas : rat\u00e9e. La poitrine qui touche est le rep\u00e8re des tractions hautes, pas de celles-ci.']];   /* lot 59 */
 function baremeOf(L){
   if(!L)return '';
   if(L.bareme!==undefined)return String(L.bareme);
@@ -5303,10 +5315,10 @@ function panelClick(e){
           if(x.dataset.rir==='h'){ if(dr==='x')x.setAttribute('aria-pressed','false'); return; }
           x.setAttribute('aria-pressed',x===b);
         });
+        if(p.dataset.rirask==='1'&&rrow.dataset&&rrow.dataset.rirrow==='last'){ e.stopPropagation(); saveLine(p,p.dataset.panel); return; }   /* lot 59 : un clic */
       }
       e.stopPropagation(); return;
     }
-    if(b.dataset.fm==='close'){closeBlock();e.stopPropagation();return;}   /* W2 */
     if(b.dataset.fm){failPick(b.dataset.fk,b.dataset.fm,!!p.closest('#todayout'));e.stopPropagation();return;}   /* B2 */
     if(b.dataset.frv){   /* V2 : départ du nouveau run, proposition choisie */
       var rk=b.dataset.frv, rq=rk.split('|'), rf=findLine(rk), rL=rf&&S.lifts[rf.line.li], rv=rL&&flAt(rL,+rq[2],rq[3],+rq[4]);
@@ -5354,7 +5366,7 @@ function saveLine(p,key){
       var v=readRir(r); return v===undefined?null:v;
     });
     rir=rirs[rirs.length-1];
-  }else{ rir=readRir(p.querySelector('[data-rirrow=last]')); if(rir===undefined)rir=null; }
+  }else{ rir=readRir(p.querySelector('[data-rirrow=last]')); var rirq=(rir===null); if(rir===undefined){ if(rirAsk(p,x,sets))return; rir=null; } }   /* lot 59 */
   /* validite : tronquee au nombre de reps de chaque serie, rien si rien n'est juge */
   var valid=sets.map(function(_,st){
     var n=vCount(key,sets,st), a=(PV[st]||[]).slice(0,n).map(function(c){return c||null;});
@@ -5369,6 +5381,7 @@ function saveLine(p,key){
     role:x.role,presLoad:kp?o0.presLoad:x.load,presReps:kp?o0.presReps:x.reps,presSets:kp?o0.presSets:x.sets,load:load,sets:sets,rir:rir,
     bw:kp?o0.bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
   if(rirs)e.rirs=rirs;
+  if(!each&&rirq)e.rirq=1;   /* lot 59 : « ? » choisi, réserve jugée non estimable */
   if(valid)e.valid=valid;
   var frm=Array.prototype.map.call(p.querySelectorAll('[data-frm]'),function(b){return b.getAttribute('aria-pressed')==='true'?'c':null;});   /* lot 48 (R12) */
   if(frm.some(Boolean))e.form=sets.map(function(_,q){return frm[q]||null;});
@@ -5381,6 +5394,7 @@ function saveLine(p,key){
   var fAuto=failAuto(L,x,key,e), fNow=!!(p.querySelector('[data-fnow]')&&p.querySelector('[data-fnow]').checked);   /* B2 ; lot 58 */
   var rk0=rkSnap(x.li);   /* lot 48 : badge */
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e); bwFollow();   /* lot 40 */
+  autoDone(f.w+'|'+f.day);   /* lot 59 */
   draftDrop(p,key); LASTOPEN=null;
   /* la ligne devient la reference des jugements de ses analyses video */
   veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
@@ -5388,6 +5402,29 @@ function saveLine(p,key){
   save(); closePanel(); refreshPlans(); rkBadge(x.li,rk0,key);   /* lot 48 */
   if(fAuto&&(fNow||!inToday)){ failReopen(key,inToday?'todayout':'out'); return; }   /* B2 : le choix apres echec s'affiche ; lot 58 : en Séance du jour, seulement si « décider maintenant » est coché */
   if(inToday)openNext(key);
+}
+/* Lot 59 (réponse 23) : réserve vide à l'enregistrement → l'outil la demande ; un chiffre ou « ? » enregistre d'un clic.
+   Enregistrer de nouveau sans rien toucher : réserve non notée, comme avant. */
+function rirAsk(p,x,sets){
+  var row=p.querySelector('[data-rirrow=last]');
+  if(!row||p.dataset.rirask==='1'||x.role==='deload'||!(sets||[]).some(function(v){return v!=null;}))return false;
+  var fin=finRead(p); if(fin&&fin.ch)return false;
+  p.dataset.rirask='1'; row.classList.add('rirask');
+  row.insertAdjacentHTML('beforebegin','<p class="note rirq"><b>Réserve de la dernière série ?</b> Touchez un chiffre, ou « ? » si vous ne savez pas : '+
+    'c\'est enregistré aussitôt. « Enregistrer » de nouveau : réserve non notée.</p>');
+  if(row.scrollIntoView)row.scrollIntoView({block:'center',behavior:'smooth'});
+  return true;
+}
+/* Lot 59 (réponse 30) : toutes les lignes d'une séance saisies (faites ou sautées, une au moins faite) → séance faite d'office. */
+function autoDone(k){
+  if(SIM||!k||S.done[k])return;
+  buildPlan();
+  var q=k.split('|'), wk=PLAN.filter(function(x){return x.w===+q[0];})[0], dd=wk&&wk.days.filter(function(d){return d.label===q[1];})[0];
+  if(!dd||!dd.lines.length)return;
+  var es=dd.lines.map(function(x){return entryOf(x.key);});
+  if(es.some(function(e){return !e;})||!es.some(function(e){return e.state!=='skip';}))return;
+  S.done[k]=es.map(function(e){return String(e.date||'').slice(0,10);}).filter(Boolean).sort().pop()||todayISO();
+  if(S.skip)delete S.skip[k];
 }
 /* R5 : la prochaine ligne non saisie de la seance s'ouvre d'elle-meme. Meme code apres
    un enregistrement et apres un saut : une seule fonction. */
@@ -5411,6 +5448,7 @@ function skipLine(p,key){
   if(/^[zhr]\|/.test(key))fzEnsure(L);   /* B1 */
   flDropKey(key,1);   /* B2 : sautee = ni echec ni reussite */
   S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e); bwFollow();   /* lot 40 */
+  autoDone(f.w+'|'+f.day);   /* lot 59 */
   draftDrop(p,key); LASTOPEN=null;
   var inToday=!!(p.closest&&p.closest('#todayout'));
   save(); closePanel(); refreshPlans();
@@ -5486,7 +5524,7 @@ function renderWeekVol(){
   var h='<div class="scroll"><table class="stt"><thead><tr><th>Sem.</th>'+lifts.map(function(i){return '<th>'+esc(S.lifts[i].name)+'<br>séries \u00b7 t</th>';}).join('')+
     '<th>tonnage<br>total</th></tr></thead><tbody>';
   rows.forEach(function(r){
-    h+='<tr><td>S'+(r.w+1)+'</td>'+lifts.map(function(i){var a=r.agg[i]; return '<td>'+(a?a.sets+' \u00b7 '+F(Math.round(a.ton/100)/10):'\u2014')+'</td>';}).join('')+
+    h+='<tr><td>'+sLab(r.w)+'</td>'+lifts.map(function(i){var a=r.agg[i]; return '<td>'+(a?a.sets+' \u00b7 '+F(Math.round(a.ton/100)/10):'\u2014')+'</td>';}).join('')+
       '<td>'+F(Math.round(r.tot/100)/10)+' t</td></tr>';
   });
   el.innerHTML=h+'</tbody></table></div><p class="note">Séries et tonnage (en tonnes) des séances enregistrées, main lifts en colonnes ; '+
@@ -5605,15 +5643,21 @@ var FORMANCH=[
  '\u2014 bon, sans plus',
  '\u2014 frais, rien \u00e0 signaler'
 ];
+/* Lot 59 (réponse 31) : étiquettes de séance, en plus du texte libre. S.dayTags[séance] = [clés]. */
+var DTAGS=[['pluie','pluie / froid'],['grip','grip'],['nuit','mauvaise nuit'],['jour','journée dure'],['presse','pressé']];
+function dtagName(t){ var o=DTAGS.filter(function(q){return q[0]===t;})[0]; return o?o[1]:t; }
 function renderForm(){
   var k=S.tsel;
   if(!k){$('formrows').innerHTML='';$('formnote').textContent='';return;}
-  var f=formOf(k), simple=true, h='';   /* lot 44 (8b) */
+  var f=formOf(k), simple=true, h='', tg=(S.dayTags&&S.dayTags[k])||[];   /* lot 44 (8b) */
+  if(!f.gen&&!S.done[k])h+='<p class="note fask"><b>À noter avant la 1re série</b> : une note de 1 à 5, cinq secondes.</p>';   /* lot 59 (réponse 24) */
   if(simple){
     h+='<div class="pillrow fdemi">'+[1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){   /* lot 58 : demi-notes */
       return '<button class="pill'+(v%1?' demi':'')+'" data-fq="gen" data-fv="'+v+'" aria-pressed="'+(f.gen===v)+'">'+F(v)+'</button>';
     }).join('')+'</div>'+
-    (f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+formAnch(f.gen)+'</b></p>':'');
+    (f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+formAnch(f.gen)+'</b></p>':'')+
+    '<div class="pillrow dtags" style="margin-top:6px">'+DTAGS.map(function(q){   /* lot 59 */
+      return '<button class="pill" data-dtag="'+q[0]+'" aria-pressed="'+(tg.indexOf(q[0])>=0)+'">'+q[1]+'</button>';}).join('')+'</div>';
   }else{
     h+=formQ().map(function(q){
       return '<p class="note" style="margin:8px 0 0"><b>'+q.n+'</b> <span class="src">'+q.h+'</span></p><div class="pillrow">'+
@@ -5646,6 +5690,9 @@ $('formrows').addEventListener('click',function(ev){
   if(t){ var kk=t.dataset.fon; if(!S.formOn)S.formOn={};
     if(S.formOn[kk])delete S.formOn[kk]; else S.formOn[kk]=1;
     save(); renderForm(); return; }
+  var tb=ev.target.closest?ev.target.closest('[data-dtag]'):null;
+  if(tb){ var kt=S.tsel; if(!kt)return; if(!S.dayTags)S.dayTags={}; var a=S.dayTags[kt]||(S.dayTags[kt]=[]), ti=a.indexOf(tb.dataset.dtag);   /* lot 59 */
+    if(ti>=0)a.splice(ti,1); else a.push(tb.dataset.dtag); if(!a.length)delete S.dayTags[kt]; save(); renderForm(); return; }
   var b=ev.target.closest?ev.target.closest('[data-fq]'):null; if(!b)return;
   var k=S.tsel; if(!k)return;
   if(!S.form[k])S.form[k]={};
@@ -5657,7 +5704,7 @@ $('formrows').addEventListener('click',function(ev){
 
 function nextSession(){
   var sess=sessions(); if(!sess.length)return null;
-  for(var i=0;i<sess.length;i++)if(!S.done[sess[i]])return sess[i];
+  for(var i=0;i<sess.length;i++)if(!S.done[sess[i]]&&!(S.skip&&S.skip[sess[i]]))return sess[i];   /* lot 59 */
   return sess[sess.length-1];
 }
 function goSession(k){ if(!k)return; S.tsel=k; save(); renderToday(); }
@@ -5686,13 +5733,13 @@ function renderToday(){
   var k=S.tsel;
   if(sess.indexOf(k)<0){
     k=null;
-    for(var i=0;i<sess.length;i++){ if(!S.done[sess[i]]){k=sess[i];break;} }
+    for(var i=0;i<sess.length;i++){ if(!S.done[sess[i]]&&!(S.skip&&S.skip[sess[i]])){k=sess[i];break;} }   /* lot 59 */
     if(!k)k=sess[sess.length-1];
     S.tsel=k;
   }
   $('tday').innerHTML=sess.map(function(q){
     var a=q.split('|');
-    return '<option value="'+q+'"'+(q===k?' selected':'')+'>Semaine '+(+a[0]+1)+' \u00b7 '+a[1]+(rbOn()?' \u00b7 '+rbSub(+a[0]):'')+(S.done[q]?' \u2713':'')+'</option>';   /* lot R1 (D8) */
+    return '<option value="'+q+'"'+(q===k?' selected':'')+'>'+(+a[0]<0?'Deload':'Semaine '+(+a[0]+1)+' \u00b7 '+a[1]+(rbOn()?' \u00b7 '+rbSub(+a[0]):''))+(S.done[q]?' \u2713':(S.skip&&S.skip[q])?' (saut\u00e9e)':'')+'</option>';   /* lot 59 */   /* lot R1 (D8) */
   }).join('');
   var wIdx=+k.split('|')[0], sel=k.split('|')[1];
   var weeks=PLAN.filter(function(wk){return wk.w===wIdx;}).map(function(wk){
@@ -5719,15 +5766,16 @@ function renderToday(){
   $('tprog').textContent=(dd?'prévue '+dd+' \u00b7 ':'')+(S.done[k]?'faite le '+frDate(S.done[k]):nd+' / '+sess.length+' faites');
   var nk=nextSession(), off=(nk&&k!==nk);
   $('tback').style.display=off?'':'none';
-  if(off)$('tback').textContent='Revenir \u00e0 S'+(+nk.split('|')[0]+1)+' \u2014 '+nk.split('|')[1];
+  if(off)$('tback').textContent='Revenir \u00e0 '+(+nk.split('|')[0]<0?'Deload':'S'+(+nk.split('|')[0]+1)+' \u2014 '+nk.split('|')[1]);   /* lot 59 */
   $('tprev').disabled=(sessions().indexOf(k)<=0);
   $('tnext').disabled=(sessions().indexOf(k)>=sess.length-1);
   renderForm();
   $('tdone').textContent=S.done[k]?'Rouvrir cette s\u00e9ance':'Terminer la s\u00e9ance';
   $('tdone').className=S.done[k]?'act ghost donebtn':'act donebtn';
+  var sk=!!(S.skip&&S.skip[k]); $('tskip').style.display=S.done[k]?'none':''; $('tskip').textContent=sk?'Annuler « sautée »':'Séance sautée';   /* lot 59 */
   setTimeout(function(){ if($('p-today').classList.contains('on'))reopenPanel('today'); },0);
   $('tstate').innerHTML=(off?'<b>Vous consultez une autre s\u00e9ance que celle en cours.</b> ':'')+
-    (S.done[k]?'Marqu\u00e9e faite le <b>'+frDate(S.done[k])+'</b>. ':'')+
+    (S.done[k]?'Marqu\u00e9e faite le <b>'+frDate(S.done[k])+'</b>. ':(S.skip&&S.skip[k])?'Marqu\u00e9e saut\u00e9e. ':'')+
     '<b>'+nd+'</b> s\u00e9ance'+(nd>1?'s':'')+' sur '+sess.length+' marqu\u00e9e'+(nd>1?'s':'')+' faite'+(nd>1?'s':'')+' sur ce bloc.'+
     (S.start?'':' <b>Aucune date de d\u00e9but de bloc</b> : les dates du programme restent vides tant que ce champ est vide.');
   applyFolds();
@@ -5739,8 +5787,16 @@ $('tdone').addEventListener('click',function(){
     S.done[k]=todayISO();
     buildPlan();
     var sess=sessions(), i=sess.indexOf(k);
-    for(var j=i+1;j<sess.length;j++){ if(!S.done[sess[j]]){ S.tsel=sess[j]; break; } }
+    for(var j=i+1;j<sess.length;j++){ if(!S.done[sess[j]]&&!(S.skip&&S.skip[sess[j]])){ S.tsel=sess[j]; break; } }
   }
+  if(S.skip)delete S.skip[k];   /* lot 59 */
+  save(); renderToday(); generate();
+});
+$('tskip').addEventListener('click',function(){   /* lot 59 (réponse 30) : séance pas faite, par choix */
+  var k=S.tsel; if(!k||S.done[k])return; if(!S.skip)S.skip={};
+  if(S.skip[k])delete S.skip[k];
+  else{ S.skip[k]=todayISO(); var sess=sessions(), i=sess.indexOf(k);
+    for(var j=i+1;j<sess.length;j++){ if(!S.done[sess[j]]&&!S.skip[sess[j]]){ S.tsel=sess[j]; break; } } }
   save(); renderToday(); generate();
 });
 /* Échauffement : construit sur la série la plus lourde de chaque mouvement du jour. */
@@ -5752,7 +5808,7 @@ function warmCard(weeks){
     var x=top[k], L=S.lifts[x.li], wo=warmOf(L,x.li,x.load), st=wo.steps, kinds=warmKinds(L);
     var kf='warm'+x.li;
     return '<div class="day'+(fold(kf)?' folded':'')+'"><div class="dayn" data-fold="'+kf+'">'+chev(kf)+
-      esc(L.name)+' — jusqu\'à '+loadKg(L,x.load)+(wo.own?' <em>· ajusté pour cette séance</em>':'')+'</div>'+
+      esc(L.name)+' — jusqu\'à '+loadKg(L,x.load)+(wo.own?(warmSame(L,wo.steps,x.load)?' <em>· fait comme proposé</em>':' <em>· ajusté pour cette séance</em>'):'')+'</div>'+
       st.map(function(w,q){
         var bw=(w.load==null||+w.load===0);
         return '<div class="line wrow"><span class="nm n'+col(x.li)+'">Montée '+(q+1)+'</span>'+
@@ -5766,7 +5822,7 @@ function warmCard(weeks){
           ' <button class="act ghost mini" data-wdel="'+x.li+'|'+q+'" data-top="'+x.load+'" aria-label="retirer">\u00d7</button></span>'+
           '<span class="in">'+(bw?(kinds.length>1?'':(L.useBw?'sans lest':'barre seule')):(x.load>0?F(Math.round(w.load/x.load*100))+' % du lest':''))+'</span></div>';
       }).join('')+
-      '<div class="btnrow" style="margin-top:4px"><button class="act ghost mini" data-wadd="'+x.li+'" data-top="'+x.load+'">+ montée</button>'+
+      '<div class="btnrow" style="margin-top:4px">'+(wo.own?'':'<button class="act mini" data-wok="'+x.li+'" data-top="'+x.load+'">Fait comme proposé</button>')+'<button class="act ghost mini" data-wadd="'+x.li+'" data-top="'+x.load+'">+ montée</button>'+
       (wo.own?'<button class="act ghost mini" data-wreset="'+x.li+'">Revenir au modèle</button>':'')+'</div></div>';
   }).join('');
   if(!body)return '';
@@ -5867,7 +5923,7 @@ function notesCard(wIdx,sel){
   return '<div class="card"><h2>Notes <em>contexte du bloc et de la séance</em></h2>'+
     '<div class="row"><div class="field w"><label>Le bloc — vaut pour toutes les séances</label>'+
       '<textarea data-note="block" rows="2" placeholder="timer 8 min par série, alternance tractions / dips…">'+esc(S.blockNote)+'</textarea></div></div>'+
-    '<div class="row" style="margin-top:8px"><div class="field w"><label>Cette séance — S'+(wIdx+1)+' '+esc(sel)+'</label>'+
+    '<div class="row" style="margin-top:8px"><div class="field w"><label>Cette séance — '+(wIdx<0?'Deload':'S'+(wIdx+1)+' '+esc(sel))+'</label>'+
       '<textarea data-note="day" data-k="'+esc(k)+'" rows="2" placeholder="ce qui a changé aujourd\'hui">'+esc(S.dayNotes[k]||'')+'</textarea></div></div>'+
     '<div class="row" style="margin-top:8px"><div class="field w"><label for="rapin">Rappel — s\'affichera en tête de cette séance</label>'+
       '<input id="rapin" type="text" placeholder="repeindre les marques, penser au timer…"></div></div>'+
@@ -5887,6 +5943,10 @@ $('todayout').addEventListener('click',function(e){
   S.rappels=(S.rappels||[]).filter(function(r){return r.id!==b.dataset.rappel;});
   save(); renderToday();
 });
+function warmSame(L,st,top){   /* lot 59 : échauffement noté identique au modèle */
+  var m=warmSteps(L,top), n=function(a){return JSON.stringify((a||[]).map(function(w){return [w.load==null?0:+w.load,+w.reps,w.kind||'norm',w.txt||''];}));};
+  return n(m)===n(st);
+}
 /* edition de l'echauffement du jour : la premiere retouche copie le modele dans la seance */
 function warmTouch(li,top){
   if(!S.warmDay)S.warmDay={};
@@ -5906,9 +5966,10 @@ $('todayout').addEventListener('change',function(e){
   save(); renderToday();
 });
 $('todayout').addEventListener('click',function(e){
-  var b=e.target.closest?e.target.closest('[data-wadd],[data-wdel],[data-wreset]'):null; if(!b)return;
+  var b=e.target.closest?e.target.closest('[data-wadd],[data-wdel],[data-wreset],[data-wok]'):null; if(!b)return;
   e.stopPropagation();
-  if(b.dataset.wreset!=null){ delete S.warmDay[warmKey(+b.dataset.wreset)]; }
+  if(b.dataset.wok!=null){ warmTouch(+b.dataset.wok,+b.dataset.top); }   /* lot 59 : le modèle devient l'échauffement fait */
+  else if(b.dataset.wreset!=null){ delete S.warmDay[warmKey(+b.dataset.wreset)]; }
   else if(b.dataset.wadd!=null){ var st=warmTouch(+b.dataset.wadd,+b.dataset.top), last=st[st.length-1];
     st.push(last?{load:last.load,reps:last.reps,kind:last.kind||'norm'}:{load:null,reps:5,kind:'norm'}); }
   else { var a=b.dataset.wdel.split('|'), s2=warmTouch(+a[0],+b.dataset.top); s2.splice(+a[1],1); }
@@ -6617,8 +6678,8 @@ function statsHTML(st){
       '.</p>';
   }).join('');
 }
-function formStats(){
-  var v=[]; for(var k in (S.form||{})){ var t=formSum(S.form[k]); if(t!=null)v.push(t); }
+function formStats(src){
+  var fo=src||S.form||{}, v=[]; for(var k in fo){ var t=formSum(fo[k]); if(t!=null)v.push(t); }
   if(!v.length)return null;
   var mx=formMax()||1;
   return {n:v.length,avg:v.reduce(function(a,b){return a+b;},0)/v.length,mx:mx,
@@ -6636,7 +6697,7 @@ function blockNotesHTML(b){   /* B21 : notes archivées à la clôture */
     var a=x.split('|'), c=y.split('|'); return sessOrd(+a[0]||0,a[1])-sessOrd(+c[0]||0,c[1]);});
   if(!nb&&!ks.length)return '';
   return '<details><summary class="note">Notes du bloc</summary>'+(nb?'<p class="note"><b>Bloc</b> : '+esc(nb)+'</p>':'')+
-    ks.map(function(k){var q=k.split('|'); return '<p class="note"><b>'+(/^\d+$/.test(q[0])?'S'+(+q[0]+1)+' '+esc(q[1]||''):esc(k))+'</b> : '+esc(dn[k])+'</p>';}).join('')+'</details>';
+    ks.map(function(k){var q=k.split('|'); return '<p class="note"><b>'+(/^-?\d+$/.test(q[0])?(+q[0]<0?'Deload':'S'+(+q[0]+1)+' '+esc(q[1]||'')):esc(k))+'</b> : '+esc(dn[k])+'</p>';}).join('')+'</details>';
 }
 /* Lot 55 (audit R6) : export Markdown d'un bloc, en cours ou archivé, depuis Données › Bilan. Prompt d'analyse en tête
    (case S.mdOn, cochée au départ ; texte S.mdPrompt, modifiable, gardé ; modèle MDPROMPT). Copier (repli : texte
@@ -6671,12 +6732,12 @@ function mdPlan(){   /* bloc en cours : séances du plan, faites ou non, lignes 
     var top={}, wm={};
     dd.lines.forEach(function(x){ if(!top[x.li]||x.load>top[x.li].load)top[x.li]=x; });
     Object.keys(top).forEach(function(li){ var L=S.lifts[+li]; if(!(+top[li].load>0))return; try{ if(L&&L.prog)wm[li]=mdW(L,warmSteps(L,top[li].load)); }catch(e){} });
-    out.push({w:wk.w,d:dd.label,done:!!S.done[wk.w+'|'+dd.label],wm:wm,
+    out.push({w:wk.w,d:dd.label,done:!!S.done[wk.w+'|'+dd.label],skip:(!S.done[wk.w+'|'+dd.label]&&S.skip&&S.skip[wk.w+'|'+dd.label])?true:undefined,wm:wm,
       l:dd.lines.map(function(x){return {li:x.li,n:x.name,r:x.role,s:x.sets,p:x.reps,c:x.load,k:x.key};})});
   }); });
   return out;
 }
-function mdPK(e){ var q=String(e&&e.key||'').split('|'); return (/^[zhacxr]$/.test(q[0])&&q.length>=5)?q:null; }   /* lot R1 : r */
+function mdPK(e){ var q=String(e&&e.key||'').split('|'); return (/^[zhacxrd]$/.test(q[0])&&q.length>=5)?q:null; }   /* lot 59 : d = deload entre deux blocs */   /* lot R1 : r */
 function mdFromLog(es){   /* séances retrouvées par les séries saisies (bloc clos avant la v51, ou séries hors du plan gardé) */
   var m={}, out=[];
   es.forEach(function(e){ var q=mdPK(e); if(!q)return; var k=q[2]+'|'+q[3];
@@ -6695,7 +6756,7 @@ function mdDone(L,e){
   var j=function(a){return a.map(function(v){return v==null?'—':v;}).join('/');};
   var t=loadKg(L||{},e.load)+', '+j(s)+(m?' m':' reps');
   if(e.tries&&j(e.tries)!==j(s))t+=' (tentées '+j(e.tries)+')';
-  t+=e.rirs?', réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?', réserve '+F(e.rir):', réserve inconnue');
+  t+=e.rirs?', réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?', réserve '+F(e.rir):e.rirq?', réserve « ? » (non estimable)':', réserve inconnue');   /* lot 59 */
   if(hasBw(e))t+=', PdC '+F(e.bw)+' kg';
   if(e.state==='miss')t+=' — cible manquée'; else if(e.state==='mod')t+=' — écart au prescrit';
   return t;
@@ -6742,7 +6803,7 @@ function mdBlock(bid){
   var es=(S.log||[]).filter(function(e){return blockOfEntry(e)===bid;}), E={}, used={};
   es.forEach(function(e){ if(e.key)E[e.key]=e; });
   var src=cur?mdPlan():(b.plan||null), old=!src;
-  var plan=(src||[]).map(function(s){return {w:s.w,d:s.d,done:s.done,wm:s.wm||{},l:s.l.slice()};});
+  var plan=(src||[]).map(function(s){return {w:s.w,d:s.d,done:s.done,skip:s.skip,wm:s.wm||{},l:s.l.slice()};});
   plan.forEach(function(s){ s.l.forEach(function(x){ if(E[x.k])used[x.k]=1; }); });
   mdFromLog(es.filter(function(e){return !used[e.key];})).forEach(function(g){
     var s=plan.filter(function(y){return y.w===g.w&&y.d===g.d;})[0];
@@ -6759,7 +6820,7 @@ function mdBlock(bid){
   p('## Légende');
   p('- Charges : lest en kg ; « PdC » = poids de corps seul ; charge système = PdC + lest. Pour un mouvement sans PdC, la charge est celle de la barre.');
   p('- « prévu → fait » : la prescription du plan, puis ce qui a été saisi. Reps par série séparées par « / » ; « — » = série non faite.');
-  p('- Réserve : reps en réserve (RIR) saisies, par série si plusieurs.');
+  p('- Réserve : reps en réserve (RIR) saisies, par série si plusieurs. « ? » = jugée non estimable ; « inconnue » = rien de noté.');
   p('- Forme : T = training (par défaut), C = clean (jambes gainées). Validité des reps : valide, franche, douteuse, trichée, ratée de peu, échec.');
   p('- Vidéo : montée en s, vitesses en m/s, hauteur en cm.');
   p('- Échauffement « non saisi » : il n’a pas été retouché dans la séance ; le modèle proposé est indiqué, rien ne dit qu’il a été suivi.');
@@ -6794,8 +6855,9 @@ function mdBlock(bid){
     if(!ent.length&&s.done!==true){ miss.push(s); return; }
     var dt=ent.map(function(e){return e.date||'';}).filter(Boolean).sort()[0]; nS++;
     p('');
-    p('### S'+(s.w+1)+' '+s.d+(dt?', le '+frDate(dt):'')+(s.done===true?' — faite':(s.done===false?' — non marquée faite':'')));
+    p('### '+(s.w<0?'Deload':'S'+(s.w+1)+' '+s.d)+(dt?', le '+frDate(dt):'')+(s.done===true?' — faite':s.skip?' — sautée':(s.done===false?' — non marquée faite':'')));   /* lot 59 */
     var fm=mdForm(forms[sk]); if(fm)p('- Forme du jour : '+fm);
+    var tgs=(cur?(S.dayTags||{}):(b.dayTags||{}))[sk]; if(tgs&&tgs.length)p('- Conditions : '+tgs.map(dtagName).join(', '));   /* lot 59 */
     var dn=String(notes[sk]||'').trim(); if(dn)p('- Note de séance : '+dn);
     var seen={};
     ent.forEach(function(e){
@@ -6816,7 +6878,7 @@ function mdBlock(bid){
   if(old&&b)p('- '+Math.max(0,(b.sess||0)-(b.doneN||0))+' sur '+(b.sess||0)+' (détail non gardé : bloc clos avant la v51).');
   else if(!miss.length)p('- Aucune.');
   else{ if(cur)p('_Bloc en cours : les séances à venir sont comprises._');
-    miss.forEach(function(s){ p('- S'+(s.w+1)+' '+s.d+' : '+(s.l.map(function(x){return x.n+' '+mdPres(S.lifts[x.li]||null,x);}).join(' ; ')||'rien de prévu')); }); }
+    miss.forEach(function(s){ p('- '+(s.w<0?'Deload':'S'+(s.w+1)+' '+s.d)+(s.skip?' (sautée)':'')+' : '+(s.l.map(function(x){return x.n+' '+mdPres(S.lifts[x.li]||null,x);}).join(' ; ')||'rien de prévu')); }); }
   var hp=es.filter(function(e){return !mdPK(e);}).sort(function(x,y){return x.date<y.date?-1:(x.date>y.date?1:0);});
   if(hp.length){ p(''); p('## Hors programme');
     hp.forEach(function(e){ var L=S.lifts[e.li]||null; p('- '+frDate(e.date)+', '+(e.lift||'')+' : '+mdDone(L,e)); mdSub(L,e).forEach(p); }); }
@@ -6844,7 +6906,7 @@ function renderBilan(){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
         ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+blockGoalHTML(b)+bxHTML(b.bx)+blockNotesHTML(b)+blockDescHTML(b)+mdBtn(b.id)+'</div>';   /* lot 55 */
+        statsHTML(b.stats)+blockGoalHTML(b)+bxHTML(b.bx)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+mdBtn(b.id)+'</div>';   /* lot 59 */   /* lot 55 */
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -6868,20 +6930,236 @@ function askRefTake(L,e){
     '\n\nLa reprendre comme référence ?'))return;
   L.ref.load=r.load; L.ref.reps=r.reps; L.ref.rir=r.rir; L.ref.bw=r.bwe?null:r.bw; L.ref.date=r.date; L.ref.est=false;
 }
+/* Lot 59 (réponses 1-5) : deload entre deux blocs. Clôturer le bloc démarre le deload : une séance, le J3 (le jeudi)
+   suivant, mouvements principaux seulement, règle du gabarit (2 × 5 ; Zlat : 50 % du lest du dernier top set ; squat :
+   70 % du dernier jour lourd ; 3x6 : 10 kg sous la dernière séance légère) ; le bloc suivant commence au J1 (le
+   dimanche) d'après. S.dload = {b, d, lines:[{li, sets, reps, load, info}]}, modifiable dans Programme. Pseudo-semaine
+   w = -1, jour « DL », clés d|li|-1|DL|n|bN : les séries du deload appartiennent au nouveau bloc. */
+function sLab(w){ return w<0?'Deload':'S'+(w+1); }
+function wLab(w){ return w<0?'Deload':'Semaine '+(w+1); }
+function dlWeek(){
+  var D=S.dload; if(!D||+D.b!==+S.blockId||!(D.lines||[]).length)return null;
+  var ls=D.lines.map(function(q,n){ var L=S.lifts[+q.li]; if(!L)return null;
+    return {li:+q.li,name:L.name,role:'deload',sets:+q.sets||2,reps:String(q.reps||5),load:q.load==null?null:+q.load,
+      info:q.info||'deload entre deux blocs',key:'d|'+q.li+'|-1|DL|'+n+BK()}; }).filter(Boolean);
+  return ls.length?{w:-1,dl:1,days:[{label:'DL',lines:ls}]}:null;
+}
+function dlBase(i,bid){   /* dernier top set du bloc bid (sinon la série la plus lourde de la dernière séance) */
+  var es=(S.log||[]).filter(function(e){ return e.li===i&&e.state!=='skip'&&e.load!=null&&blockOfEntry(e)===bid&&
+    /^[zhr]\|/.test(String(e.key||''))&&(e.sets||[]).some(function(v){return v!=null;}); });
+  var src=es.filter(function(e){return e.role==='top'||e.role==='amrap'||e.role==='test';});
+  if(!src.length)src=es.filter(function(e){return e.role!=='var'&&e.role!=='deload';});
+  if(!src.length)src=es;
+  if(!src.length)return null;
+  var d=src.map(function(e){return String(e.date||'');}).sort().pop();
+  return src.filter(function(e){return String(e.date||'')===d;}).reduce(function(a,e){return (!a||+e.load>+a.load)?e:a;},null);
+}
+function dlPropose(bid){
+  var out=[];
+  S.lifts.forEach(function(L,i){
+    var P=L.prog, t=tplOf(P.tpl); if(!L.main||P.tpl==='off'||!t||t.acc||t.special)return;
+    var e=dlBase(i,bid); if(!e)return;
+    var l=+e.load||0, bw=e.bw!=null?+e.bw:+S.bw, ld, info;
+    if(t.sq){ ld=Math.max(0,rnd((bwZ(L,bw)+l)*0.7-bwZ(L,bw),L.step)); info='70 % du dernier jour lourd ('+loadKg(L,l)+'), gabarit squat'; }
+    else if(t.s36){ ld=Math.max(0,rnd(l-boGap(L,P,85)-10,L.step)); info='10 kg sous la dernière séance légère, gabarit 3x6'; }
+    else { ld=Math.max(0,rnd(0.5*l,L.step)); info='50 % du lest du dernier top set ('+loadKg(L,l)+' le '+frDate(e.date)+')'; }
+    out.push({li:i,sets:2,reps:5,load:ld,info:'deload entre deux blocs : '+info});
+  });
+  return out;
+}
+function isoD(dt){ var p=function(n){return (n<10?'0':'')+n;}; return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate()); }
+function dlDates(from){   /* le J3 qui suit (le jeudi), puis le J1 d'après (le dimanche) */
+  var order=String(S.jours||'dim,mar,jeu').split(','), j3=order[Math.min(2,order.length-1)], j1=order[0];
+  var nx=function(dt,key){ var want=DAYN[key], k=want===undefined?7:(want-dt.getDay()+7)%7; return new Date(dt.getTime()+(k||7)*86400000); };
+  var d=nx(new Date((from||todayISO())+'T12:00:00'),j3);
+  return {d:isoD(d),s:isoD(nx(d,j1))};
+}
+function dlTxt(D){
+  return (D.lines||[]).map(function(q){ var L=S.lifts[+q.li]; return L?esc(L.name)+' '+(+q.sets||2)+' × '+(q.reps||5)+' à '+loadKg(L,q.load):''; }).filter(Boolean).join(' · ');
+}
+/* Lot 59 (réponse 7) : la clôture garde de quoi revenir en arrière (b.undo, sur le dernier bloc clos seulement).
+   « Rouvrir » tant que rien n'est noté dans le nouveau bloc. Bloc clos avant la v61 : reprise de ce que le bilan a
+   archivé, décisions après échec rejouées par la règle du gabarit (à confirmer). */
+var SNAPK=['blockId','done','skip','dayNotes','dayTags','tsel','blockNote','blockGoal','form','start','lifts','dload'];
+function blockSnap(){ var o={}; SNAPK.forEach(function(k){ if(S[k]!==undefined)o[k]=JSON.parse(JSON.stringify(S[k])); }); return o; }
+function reopenable(){
+  var bs=S.blocks||[], b=bs[bs.length-1]; if(!b||+b.id!==+S.blockId-1)return null;
+  if((S.log||[]).some(function(e){return blockOfEntry(e)===+S.blockId;}))return null;
+  return b;
+}
+function flReplay(){   /* bloc rouvert sans sauvegarde : règle d'échec du gabarit rejouée dans l'ordre des séances */
+  buildPlan();
+  var es=(S.log||[]).filter(function(e){return /^[zh]\|/.test(String(e.key||''))&&inBlock(e.key)&&e.state!=='skip';});
+  es.sort(function(a,b){ var p=String(a.key).split('|'), q=String(b.key).split('|'); return sessOrd(+p[2],p[3])-sessOrd(+q[2],q[3])||(+p[4])-(+q[4]); });
+  es.forEach(function(e){ var f=findLine(e.key); if(!f)return; var L=S.lifts[f.line.li]; if(L&&failAuto(L,f.line,e.key,e))buildPlan(); });
+}
+function reopenBlock(){
+  var b=reopenable(); if(!b)return false;
+  if(!confirm('Rouvrir le bloc '+b.id+' ?\n\n'+(b.undo?'Tout revient comme avant la clôture : séances faites, notes, forme du jour, décisions après échec, réglages du programme. '+
+    'Ce qui a été changé depuis dans Programme pour le bloc '+S.blockId+' est perdu, deload compris.':
+    'Ce bloc a été clôturé avant la v61 : l\'outil n\'avait rien gardé pour revenir en arrière. Il reprend ce que le bilan a archivé : séances faites, notes, '+
+    'forme du jour, note et objectif du bloc, date de début. Les décisions après échec sont rejouées par la règle du gabarit et marquées « à confirmer » : '+
+    'refaites vos choix (« Répéter », « Fin du run »…) dans les panneaux d\'échec. Les réglages actuels du programme sont gardés.')))return false;
+  if(b.undo){ var u=b.undo; SNAPK.forEach(function(k){ if(u[k]!==undefined)S[k]=u[k]; else delete S[k]; }); }
+  else{
+    S.blockId=+b.id; S.start=b.from||S.start; S.dayNotes=b.dayNotes||{}; S.form=b.formData||{}; S.dayTags=b.dayTags||{};
+    S.blockNote=b.note||''; S.blockGoal=(b.goal&&b.goal.txt)||S.blockGoal||''; S.done={}; S.skip={}; S.tsel=null; delete S.dload;
+    (b.plan||[]).forEach(function(q){ var k=q.w+'|'+q.d; if(q.done)S.done[k]=b.to||todayISO(); else if(q.skip)S.skip[k]=b.to||todayISO(); });
+    S.lifts.forEach(function(L){
+      var g=b.goal&&(b.goal.l||[]).filter(function(x){return x.n===L.name;})[0]; if(g&&!L.prog.goal)L.prog.goal=g.g;
+      var ds=(b.desc||[]).filter(function(x){return x.n===L.name;})[0]; if(ds&&!L.prog.desc)L.prog.desc=ds.d;
+      L.prog.adj=[]; L.prog.fl=[];
+    });
+  }
+  S.blocks.pop();
+  if(!b.undo)flReplay();
+  CLOSEP=null; save(); renderAll();
+  return true;
+}
+/* Lot 59 (réponses 6, 9, 10) : la clôture se fait depuis Programme seulement, après une vérification de ce qui manque
+   (« Compléter » ouvre la séance ; « Clôturer quand même »), avec le deload et la date de début du bloc suivant. */
+var CLOSEP=null;   /* panneau ouvert : {m:'close'|'dl', on, d, s, lines} */
+function closeChecks(){
+  buildPlan(); var o=[], nd=[], nf=[], nr=[], pend=failPendList();
+  sessions().forEach(function(k){
+    var q=k.split('|'), w=+q[0], wk=PLAN.filter(function(x){return x.w===w;})[0], dd=wk&&wk.days.filter(function(d){return d.label===q[1];})[0]; if(!dd)return;
+    var es=dd.lines.map(function(x){return entryOf(x.key);}).filter(Boolean), did=es.some(function(e){return e.state!=='skip';});
+    if(did&&!S.done[k])nd.push(k);
+    var fo=formOf(k); if((did||S.done[k])&&!Object.keys(fo).some(function(q){return q!=='d'&&typeof fo[q]==='number';}))nf.push(k);   /* repères détaillés d'avant le lot 44 compris */
+    es.forEach(function(e){
+      if(e.state==='skip'||e.role==='deload'||e.role==='acc'||e.role==='extra'||!(e.sets||[]).some(function(v){return v!=null;}))return;
+      if(e.rir!=null||e.rirq||(e.rirs&&e.rirs.some(function(v){return v!=null;}))||(e.fin&&e.fin.ch))return;
+      nr.push({k:k,n:e.lift+(e.role==='top'?' (top set)':e.role==='back'?' (back-off)':e.role==='var'?' (variante)':'')});
+    });
+  });
+  var lab=function(k){var q=k.split('|'); return +q[0]<0?'Deload':'S'+(+q[0]+1)+' '+q[1];};
+  if(pend.length)o.push({t:'Échec sans décision',d:pend.map(function(x){return esc(S.lifts[x.x.li].name)+', '+lab(x.w+'|'+x.d);}).join(' ; '),go:'f'+pend[0].x.key});
+  if(nd.length)o.push({t:'Séance commencée, pas marquée faite',d:nd.map(lab).join(', '),go:'s'+nd[0]});
+  if(nf.length)o.push({t:'Séance faite sans forme du jour',d:nf.map(lab).join(', '),go:'s'+nf[0]});
+  if(nr.length){ var g={}; nr.forEach(function(x){ (g[x.k]=g[x.k]||[]).push(x.n); });
+    o.push({t:'Série sans réserve (ni chiffre ni « ? »)',d:Object.keys(g).map(function(k){return lab(k)+' : '+esc(g[k].join(', '));}).join(' ; '),go:'s'+nr[0].k}); }
+  if(!String(S.blockNote||'').trim())o.push({t:'Note de bloc vide',d:'conditions, matériel, ce qui a changé pendant le bloc',go:'n'});
+  return o;
+}
+function closeOpen(m){
+  var bid=m==='close'?+S.blockId:+S.blockId-1, dd=dlDates(), D=S.dload&&+S.dload.b===+S.blockId?S.dload:null;
+  var ls=(m==='dl'&&D)?JSON.parse(JSON.stringify(D.lines)):dlPropose(bid);
+  CLOSEP={m:m,on:!!ls.length,d:(m==='dl'&&D)?D.d:dd.d,s:(m==='dl'&&S.start&&D)?S.start:(ls.length?dd.s:todayISO()),lines:ls};
+  renderCloseBox();
+}
+function closeDo(){
+  var c=CLOSEP; if(!c)return;
+  var dl=(c.on&&c.lines.length)?{d:c.d,lines:c.lines}:null;
+  if(c.m==='dl'){
+    if(dl){ S.dload={b:+S.blockId,d:dl.d,lines:dl.lines}; } else delete S.dload;
+    if(c.s)S.start=c.s;
+    S.tsel=null; CLOSEP=null; save(); renderAll(); return;
+  }
+  CLOSEP=null;
+  closeBlock(null,null,{noAsk:1,dload:dl,start:c.s||null});
+}
+function closeGo(g){
+  if(g.charAt(0)==='f'){ failGo(g.slice(1)); }
+  else if(g.charAt(0)==='s'){ S.tsel=g.slice(1); save(); renderToday(); }
+  var b=document.querySelector('#nav button[data-p=today]'); if(b)b.click();
+}
+function renderCloseBox(){
+  var el=$('closebox'); if(!el)return;
+  var h='', c=CLOSEP, rb=reopenable();
+  if(c){
+    var ck=c.m==='close'?closeChecks():[];
+    h+='<div class="card cbox"><h2>'+(c.m==='close'?'Clôturer le bloc '+S.blockId:'Deload avant le bloc '+S.blockId)+'</h2>';
+    if(c.m==='close'){
+      h+=ck.length?'<p class="note"><b>À compléter avant la clôture</b> (rien n\'est obligatoire) :</p>'+ck.map(function(x){
+          return '<div class="flag"><b>'+x.t+'</b> : '+x.d+'<div class="btnrow"><button class="act ghost mini" data-cgo="'+esc(x.go)+'">Compléter</button></div></div>';}).join('')
+        :'<p class="note">Rien ne manque : séances, forme du jour, réserves et décisions d\'échec sont notées.</p>';
+    }
+    h+='<label class="chk" style="margin-top:8px"><input type="checkbox" data-cl="on"'+(c.on?' checked':'')+(c.lines.length?'':' disabled')+'>'+
+      (c.m==='close'?'Commencer le bloc suivant par le deload':'Séance de deload avant la semaine 1')+'</label>';
+    if(!c.lines.length)h+='<p class="note">Aucun mouvement principal avec un top set noté dans le bloc : pas de deload proposé.</p>';
+    if(c.on&&c.lines.length){
+      h+='<div class="row" style="margin-top:6px"><div class="field md"><label>Deload, le</label><input type="date" data-cl="d" value="'+esc(c.d)+'"></div></div>'+
+        c.lines.map(function(q,n){ var L=S.lifts[+q.li]; return '<div class="row" style="margin-top:6px"><div class="field sm"><label>'+esc(L.name)+' '+(+q.sets||2)+' × '+(q.reps||5)+'</label>'+
+          '<input class="numin" data-cll="'+n+'" type="text" inputmode="decimal" value="'+F(q.load)+'" aria-label="lest du deload"></div>'+
+          '<p class="note" style="flex:1 1 60%;margin:auto 0 4px">'+esc(String(q.info||'').replace(/^deload entre deux blocs : /,''))+'</p></div>'; }).join('')+
+        '<p class="note">Une seule séance, mouvements principaux seulement ; les accessoires reprennent avec le bloc.</p>';
+    }
+    h+='<div class="row" style="margin-top:6px"><div class="field md"><label>'+(c.m==='close'?'Début du bloc suivant':'Début du bloc (semaine 1)')+'</label><input type="date" data-cl="s" value="'+esc(c.s||'')+'"></div></div>'+
+      (c.m==='close'?'<p class="note">Le bilan est archivé et reste consultable dans Données ; il se complète ensuite depuis le bilan. Le programme du bloc suivant reste modifiable. '+
+        '« Rouvrir le bloc '+S.blockId+' » reste possible tant que rien n\'est noté dans le nouveau bloc.</p>':'')+
+      '<div class="btnrow"><button class="act" data-cdo="1">'+(c.m==='close'?(ck.length?'Clôturer quand même':'Clôturer le bloc'):'Enregistrer')+'</button>'+
+      '<button class="act ghost" data-cno="1">Annuler</button></div></div>';
+  }else{
+    var D=S.dload&&+S.dload.b===+S.blockId?S.dload:null;
+    if(D)h+='<p class="note"><b>Deload</b> le '+frDate(D.d)+' : '+dlTxt(D)+' <button class="linkbtn" data-cdl="1">Modifier</button></p>';
+    else if(rb)h+='<p class="note"><button class="linkbtn" data-cdl="1">Ajouter une séance de deload</button> avant la semaine 1 (calculée sur le bloc '+rb.id+').</p>';
+    if(rb)h+='<p class="note">Bloc '+rb.id+' clôturé le '+frDate(rb.to)+'. Rien n\'est encore noté dans le bloc '+S.blockId+' : <button class="linkbtn" data-cro="1">Rouvrir le bloc '+rb.id+'</button></p>';
+  }
+  el.innerHTML=h;
+}
+$('closebox').addEventListener('click',function(ev){
+  var b=ev.target.closest?ev.target.closest('[data-cgo],[data-cdo],[data-cno],[data-cdl],[data-cro]'):null; if(!b)return;
+  if(b.dataset.cgo){ closeGo(b.dataset.cgo); return; }
+  if(b.dataset.cdo){ closeDo(); return; }
+  if(b.dataset.cno){ CLOSEP=null; renderCloseBox(); return; }
+  if(b.dataset.cdl){ closeOpen('dl'); return; }
+  if(b.dataset.cro){ reopenBlock(); }
+});
+$('closebox').addEventListener('change',function(ev){
+  var t=ev.target, c=CLOSEP; if(!c||!t||!t.dataset)return;
+  if(t.dataset.cl==='on'){ c.on=!!t.checked; if(c.m==='close'){ c.s=c.on?dlDates().s:todayISO(); } }
+  else if(t.dataset.cl==='d'){ c.d=t.value||c.d; }
+  else if(t.dataset.cl==='s'){ c.s=t.value||c.s; }
+  else if(t.dataset.cll!=null){ var q=c.lines[+t.dataset.cll], v=num(t.value,null); if(q&&v!=null&&v>=0)q.load=v; }
+  renderCloseBox();
+});
+/* Lot 59 (réponse 8) : bilan archivé complétable — séances faites, forme du jour, notes de séance, note de bloc. */
+var BEDIT=null;
+function blockEditHTML(b){
+  if(!b.plan)return '';
+  var op=BEDIT===+b.id, fd=b.formData||{}, dn=b.dayNotes||{};
+  var ss=b.plan.slice().sort(function(x,y){return sessOrd(x.w,x.d)-sessOrd(y.w,y.d);});
+  var a=' data-bid="'+b.id+'"';
+  return '<details class="bedit"'+(op?' open':'')+' data-bed="'+b.id+'"><summary class="note">Compléter ce bloc</summary>'+
+    '<div class="field w" style="margin-top:6px"><label>Note de bloc</label><textarea rows="2"'+a+' data-ben="note">'+esc(b.note||'')+'</textarea></div>'+
+    ss.map(function(q){ var k=q.w+'|'+q.d, f=fd[k]||{}, ka=a+' data-bk="'+esc(k)+'"';
+      return '<div class="row bedrow" style="margin-top:6px;align-items:flex-end"><div class="field sm"><label>'+(q.w<0?'Deload':'S'+(q.w+1)+' '+esc(q.d))+'</label>'+
+        '<label class="chk" style="margin:0"><input type="checkbox"'+ka+' data-ben="done"'+(q.done?' checked':'')+'>faite</label></div>'+
+        '<div class="field sm"><label>Forme</label><select'+ka+' data-ben="form"><option value="">—</option>'+[1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){
+          return '<option value="'+v+'"'+(f.gen===v?' selected':'')+'>'+F(v)+'</option>';}).join('')+'</select></div>'+
+        '<div class="field w" style="flex:1 1 55%"><label>Note de séance</label><input type="text"'+ka+' data-ben="dn" value="'+esc(dn[k]||'')+'"></div></div>';
+    }).join('')+'<p class="note">Enregistré à chaque changement ; l\'export Markdown du bloc en tient compte.</p></details>';
+}
+function blockEdit(t){
+  var b=(S.blocks||[]).filter(function(x){return +x.id===+t.dataset.bid;})[0]; if(!b)return;
+  var k=t.dataset.bk, f=t.dataset.ben; BEDIT=+b.id;
+  if(f==='note')b.note=t.value;
+  else if(f==='dn'){ b.dayNotes=b.dayNotes||{}; if(String(t.value).trim())b.dayNotes[k]=t.value; else delete b.dayNotes[k]; }
+  else if(f==='form'){ b.formData=b.formData||{}; var v=num(t.value,null);
+    if(v==null){ if(b.formData[k])delete b.formData[k].gen; } else { b.formData[k]=b.formData[k]||{}; b.formData[k].gen=v; if(!b.formData[k].d)b.formData[k].d=todayISO(); }
+    b.form=formStats(b.formData); }
+  else if(f==='done'){ (b.plan||[]).forEach(function(q){ if(q.w+'|'+q.d===k){ q.done=!!t.checked; if(q.done)delete q.skip; } });
+    b.doneN=(b.plan||[]).filter(function(q){return q.done;}).length; }
+  save(); renderBilan();
+}
 /* Lot 9 : `after` est appele apres la remise a zero et avant save(), pour le bac a sable
    (« cloturer puis appliquer ») ; `msg` remplace alors le texte du confirm, et on reste
    sur Programme au lieu de basculer sur Donnees — c'est le nouveau plan qu'on veut voir. */
-function closeBlock(after,msg){   /* W2 : aussi appelée depuis le panneau d'échec */
+function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} depuis le panneau de clôture */
   if(typeof after!=='function'){after=null;msg=null;}   /* lot 9 : #newblock passe l'Event en 1er argument */
-  if(!confirm(msg||'Cl\u00f4turer le bloc '+S.blockId+' ?\n\nLe bilan est archiv\u00e9 et reste consultable dans Donn\u00e9es. '+
+  opt=opt||{};
+  if(!opt.noAsk&&!confirm(msg||'Cl\u00f4turer le bloc '+S.blockId+' ?\n\nLe bilan est archiv\u00e9 et reste consultable dans Donn\u00e9es. '+
     'Vos s\u00e9ries restent dans l\'historique et dans l\'ajustement de courbe. Le plan repart vierge : s\u00e9ances marqu\u00e9es '+
     'faites et charges r\u00e9p\u00e9t\u00e9es apr\u00e8s \u00e9chec sont remises \u00e0 z\u00e9ro ; notes de s\u00e9ance, note de bloc, objectifs (jug\u00e9s \u00e0 la cl\u00f4ture) et rep\u00e8res de forme sont archiv\u00e9s avec le bilan.'))return;
+  var snap=blockSnap();   /* lot 59 : pour « Rouvrir » */
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
+  (S.blocks||[]).forEach(function(b){ delete b.undo; });
   S.blocks.push({id:S.blockId,from:S.start||null,to:todayISO(),sess:sess.length,doneN:nd,form:formStats(),
     tpl:S.lifts.map(function(L){var t=tplOf(L.prog.tpl); return L.name+' : '+(t?t.name:L.prog.tpl)+', +'+F(L.prog.inc)+' kg';}),
     stats:blockStats(S.start||null,todayISO()),
-    note:S.blockNote||'', dayNotes:JSON.parse(JSON.stringify(S.dayNotes||{})), formData:JSON.parse(JSON.stringify(S.form||{}))});
+    note:S.blockNote||'', dayNotes:JSON.parse(JSON.stringify(S.dayNotes||{})), formData:JSON.parse(JSON.stringify(S.form||{})),
+    dayTags:JSON.parse(JSON.stringify(S.dayTags||{})), undo:snap});   /* lot 59 */
   var bgA=goalArch(); if(bgA)S.blocks[S.blocks.length-1].goal=bgA;
   S.blocks[S.blocks.length-1].bx=bilanX(+S.blockId||1);
   S.blocks[S.blocks.length-1].plan=mdPlan();   /* lot 55 : séances faites ou non, lignes prévues, échauffement proposé */   /* lot 54 : records, run, suggestions figés */   /* lot 53 : objectifs jugés et archivés */
@@ -6893,17 +7171,18 @@ function closeBlock(after,msg){   /* W2 : aussi appelée depuis le panneau d'éc
   });
   var hbn=S.lifts.map(hBsNext);   /* lot 57 : l'état B continue au bloc suivant, on n'en sort que par le bouton */
   S.blockId=(+S.blockId||1)+1;
-  S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.blockGoal=''; S.form={};
+  S.done={}; S.dayNotes={}; S.tsel=null; S.blockNote=''; S.blockGoal=''; S.form={}; S.skip={}; S.dayTags={}; CLOSEP=null;
   S.lifts.forEach(function(L,i){L.prog.adj=[];L.prog.fl=[];L.prog.hdl=[];L.prog.hBs=hbn[i];delete L.prog.desc;delete L.prog.goal;});   /* lot 46 (R5) : desc */   /* B2, Q6 */
   draftPurge();   /* B7 : brouillons du bloc clôturé */
-  S.start=todayISO();
+  S.start=opt.start||todayISO();
+  if(opt.dload)S.dload={b:S.blockId,d:opt.dload.d,lines:opt.dload.lines}; else delete S.dload;   /* lot 59 */
   dq().view='bilan';
   if(after)after();   /* lot 9 */
   save(); renderAll();
   if(after)return;    /* lot 9 : on reste sur Programme */
   var b=document.querySelector('#nav button[data-p=data]'); if(b)b.click();
 }
-$('newblock').addEventListener('click',closeBlock);
+$('newblock').addEventListener('click',function(){ if(CLOSEP&&CLOSEP.m==='close')CLOSEP=null; else closeOpen('close'); renderCloseBox(); });   /* lot 59 */
 /* lot 55 : panneau d'export Markdown du bilan */
 $('bilan').addEventListener('click',function(ev){
   var t=ev.target, b=t&&t.closest?t.closest('[data-mdx],[data-mdc],[data-mdd],[data-mdr]'):null; if(!b)return;
@@ -6916,7 +7195,8 @@ $('bilan').addEventListener('click',function(ev){
   var ok=function(){ var o=b.textContent; b.textContent='Copié ('+txt.length+' caractères)'; setTimeout(function(){b.textContent=o;},1600); };
   try{ navigator.clipboard.writeText(txt).then(ok,fb); }catch(e){ fb(); }
 });
-$('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdon')){ S.mdOn=!!t.checked; save(); } });
+$('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdon')){ S.mdOn=!!t.checked; save(); }
+  if(t&&t.dataset&&t.dataset.ben)blockEdit(t); });   /* lot 59 */
 $('bilan').addEventListener('input',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdpr')){ S.mdPrompt=t.value; save(); } });
 
 /* bloc d'une serie : suffixe |bN de la cle ; sans suffixe, bloc 1 ; hors programme, par la date.
@@ -6932,7 +7212,7 @@ function blockStart(){
 function blockOfEntry(e){
   var m=/\|b(\d+)$/.exec(String(e.key||''));
   if(m)return +m[1];
-  if(/^[zhacxr]\|/.test(String(e.key||'')))return 1;   /* lot R1 : r */
+  if(/^[zhacxrd]\|/.test(String(e.key||'')))return 1;   /* lot R1 : r ; lot 59 : d */
   var d=e.date||'';
   for(var i=0;i<(S.blocks||[]).length;i++){ var b=S.blocks[i];
     if((!b.from||d>=b.from)&&(!b.to||d<=b.to))return +b.id; }
