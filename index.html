@@ -510,7 +510,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" id="cbw0">PdC courant</button></div>
     </div>
     <div class="row" style="margin-bottom:6px">
-      <div class="field w"><label for="cbase">1RM de base</label><select id="cbase"><option value="cur">1RM estimé du moment (comme Séance du jour)</option><option value="ref">1RM de référence (Origine du 1RM)</option></select></div>
+      <div class="field w"><label for="cbase">1RM de base</label><select id="cbase"><option value="cur">e1RM du bloc précédent (comme Séance du jour)</option><option value="ref">1RM de référence (Origine du 1RM)</option></select></div>
     </div>
     <p class="note" id="cbwnote" style="margin-top:0"></p>
     <p class="note" id="cbestnote" style="margin-top:0"></p>
@@ -560,7 +560,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <details><summary class="note">Comment c'est calculé</summary><p class="note">Le pourcentage porte sur la charge système
     (PdC de calcul + lest), la convention de Zlat et du générateur : l'outil ajoute le poids de corps
     lui-même et ne vous montre que le lest. « % » et « Lest » sont liés : modifiez l'un, l'autre suit.
-    La base par défaut est le « 1RM de base » choisi en haut de l'onglet (1RM estimé du moment, comme Séance du jour, ou 1RM de référence) ;
+    La base par défaut est le « 1RM de base » choisi en haut de l'onglet (e1RM du bloc précédent, comme Séance du jour, ou 1RM de référence) ;
     la colonne « reps prédites » est toujours calculée sur ce 1RM, même si vous changez la base.</p></details>
   </div>
 </section>
@@ -775,7 +775,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v62';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
+var APPV='v65';   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
 var DORDER=['J1','J2','J3','J4','Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
@@ -2945,7 +2945,7 @@ function chBw(){return CBW!=null?CBW:dayBw();}
 /* lot 60 (Q1) : base des % et du 1RM de l'onglet. 'cur' (defaut) = 1RM estime du moment, comme Seance du jour (rkRM) ;
    'ref' = 1RM de reference (Origine du 1RM). Sans serie notee, 'cur' retombe sur la reference. */
 function chBase(){ return S.cBase==='ref'?'ref':'cur'; }
-function chSt(L){ return (chBase()==='cur'&&L.main)?rkRM(S.lifts.indexOf(L)):null; }
+function chSt(L){ return (chBase()==='cur'&&L.main)?rkBase(S.lifts.indexOf(L)):null; }   /* lot 60 B */
 function chCur(L){ var st=chSt(L); return st?st.cur:null; }
 function chRM(L){ var c=chCur(L); return c?c.rm:rmOf(L); }
 function chSysRM(L){ return chRM(L)-eff(L)+bwZ(L); }
@@ -3057,9 +3057,9 @@ function renderHead0(){
   var L=cur(), st=chSt(L), c=st&&st.cur;
   if(c){   /* lot 60 (Q1) */
     var s=c.s, rf=rmOf(L);
-    $('rmhead').innerHTML='1RM estimé du moment <b>'+F(rnd(c.rm-eff(L),0.25))+' kg</b> de lest'+
+    $('rmhead').innerHTML='e1RM '+(st.tops?'des top sets ':'')+'du '+(st.prev?(st.cb?'bloc '+st.cb:'hors bloc'):'bloc en cours')+' <b>'+F(rnd(c.rm-eff(L),0.25))+' kg</b> de lest'+
       (L.useBw?', soit <b>'+F(rnd(chSysRM(L),0.25))+' kg</b> de charge système':'')+
-      ', comme les % de Séance du jour. Déduit '+(st.fb?'de la série la plus récente (aucune dans le bloc en cours)':'de la meilleure série du bloc en cours')+
+      ', base fixe des % de Séance du jour pendant le bloc '+st.bid+(st.prev?'':' (aucune série avant ce bloc : celles du bloc en cours)')+(st.tops?'. Meilleur top set':'. Meilleure série')+
       ' : '+loadLab(L,s.load)+' '+S.sep+' '+s.reps+(s.rir>0?' à '+F(s.rir)+' en réserve':' à l\'échec')+(s.date?', le '+frDate(s.date):'')+
       '. 1RM de référence : '+F(rnd(rf-eff(L),0.25))+' kg de lest ('+refOf(L).src+').';
     return;
@@ -4564,12 +4564,31 @@ function lineState(key,date){
 var PCTC={};
 function pctOf(x){   /* lot 60 : PdC = dayBw(), le meme que l'onglet Charges */
   var L=S.lifts[x.li]; if(!L||!L.main||isM(L)||x.load==null||x.role==='var'||x.vmod||x.tech)return null;
-  if(!(x.li in PCTC))PCTC[x.li]=rkRM(x.li);
+  if(!(x.li in PCTC))PCTC[x.li]=rkBase(x.li);   /* lot 60 B : e1RM du bloc précédent */
   var st=PCTC[x.li]; if(!st)return null;
   var bw=dayBw(), rm=st.cur.rm-eff(L,bw)+bwZ(L,bw), sy=bwZ(L,bw)+(+x.load||0);
   return rm>0?sy/rm*100:null;
 }
-function pctHTML(x){ var v=pctOf(x); return v==null?'':' <span class="pc" title="% du 1RM estimé du moment, charge système">'+Math.round(v)+' %</span>'; }
+/* Lot 61 (12/10, demande de Luka) : réserve attendue d'une série, d'après la même base que les % (rkBase : top sets du bloc
+   précédent) et le PdC (celui de la série notée, sinon du jour). Modèle de l'onglet Charges : reps à l'échec r = (rm/d-1)/k+1.
+   Série fraîche : la fatigue des séries suivantes n'est pas comptée. */
+function rirExp(x,n,bw){
+  var L=S.lifts[x.li]; if(!L||!L.main||isM(L)||x.load==null||x.role==='var'||x.vmod||x.tech||!(n>0))return null;
+  var st=rkBase(x.li); if(!st)return null;
+  if(bw==null)bw=dayBw();
+  var d=eff(L,bw)+(+x.load||0); if(d<=0)return null;
+  var r=(st.cur.rm/d-1)/L.k+1;
+  return {r:r,rir:r-n,n:n,st:st,bw:bw,lest:st.cur.rm-eff(L,bw)};
+}
+function rirExpHTML(x,e){
+  var tr=saisieOf(e), n=tr&&tr[0]!=null?tr[0]:repMax(x.reps), o=rirExp(x,n,e&&e.bw?e.bw:null); if(!o)return '';
+  var v=Math.round(o.rir*2)/2, L=S.lifts[x.li];
+  return '<p class="note" data-rirexp>Réserve attendue à '+n+' reps : '+(v>=0?'<b>≈ '+F(v)+'</b>':'<b>aucune</b>, le modèle prédit l\'échec avant')+
+    ' (le modèle prédit '+F(Math.round(o.r*10)/10)+' reps à l\'échec à cette charge, sur l\'e1RM '+(o.st.tops?'des top sets ':'')+
+    (o.st.prev?'du bloc '+o.st.cb:'du bloc en cours')+', '+F(rnd(o.lest,0.25))+' kg'+(L.useBw?' de lest au PdC de '+F(o.bw)+' kg':'')+')'+
+    (x.sets>1?'. Pour la 1re série ; les suivantes en gardent moins, la fatigue n\'est pas comptée.':'.')+'</p>';
+}
+function pctHTML(x){ var v=pctOf(x); return v==null?'':' <span class="pc" title="% de l\'e1RM des top sets du bloc précédent, charge système">'+Math.round(v)+' %</span>'; }
 function renderPlan(into,weeks,pfx,scope){
   PCTC={};
   pfx=pfx||'p'; scope=scope||'week';
@@ -5142,7 +5161,7 @@ function panelHTML(key){
   var trNow=saisieOf(e);
   var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return trNow&&trNow[q]!=null?trNow[q]:null;})
                       :[trNow&&trNow[0]!=null?trNow[0]:repDflt(x.reps)];   /* D2 */
-  var rirBlock='<div class="row" style="margin-top:10px"><div class="field w">'+
+  var rirBlock='<div class="row" style="margin-top:10px"><div class="field w">'+rirExpHTML(x,e)+   /* lot 61 */
     (x.sets>1?'<label class="chk"><input type="checkbox" data-rireach'+(each?' checked':'')+'>Réserve notée à chaque série</label>':'')+
     '<div data-rirlast'+(each?' style="display:none"':'')+'><label style="margin-top:6px">Réserve sur la dernière série</label>'+
       '<div class="pillrow" data-rirrow="last">'+rirPills(rirNow)+'</div></div>'+
@@ -6309,8 +6328,8 @@ function rkRMHTML(L,i){
     (st.top.rm>st.rec.rm+1e-9?'<p class="note">Meilleure estimation brute : '+F(rnd(st.top.rm-E0,0.25))+' kg ('+rkLab(L,st.top.s)+
       (st.top.date?', '+frDate(st.top.date):'')+'), à moins de 0,5 kg du record : bruit du modèle, pas un nouveau record.</p>':'')+
     '<p class="note">'+(st.fb
-      ? '<b>Rien de noté sur le bloc '+st.bid+'</b> : le 1RM du moment reprend la série la plus récente, '+
-        rkLab(L,st.cur.s)+(st.cur.date?' du '+frDate(st.cur.date):'')+'. Il ne dit donc pas où vous en êtes maintenant.'
+      ? '<b>Rien de noté sur le bloc '+st.bid+'</b> : le 1RM du moment reprend la meilleure série du '+(st.cb?'bloc '+st.cb:'hors bloc')+', '+
+        rkLab(L,st.cur.s)+(st.cur.date?' du '+frDate(st.cur.date):'')+'.'
       : '<b>Du moment</b> : '+rkLab(L,st.cur.s)+(st.cur.date?', du '+frDate(st.cur.date):'')+' — meilleure série du bloc '+st.bid+'.')+'</p>'+
     rkPlot(L,st)+
     '<p class="note">Un point par série à réserve connue, back-offs compris, relue avec le poids de corps du jour puis '+
@@ -6400,14 +6419,34 @@ function rkRM(li){
     return {s:s,e:s.e,date:s.date,rm:e1rm(L,s.load,s.reps,s.rir,s.bw)};
   });
   if(!pts.length)return null;
-  var rec=null, cur=null, top=null, bid=(+S.blockId||1);
+  var rec=null, cur=null, top=null, bid=(+S.blockId||1), best={};
   pts.forEach(function(p){
     if(!rec||p.rm>rec.rm+RKSEUIL)rec=p;
     if(!top||p.rm>top.rm+1e-9)top=p;
-    if(blockOfEntry(p.e)===bid&&(!cur||p.rm>cur.rm+1e-9))cur=p;
+    if(/^d\|/.test(String(p.e.key||'')))return;   /* lot 60 B : séance de deload, jamais la base du moment */
+    var b=blockOfEntry(p.e); if(!best[b]||p.rm>best[b].rm+1e-9)best[b]=p;
   });
-  var fb=!cur; if(!cur)cur=pts[pts.length-1];
-  return {pts:pts,rec:rec,cur:cur,top:top,fb:fb,bid:bid};
+  /* lot 60 B (remarque du 11/10, 21:26) : meilleure série du bloc en cours ; s'il n'en a pas encore, meilleure série du
+     bloc le plus récent qui en a (avant : la série la plus récente, 27,5 × 7 au lieu de 37,5 × 5) */
+  var cb=null; for(var b=bid;b>=0;b--){ if(best[b]){ cb=b; break; } }
+  if(cb!=null)cur=best[cb]; else { cur=pts[pts.length-1]; cb=blockOfEntry(cur.e); }
+  return {pts:pts,rec:rec,cur:cur,top:top,fb:cb!==bid,bid:bid,cb:cb};
+}
+/* lot 60 B (21:30) : base des % (Séance du jour, Charges, export du programme) = meilleur e1RM du bloc PRÉCÉDENT le plus
+   récent qui en a (« hors bloc » compris), fixe pendant tout le bloc en cours ; seulement si aucun bloc précédent n'a de
+   série : celle du bloc en cours. rkRM (Records, « 1RM du moment ») ne change pas. */
+function rkBase(li){
+  var st=rkRM(li); if(!st)return null;
+  var L=S.lifts[li], bid=st.bid, best={};
+  /* lot 60 C (12/10) : seuls les top sets comptent, quelle que soit la reserve ; un bloc sans top set garde toutes ses series */
+  var top={};
+  st.pts.forEach(function(p){ if(/^d\|/.test(String(p.e.key||'')))return; var b=blockOfEntry(p.e), t=roleGroup(p.e)==='top';
+    if(t&&!top[b]){ top[b]=1; delete best[b]; }
+    if(top[b]&&!t)return;
+    if(!best[b]||p.rm>best[b].rm+1e-9)best[b]=p; });
+  var cb=null; for(var b=bid-1;b>=0;b--){ if(best[b]){ cb=b; break; } }
+  if(cb==null){ cb=bid; if(!best[bid])return null; }
+  return {cur:best[cb],cb:cb,bid:bid,prev:cb<bid,tops:!!top[cb]};
 }
 function rkSig(s){ return s.e.key+'|'+s.st+'|'+s.reps+'|'+s.load+'|'+s.fd; }
 function rkVal(L,s,ms){
@@ -6815,7 +6854,7 @@ function pxData(){
   }); });
   var lifts=S.lifts.map(function(L,i){
     if(!L.prog||L.prog.tpl==='off'||ASGSKIP[i])return null;
-    var t=tplOf(L.prog.tpl), st=L.main?rkRM(i):null, r=[];
+    var t=tplOf(L.prog.tpl), st=L.main?rkBase(i):null, r=[];
     var tk=String(L.prog.tpl);
     Object.keys(BRLAB).forEach(function(k){ var v=L.prog[k]; if(k!=='tpl'&&k!=='pair'&&(v==null||v===''||(Array.isArray(v)&&!v.length)))return;
       if((tk!=='acc'&&/^acc/.test(k))||(tk==='acc'&&k!=='tpl'&&!/^acc/.test(k))||(tk!=='advpeak'&&k==='jumps')||(!HELMS[tk]&&/^(hStart|hMan|hdl|hinc)$/.test(k))||(!ROBIN[tk]&&/^rb/.test(k)))return;   /* réglages d'un autre type de gabarit */
@@ -6826,10 +6865,10 @@ function pxData(){
 }
 function pxMD(o,titre){
   var t=['# '+titre,'','Exporté le '+frDate(todayISO())+'. Bloc '+o.bid+(o.start?', départ le '+frDate(o.start):'')+', '+o.nwk+' semaines, jours '+String(o.jours).split(',').join(' / ')+
-    '. PdC de calcul '+F(o.bw)+' kg. Les % portent sur le 1RM estimé du moment, en charge système, comme en Séance du jour.','','## Réglages des mouvements',''];
+    '. PdC de calcul '+F(o.bw)+' kg. Les % portent sur l\'e1RM des top sets du bloc précédent, fixe pendant le bloc, en charge système, comme en Séance du jour.','','## Réglages des mouvements',''];
   o.lifts.forEach(function(L){
     t.push('### '+L.n+(L.main?'':' (secondaire)'),'');
-    if(L.main)t.push('- 1RM de référence : '+F(L.ref)+' kg'+(L.useBw?' de lest':'')+(L.cur!=null?' ; 1RM estimé du moment : '+F(L.cur)+' kg'+(L.useBw?' de lest':''):''));
+    if(L.main)t.push('- 1RM de référence : '+F(L.ref)+' kg'+(L.useBw?' de lest':'')+(L.cur!=null?' ; e1RM du bloc précédent : '+F(L.cur)+' kg'+(L.useBw?' de lest':''):''));
     L.r.forEach(function(q){ t.push('- '+q[0]+' : '+q[1]); }); t.push('');
   });
   t.push('## Plan','');
