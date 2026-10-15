@@ -63,6 +63,7 @@ th:first-child,td:first-child{text-align:left}
 .serie ul.ko{background:var(--ko-bg);border:2px solid var(--ko);color:#000}
 .video h3 .heure{display:inline-block;background:#000;color:#fff;border-radius:6px;padding:.05rem .45rem;margin-right:.35rem;font-size:1.2rem}
 #echange{display:none;border:3px solid var(--av);background:var(--av-bg);color:#000}
+#nechmsg{border:2px solid var(--av);background:var(--av-bg);color:#000;padding:.5rem .75rem;margin:.5rem 0;font-weight:600}   /* lot 74 B */
 #echange .paire{display:grid;gap:.5rem;border-top:2px solid var(--av);padding-top:.6rem}
 #res{display:none}
 #bilan td,#bilan th{font-size:1rem}
@@ -77,6 +78,9 @@ th:first-child,td:first-child{text-align:left}
 <input type="file" id="fichiers" multiple accept="video/mp4,video/*" aria-label="Vidéos de la séance">
 <p class="petit">Choisissez toutes les vidéos de la séance d'un coup (appui long sur la première, puis touchez les autres). Les vidéos d'origine (VID_…), pas des copies envoyées par une messagerie.</p>
 <p class="petit"><b>Les lignes ci-dessous sont rangées par heure de prise de vue</b> (la plus ancienne en haut), quel que soit l'ordre dans lequel vous avez touché les vidéos. Vérifiez l'heure avant de taper chaque légende.</p>
+<label id="nechl" style="display:grid;gap:.25rem;margin:.75rem 0 .25rem;font-weight:600">Échauffements filmés avant le top set<select id="nech"><option value="0">Aucun</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+<p class="petit">Les premières vidéos (par heure) passent alors en « Échauffement », la suivante en « Top set », les autres en « Back-off ». Une vidéo d'échauffement est rangée à part dans Vitesse et n'est jamais rattachée à une série de travail. Tapez son lest (0 au poids du corps) et ses reps. Laissez la variante sur « Aucune » pour qu'elle compte dans la droite charge-vitesse.</p>
+<p id="nechmsg" role="status" hidden></p>
 <div id="liste" style="display:grid;gap:.75rem"></div></section>
 
 <section class="carte" id="formulaire"><h2>2. La séance (une seule fois)</h2>
@@ -4297,7 +4301,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot R3","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"lot 74b","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4334,7 +4338,7 @@ function ligneVideo(f, i) {
   const g = el('div', { class: 'trois' });
   const lt = el('label', {}, 'Type'); const s = el('select', { id: 'v' + i + '-type_serie' });
   for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
-  s.value = $('typeseance').value === 'secondaire' ? 'secondaire' : (i === 0 ? 'top set' : 'back-off'); lt.appendChild(s); g.appendChild(lt);
+  s.value = S40.typeLigne(i, +$('nech').value || 0, $('typeseance').value === 'secondaire'); /* lot 74 B */ lt.appendChild(s); g.appendChild(lt);
   const ll = el('label', {}, 'Lest (kg)'); ll.appendChild(el('input', { id: 'v' + i + '-lest_kg', inputmode: 'decimal', autocomplete: 'off', placeholder: '25' })); g.appendChild(ll);
   const lr = el('label', {}, 'Reps ann.'); lr.appendChild(el('input', { id: 'v' + i + '-reps_annoncees', inputmode: 'numeric', autocomplete: 'off', placeholder: '7' })); g.appendChild(lr);
   d.appendChild(g);
@@ -4346,7 +4350,7 @@ function ligneVideo(f, i) {
 
 $('typeseance').addEventListener('change', () => {
   const sec = $('typeseance').value === 'secondaire';
-  fichiers.forEach((f, i) => { $('v' + i + '-type_serie').value = sec ? 'secondaire' : (i === 0 ? 'top set' : 'back-off'); });
+  fichiers.forEach((f, i) => { $('v' + i + '-type_serie').value = S40.typeLigne(i, +$('nech').value || 0, sec); });   // lot 74 B
 });
 document.addEventListener('visibilitychange', () => { if (enCours && document.hidden) masquee++; });
 $('fichiers').addEventListener('change', (e) => {
@@ -4642,18 +4646,46 @@ function afficher(vs, sortie) {
   }
   const virg = function (v) { return v === null || v === undefined || v === "" ? "" : String(v).replace(".", ","); };
   // ce qu'il faut mettre dans les champs : commun (une fois) et une ligne par video (null = video en trop)
-  function preRemplissage(seance, nb) {
+  // lot 74 B : type proposé pour la ligne i quand les nEch premières vidéos sont des échauffements
+  function typeLigne(i, nEch, sec) {
+    nEch = nEch || 0;
+    if (i < nEch) return "echauffement";
+    return sec ? "secondaire" : (i === nEch ? "top set" : "back-off");
+  }
+  // lot 74 B : alertes sur les types, d'après les lignes ({ type, lest } ; lest = nombre ou null), nEch et l'écart
+  // vidéos − séries de l'app (null sans séance de l'app). Numéros de vidéo comptés à partir de 1.
+  function alertesEch(lignes, nEch, ecart) {
+    const out = [], num = function (v) { return v === null || v === undefined || v === "" || isNaN(+v) ? null : +v; };
+    const kg = function (v) { return String(v).replace(".", ",") + " kg"; };
+    if (!nEch && ecart > 0) out.push("Il y a " + ecart + " vidéo" + (ecart > 1 ? "s" : "") + " de plus que de séries de travail dans l'app. " +
+      "Si ce sont des échauffements filmés avant le top set, choisissez " + ecart + " dans « Échauffements filmés avant le top set » : sinon ils seront pris pour vos séries de travail.");
+    const iTop = lignes.findIndex(function (l) { return l.type === "top set"; });
+    if (iTop >= 0) {
+      for (let j = 0; j < iTop; j++) if (lignes[j].type === "back-off")
+        out.push("Vidéo " + (j + 1) + " : typée Back-off, mais filmée avant le top set. Si c'est un échauffement, changez son type ou le réglage ci-dessus.");
+      const lt = num(lignes[iTop].lest);
+      if (lt !== null) {
+        let jMax = -1;
+        lignes.forEach(function (l, j) { const x = num(l.lest); if (j !== iTop && (l.type === "back-off" || l.type === "top set") && x !== null && x > lt && (jMax < 0 || x > num(lignes[jMax].lest))) jMax = j; });
+        if (jMax >= 0) out.push("Vidéo " + (iTop + 1) + " : typée Top set, mais plus légère (" + kg(lt) + ") que la vidéo " + (jMax + 1) + " (" + kg(num(lignes[jMax].lest)) + "). Est-ce un échauffement ?");
+      }
+    }
+    return out;
+  }
+  function preRemplissage(seance, nb, nEch) {
+    nEch = nEch || 0;   // lot 74 B : les nEch premières vidéos sont des échauffements, hors séries de l'app
     const commun = { pdc: virg(seance.pdc), semaine: String(seance.semaine || ""), seance: String(seance.seance || ""),
       typeseance: seance.type === "secondaire" ? "secondaire" : "principale" };
     const vs = seance.series.map(function (s) { return VARIANTES.indexOf(s.variante || "") >= 0 ? (s.variante || "") : ""; });
     commun.variseance = vs.length && vs.every(function (v) { return v === vs[0]; }) ? vs[0] : "";
     const lignes = [];
     for (let i = 0; i < nb; i++) {
-      const s = seance.series[i];
+      if (i < nEch) { lignes.push({ type_serie: "echauffement", lest_kg: "", reps_annoncees: "", variante: commun.variseance }); continue; }   // lot 74 B
+      const s = seance.series[i - nEch];
       lignes.push(s ? { type_serie: TYPES.indexOf(s.type) >= 0 ? s.type : "", lest_kg: virg(s.lest),
         reps_annoncees: s.reps === null || s.reps === undefined ? "" : String(s.reps), variante: vs[i] } : null);
     }
-    return { commun: commun, lignes: lignes, ecart: nb - seance.series.length };
+    return { commun: commun, lignes: lignes, ecart: nb - nEch - seance.series.length };
   }
   // Q7 : la ligne i (back-off ou secondaire) vient d'etre tapee : les lignes suivantes du meme type que
   // l'utilisateur n'a pas tapees lui-meme prennent la meme valeur. tapees[j] = vrai si la ligne j a ete tapee.
@@ -4674,7 +4706,7 @@ function afficher(vs, sortie) {
     if (pr && pr.ecart < 0) t += " ; " + (-pr.ecart) + " série" + (-pr.ecart > 1 ? "s" : "") + " sans vidéo, ignorée" + (-pr.ecart > 1 ? "s" : "");
     return t + ". Vérifiez chaque ligne avant d'analyser.";
   }
-  globalThis.S40 = { CLE: CLE, lireResume: lireResume, seanceA: seanceA, preRemplissage: preRemplissage, aRecopier: aRecopier, message: message };
+  globalThis.S40 = { CLE: CLE, lireResume: lireResume, seanceA: seanceA, preRemplissage: preRemplissage, aRecopier: aRecopier, message: message, typeLigne: typeLigne, alertesEch: alertesEch };
   if (typeof document === "undefined" || !document.getElementById("liste")) return;
 
   // ---- branchement sur la page ----
@@ -4683,7 +4715,8 @@ function afficher(vs, sortie) {
   const nbLignes = function () { return document.querySelectorAll("#liste .video").length; };
   function remplir() {
     let r = null; try { r = lireResume(localStorage.getItem(CLE)); } catch (e) { r = null; }
-    const date = $("date").value, s = seanceA(r, date), pr = s ? preRemplissage(s, nbLignes()) : null;
+    const date = $("date").value, s = seanceA(r, date), pr = s ? preRemplissage(s, nbLignes(), +$("nech").value || 0) : null;
+    dernier = pr;   // lot 74 B
     if (pr) {
       for (const k of ["pdc", "semaine", "seance", "typeseance", "variseance"]) if (!tapes[k]) $(k).value = pr.commun[k];
       pr.lignes.forEach(function (l, i) {
@@ -4692,6 +4725,7 @@ function afficher(vs, sortie) {
       });
     }
     $("prevu").textContent = nbLignes() ? message(r, date, s, pr) : "";
+    majAlertes();   // lot 74 B
   }
   document.addEventListener("input", function (e) {
     const t = e.target; if (!t || !t.id) return;
@@ -4709,6 +4743,21 @@ function afficher(vs, sortie) {
     remplir();
   });
   $("date").addEventListener("change", remplir);
+  // lot 74 B : réglage des échauffements et alertes
+  let dernier = null;
+  function majAlertes() {
+    const n = nbLignes(), l = [];
+    for (let j = 0; j < n; j++) l.push({ type: $("v" + j + "-type_serie").value, lest: String($("v" + j + "-lest_kg").value || "").replace(",", ".").trim() });
+    const a = n ? alertesEch(l, +$("nech").value || 0, dernier ? dernier.ecart : null) : [], m = $("nechmsg");
+    m.textContent = a.join(" "); m.hidden = !a.length;
+  }
+  $("nech").addEventListener("change", function () {
+    const sec = $("typeseance").value === "secondaire";
+    for (let j = 0; j < nbLignes(); j++) { const id = "v" + j + "-type_serie"; delete tapes[id]; $(id).value = typeLigne(j, +$("nech").value || 0, sec); }
+    remplir();
+  });
+  document.addEventListener("input", majAlertes);
+  document.addEventListener("change", majAlertes);
 })();
 // <<< BLOC SEANCE40 - FIN >>>
 </script>
