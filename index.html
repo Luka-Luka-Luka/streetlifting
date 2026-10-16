@@ -315,6 +315,8 @@ details.failfold>summary{cursor:pointer}
 .pill{font:600 13px/1 var(--num);min-width:38px;padding:8px 7px;border:1px solid var(--rule);border-radius:var(--r);
   background:var(--surface);color:var(--ink);cursor:pointer;text-align:center}
 .pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.fq{display:grid;gap:12px;margin-top:6px}.fq fieldset{border:0;padding:0;margin:0;min-width:0}.fq legend{font:600 13px/1.35 var(--txt);padding:0;margin-bottom:2px}   /* lot 83 */
+.fq .pill{min-width:0;font-size:12.5px;padding:7px 9px}.fq textarea{width:100%}
 /* lot 75 : Charges simplifié */
 .chi{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;border-radius:50%;
   border:1px solid var(--rule);background:transparent;color:var(--muted);font:600 13px/1 var(--txt);cursor:pointer;vertical-align:middle;padding:0}
@@ -356,6 +358,34 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 .logrow{display:grid;grid-template-columns:58px 1fr auto;gap:8px;align-items:start;
   padding:6px 0;border-bottom:1px solid var(--rule);font-size:13px}
 .logrow:last-child{border-bottom:0}
+/* lot 77 : une ligne par série, le reste au toucher */
+.logrow{cursor:pointer}
+.logrow:not(.lgopen) .lgmore{display:none}
+/* lot 80 : à compléter, saisie douteuse */
+.lrn{font:500 11.5px/1.2 var(--txt);color:var(--muted);white-space:nowrap}   /* lot 81 */
+.acomp,.dout{font:600 12px/1.2 var(--txt);color:var(--warn);white-space:nowrap}
+.line.acp .nm::after{content:" · à compléter";font:600 11.5px/1 var(--txt);color:var(--warn)}
+.line.dbt .nm::after{content:" · douteuse";font:600 11.5px/1 var(--txt);color:var(--warn)}
+.logrow .lgchev{color:var(--muted);font-size:12px;margin-left:4px}
+#dtabs .pill[data-dvg]{flex:1 0 auto}
+/* lot 78 : Programme en deux vues, menu ⚙ */
+.pseg{display:flex;gap:6px;margin:0 0 10px}
+.pseg .pill{flex:1 1 0;padding:11px 8px;font-family:var(--txt)}
+#p-prog[data-pv="bloc"] #cardsim{display:none}
+#p-prog[data-pv="sim"] > :not(#pseg):not(#cardsim){display:none}
+#assign .tagname[data-fold]{flex-wrap:wrap;column-gap:4px}
+.liftcard .asgsum{display:block;flex:1 1 100%;padding-left:32px;font:400 12.5px/1.35 var(--txt);letter-spacing:0;color:var(--muted);margin-top:3px}
+.liftcard .asgmod{display:none;font:600 12px/1 var(--txt);letter-spacing:0;color:var(--ink);text-decoration:underline;margin-left:auto}
+.liftcard.folded .asgmod{display:inline}
+.oulist{list-style:none;margin:0;padding:0}
+.oulist li{padding:7px 0;border-bottom:1px solid var(--rule);font:400 13.5px/1.45 var(--txt)}
+.oulist li:last-child{border-bottom:0}
+.brcmp{margin:6px 0 0;padding-left:18px}
+.appmenu{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.appmenu[hidden]{display:none}
+.appmenu .note{margin:0;flex:1 1 100%}
+@media (max-width:400px){ .hrow{gap:5px} h1.logo img{height:40px} .iconbtn.hlab{padding:0 6px} #appmen{width:30px} }   /* lot 78 : ⚙ tient à 360 px */
+@media (max-width:340px){ .hrow{flex-wrap:wrap;row-gap:6px} }   /* lot 78 : à 320 px, les boutons passent dessous */
 .logrow .d{font:500 12px/1.3 var(--num);color:var(--muted)}
 .logrow .t{font:400 12.5px/1.4 var(--txt)}
 .logrow .t b{font-weight:600}
@@ -513,6 +543,12 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div class="field sm" id="bwedit" style="display:none;flex:0 0 84px"><label for="bw">PdC, correction</label><input id="bw" class="numin" type="text" inputmode="decimal" value="86"></div>
     <button class="iconbtn hlab" id="reorg" title="Réorganiser cet onglet" aria-label="Réorganiser cet onglet">⇅ Ranger</button>
     <button class="iconbtn hlab" id="foldall" title="Tout replier" aria-label="Tout replier">▾ Replier</button>
+    <button type="button" class="iconbtn sq" id="appmen" title="Palette et thème" aria-label="Palette et thème" aria-expanded="false">⚙</button>
+  </div>
+  <div class="appmenu" id="appmenu" hidden>   <!-- lot 78 (P4) : réglages de l'app, sortis de Réglages du bloc -->
+    <p class="note">Réglages de l'app</p>
+    <button type="button" class="act ghost" id="pal" title="Palette" aria-label="Palette">🎨</button>
+    <button type="button" class="act ghost" id="theme" title="Thème" aria-label="Thème">☀️</button>
   </div>
 </header>
 
@@ -567,7 +603,11 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 </section>
 
 <!-- ======================= PROGRAMME ======================= -->
-<section class="page" id="p-prog">
+<section class="page" id="p-prog" data-pv="bloc">
+  <div class="pseg" id="pseg" role="group" aria-label="Afficher">   <!-- lot 78 (P1) -->
+    <button type="button" class="pill" data-pv="bloc">Bloc en cours</button>
+    <button type="button" class="pill" data-pv="sim">Simuler</button>
+  </div>
   <div class="card" id="cardassign">
     <h2>Réglages du bloc <em>gabarits, génération</em></h2>
     <div class="field w" id="bgoalf" style="margin-bottom:10px"><label for="bgoal">Objectif du bloc — en clair, archivé à la clôture</label><textarea id="bgoal" rows="3" placeholder="ex. 5 reps propres à +40 kg aux tractions, tenir les 3 séances par semaine"></textarea></div>
@@ -579,10 +619,8 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
         <select id="verbo"><option value="norm">repliés</option><option value="full">dépliés</option><option value="min">écarts seulement</option></select></div>
       <div class="field sm"><label for="sep">Séparateur</label>
         <select id="sep"><option value="×">×</option><option value="*" selected>*</option></select></div>
-    </div>
-    <div class="row" style="margin-top:8px">   <!-- lot 65 (Q14) : venus de l'en-tête -->
-      <div class="field md"><label for="pal">Palette</label><button type="button" class="act ghost" id="pal" title="Palette" aria-label="Palette">🎨</button></div>
-      <div class="field md"><label for="theme">Thème</label><button type="button" class="act ghost" id="theme" title="Thème" aria-label="Thème">☀️</button></div>
+      <div class="field md"><label for="rirexpm">Réserve attendue</label>   <!-- lot 79 (A6) -->
+        <select id="rirexpm"><option value="">cachée jusqu'à ma saisie</option><option value="1">affichée avant la série</option></select></div>
     </div>
     <div class="field w" style="margin-top:8px"><label>Jours — 3 ou 4 cases, et le jour de la 1re séance (J1)</label><div id="jours" class="daypick"></div><div id="joursnote"></div></div>
     <div class="btnrow">
@@ -600,12 +638,12 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <div id="out"></div>
   </div>
   <div class="card" id="cardind">
-    <h2>Suivi des main lifts <em>sur le bloc généré</em></h2>
+    <h2>Où en est le bloc <em>main lifts</em></h2>
     <div id="indout"></div>
   </div>
-  <div class="card" id="cardsim">
-    <h2>Bac à sable <em>brouillon du programme</em></h2>
-    <p class="note" style="margin-top:0">Un <b>brouillon</b> de votre programme, calculé par le même code que « Réglages du bloc »
+  <div class="card" id="cardsim" data-chk="sim">
+    <h2>Bac à sable <em>brouillon du programme</em><button type="button" class="chi" data-chinfo="sim" aria-label="Explications" aria-pressed="false">i</button></h2>
+    <p class="note chex" style="margin-top:0">Un <b>brouillon</b> de votre programme, calculé par le même code que « Réglages du bloc »
       ci-dessus. Il reste sur ce téléphone, même après fermeture, mais à part : il ne change jamais votre programme, votre
       journal ni vos réglages, et il n'est pas dans la sauvegarde : pour le garder, exportez-le (boutons en bas). Il sert à comparer.</p>
     <div class="row">
@@ -618,8 +656,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="field w"><label class="chk"><input type="checkbox" id="brsec">Inclure les mouvements secondaires</label></div>
     </div>
     <div class="row" id="brrm" style="margin-top:8px"></div>
-    <p class="note">Vides, le PdC et les 1RM d'essai valent vos vraies valeurs (PdC courant, référence de Charges).</p>
+    <p class="note chex">Vides, le PdC et les 1RM d'essai valent vos vraies valeurs (PdC courant, référence de Charges).</p>
+    <details class="chd" data-chd="brmod"><summary id="brmodsum">Mouvements du brouillon</summary>   <!-- lot 78 (P3) -->
     <div id="brassign"></div>
+    </details>
     <div class="btnrow">
       <button class="act" id="simrun">Recalculer</button>
       <button class="act ghost" id="simreset">Repartir de mes valeurs</button>
@@ -728,15 +768,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <div class="card" id="cardview">
     <h2>Données <em>une chose à la fois</em></h2>
     <div class="dtabs" id="dtabs" role="group" aria-label="Afficher">   <!-- lot 65 (Q16) -->
-      <button type="button" class="pill" data-dvb="series">Séries</button>
-      <button type="button" class="pill" data-dvb="suivi">Bloc en cours</button>
-      <button type="button" class="pill" data-dvb="bilan">Bilan</button>
-      <button type="button" class="pill" data-dvb="records">Records</button>
-      <button type="button" class="pill" data-dvb="prog">Progression</button>
-      <button type="button" class="pill" data-dvb="courbe">Courbe</button>
-      <button type="button" class="pill" data-dvb="pesees">Pesées</button>
-      <button type="button" class="pill" data-dvb="saisie">Ajouter</button>
-      <button type="button" class="pill" data-dvb="tout">Tout</button>
+      <button type="button" class="pill" data-dvg="seances">Séances</button>
+      <button type="button" class="pill" data-dvg="progres">Progrès</button>
+      <button type="button" class="pill" data-dvg="bilan">Bilan</button>
+      <button type="button" class="pill" data-dvg="pesees">Pesées</button>
     </div>
     <div class="row" style="display:none"><div class="field w"><label for="dview">Afficher</label>
       <select id="dview">
@@ -762,14 +797,14 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div id="bilan"></div>
   </div>
 
-  <div class="card" data-dv="records">
-    <h2>Records <em>par reps, 1RM estimé, formats, forme</em></h2>
+  <div class="card" data-dv="records" data-chk="drec">
+    <h2>Records <em>par reps, 1RM estimé, formats, forme</em><button type="button" class="chi" data-chinfo="drec" aria-label="Explications" aria-pressed="false">i</button></h2>
     <div class="row">
       <div class="field md"><label for="rlift">Mouvement</label><select id="rlift"></select></div>
       <div class="field md"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="rtop">par reps : top sets et maxima seulement</label></div>
     </div>
     <div id="recs"></div>
-    <p class="note">Charge système = poids de corps <b>brut</b> + lest ; « ≈ » : poids de corps estimé. <b>Par nombre de
+    <p class="note chex">Charge système = poids de corps <b>brut</b> + lest ; « ≈ » : poids de corps estimé. <b>Par nombre de
     reps</b> : une série de 6 compte aussi à 5, 4, 3… ; deux records par case, en système et en lest. Forme de chaque
     série : <b>C</b> clean, <b>T</b> training (par défaut), <b>trichée</b> (une rep trichée : record de degré inférieur,
     le meilleur non triché s'affiche à côté) ; à valeur égale, la meilleure forme puis la première date l'emportent.
@@ -779,10 +814,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     battu un record.</p>
   </div>
 
-  <div class="card" data-dv="prog">
-    <h2>Progression <em>e1RM des top sets, fatigue des back-offs</em></h2>
+  <div class="card" data-dv="prog" data-chk="dprog">
+    <h2>Progression <em>e1RM des top sets, fatigue des back-offs</em><button type="button" class="chi" data-chinfo="dprog" aria-label="Explications" aria-pressed="false">i</button></h2>
     <div id="prog"></div>
-    <p class="note"><b>e1RM</b> : 1RM estimé de chaque top set par le modèle de l'outil (reps faites + réserve notée), en charge
+    <p class="note chex"><b>e1RM</b> : 1RM estimé de chaque top set par le modèle de l'outil (reps faites + réserve notée), en charge
     système (PdC + lest). C'est lui qui dit si la force a monté : une charge qui monte pendant que la réserve baisse peut
     laisser l'e1RM à plat. <b>Écart</b> : par rapport au top set précédent du même jour (J1 contre J1, J3 contre J3), dont la date est entre
     parenthèses. Un top set sans réserve notée n'a pas d'e1RM. Un top set raté non plus : sa croix ✕ marque l'e1RM qu'il
@@ -798,8 +833,8 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <div class="btnrow"><button class="act ghost" id="applyfit">Appliquer les coefficients ajustés</button></div>
   </div>
 
-  <div class="card" data-dv="saisie">
-    <h2>Performance hors programme</h2>
+  <div class="card" data-dv="saisie" data-chk="dsai">
+    <h2>Performance hors programme<button type="button" class="chi" data-chinfo="dsai" aria-label="Explications" aria-pressed="false">i</button></h2>
     <div class="row">
       <div class="field md"><label for="ldate">Date</label><input id="ldate" type="date"></div>
       <div class="field md"><label for="llift">Mouvement</label><select id="llift"></select></div>
@@ -820,7 +855,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="field w"><label for="lnote">Note</label><input id="lnote" type="text" placeholder="exécution, vidéo, contexte"></div>
     </div>
     <div class="btnrow"><button class="act" id="addlog">Enregistrer</button></div>
-    <p class="note">Pour un max improvisé ou une performance ancienne. Les séries du programme s'enregistrent depuis
+    <p class="note chex">Pour un max improvisé ou une performance ancienne. Les séries du programme s'enregistrent depuis
     l'onglet Séance du jour. <b>Réserve inconnue</b> exclut la série de l'ajustement de la courbe : mieux vaut ça qu'un chiffre inventé.</p>
   </div>
 
@@ -831,6 +866,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 
   <div class="card" data-dv="series">
     <h2>Séries <em id="logcount"></em></h2>
+    <details class="chd" data-chd="dfilt"><summary id="dfiltsum">Filtres</summary>
     <div class="row">
       <div class="field md"><label for="dlift">Mouvement</label><select id="dlift"></select></div>
       <div class="field md"><label for="drole">Type</label><select id="drole">
@@ -845,21 +881,22 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     </div>
     <div id="dper" class="per" data-per="d"></div>
     <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="dexp">Exporter ce qui est affiché (CSV)</button></div>
+    </details>
     <div id="dsum"></div>
     <div id="loglist"></div>
   </div>
 
-  <div class="card" data-dv="pesees">
-    <h2>Pesées <em id="pescount">tous les PdC connus</em></h2>
+  <div class="card" data-dv="pesees" data-chk="dpes">
+    <h2>Pesées <em id="pescount">tous les PdC connus</em><button type="button" class="chi" data-chinfo="dpes" aria-label="Explications" aria-pressed="false">i</button></h2>
     <div id="pper" class="per" data-per="p"></div>
     <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="pexp">Exporter ce qui est affiché (CSV)</button></div>
     <div id="peslist"></div>
-    <p class="note">Sources : le PdC du jour tapé en séance, celui enregistré avec chaque série, celui des analyses vidéo importées, et le PdC de fin de séance.
+    <p class="note chex">Sources : le PdC du jour tapé en séance, celui enregistré avec chaque série, celui des analyses vidéo importées, et le PdC de fin de séance.
     Les trois premiers sont des pesées : l'outil en fait la moyenne du jour pour ses calculs, et la plus récente devient le PdC courant. Le PdC de fin de séance est seulement noté.</p>
   </div>
 
-  <div class="card">
-    <h2>Sauvegarde</h2>
+  <div class="card" id="cardsauve">
+    <h2>Sauvegarde <em id="bksum"></em></h2>
     <div class="btnrow">
       <button class="act ghost" id="exportj">Exporter en JSON</button>
       <button class="act ghost" id="exportc">Exporter en CSV</button>
@@ -958,7 +995,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v80';   /* lot 74 */
+var APPV='v87';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1059,6 +1096,10 @@ function load(){
     if(!S.rappels)S.rappels=[];
     if(S.rapB0==null){ var rb0=+S.blockId||1; S.rapB0=(S.log||[]).some(function(e){return inBlock(e.key);})?rb0:rb0-1; }   /* lot 74 : rappels dès le bloc en cours s'il n'a encore rien d'enregistré, sinon à partir du suivant */
     if(!S.rapFait)S.rapFait={};
+    if(!S.m83){ var lb83=(S.blocks||[])[(S.blocks||[]).length-1]; if(lb83&&!lb83.fq){ if(!S.cui||typeof S.cui!=='object')S.cui={}; if(!S.cui.open)S.cui.open={}; S.cui.open['fq'+lb83.id]=1; } S.m83=1; }   /* lot 83 : questionnaire du dernier bloc clos ouvert */
+    if(!S.m81){ (S.blocks||[]).forEach(function(b){ if(+b.id===1&&b.learn==null)b.learn=1; }); S.m81=1; }   /* lot 81 (A9) : le bloc 1 */
+    if(!S.m78){ if(!S.fold)S.fold={}; (S.lifts||[]).forEach(function(L){ S.fold['a:'+L.name]=1; }); S.m78=1; }   /* lot 78 (P2) : mouvements repliés sur leur résumé */
+    if(!S.m77){ if(!S.fold)S.fold={}; S.fold['c:cardsauve']=1; S.m77=1; }   /* lot 77 : Sauvegarde repliée au premier passage */
     if(!S.veloJuge)S.veloJuge={};
     if(!S.extra)S.extra={};
     if(S.showAcc===undefined)S.showAcc=true;
@@ -1166,7 +1207,7 @@ var REFSTAMP=0, REFC={};
 function lastExploitable(L,best,bid){   /* D3 : bid = ne garder que les s\u00e9ries de ce bloc */
   var i=S.lifts.indexOf(L); if(isM(L))return null;   /* lot 46 */
   var es=S.log.filter(function(e){
-    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&
+    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&!e.doubt&&   /* lot 80 (A8) */
            e.sets&&e.sets.length&&e.sets[e.sets.length-1]&&
            (bid==null||blockOfEntry(e)===bid);
   });
@@ -1457,15 +1498,39 @@ function dcomApply(key,q,v){
   if(d){ if(q<0)d.note=v; else { if(!d.setNotes)d.setNotes=[]; d.setNotes[q]=v; } draftWrite(); }
   DCOM=null; save(); renderData(); return true;
 }
+var LGOPEN={};   /* lot 77 : lignes de Séries ouvertes (le temps de la session) */
+/* lot 80 (A10) : série d'un main lift du bloc en cours, faite, sans réserve notée ni « ? » : à compléter (rien n'est bloqué) */
+function aComp(e){
+  var L=e&&S.lifts[e.li];
+  return !!(L&&L.main&&!isM(L)&&['top','back','amrap','pr'].indexOf(e.role)>=0&&e.state!=='skip'&&!e.doubt&&!e.rirq&&e.rir==null&&
+    !(e.rirs&&e.rirs.some(function(v){return v!=null;}))&&!finCh(e)&&!/^d\|/.test(String(e.key||''))&&
+    blockOfEntry(e)===(+S.blockId||1)&&(e.sets||[]).some(function(v){return v!=null&&v>0;}));
+}
+/* lot 80 (A8) : saisie douteuse, gardée et signalée, hors calculs */
+function doubtHTML(e){
+  var on=!!(e&&e.doubt);
+  return '<div class="btnrow" style="margin-top:8px"><button type="button" class="act ghost mini" data-doubt aria-pressed="'+on+'">'+
+    (on?'⚠ Saisie douteuse : hors calculs':'Saisie douteuse ?')+'</button></div>'+
+    '<p class="note" style="margin-top:0">Erreur de frappe, chiffre dont vous doutez : la série reste, signalée, mais sort des calculs (e1RM, records, courbe).</p>';
+}
+document.addEventListener('click',function(ev){
+  var b=ev.target&&ev.target.closest?ev.target.closest('[data-doubt]'):null; if(!b)return;
+  var on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',String(on));
+  b.textContent=on?'⚠ Saisie douteuse : hors calculs':'Saisie douteuse ?';
+});
 function dataRowClick(ev){
   var t=ev.target, c=t.closest('[data-dcom]');
   if(c){ DCOM=(DCOM===c.dataset.dcom)?null:c.dataset.dcom; renderData();
     var inp=document.querySelector('#loglist .dcom [data-dctxt]'); if(inp)inp.focus(); return; }
   if(t.closest('[data-dcsave]')){ dcomSave(); return; }
   if(t.closest('[data-dccancel]')){ DCOM=null; renderData(); return; }
+  var dk=t.closest('[data-doubtk]');   /* lot 80 (A8) */
+  if(dk){ var en=S.log.filter(function(z){return z.key===dk.dataset.doubtk;})[0];
+    if(en){ if(en.doubt)delete en.doubt; else en.doubt=1; LGOPEN[en.key]=1; REFSTAMP++; save(); refreshPlans(); renderData(); } return; }
   if(t.closest('button,select,input,textarea,a,.dcom'))return;
   var r=t.closest('.logrow'); if(!r||!r.dataset.lk)return;
-  if(findLine(r.dataset.lk))openSession(r.dataset.lk);
+  var k=r.dataset.lk, on=!r.classList.contains('lgopen'); if(on)LGOPEN[k]=1; else delete LGOPEN[k];   /* lot 77 : la ligne s'ouvre ; « ouvrir la séance » est dedans */
+  r.classList.toggle('lgopen',on); var cv=r.querySelector('.lgchev'); if(cv)cv.textContent=on?'▾':'▸';
 }
 /* Suffixe de bloc : sans lui, un second bloc batirait les memes cles que le premier
    et reprendrait ses series validees. Vide sur le bloc 1 pour ne rien casser. */
@@ -2907,7 +2972,7 @@ function foldify(sel,isHead,pfx){
     var h=null,i;
     for(i=0;i<card.children.length;i++){if(isHead(card.children[i])){h=card.children[i];break;}}
     if(!h)return;
-    var key=pfx+(card.id||String(h.textContent||'').replace(/\s+/g,' ').trim().slice(0,32)||idx);
+    var key=pfx+(card.id||h.getAttribute('data-fk')||String(h.textContent||'').replace(/\s+/g,' ').trim().slice(0,32)||idx);
     var body=document.createElement('div'); body.className='cardbody';
     while(h.nextSibling)body.appendChild(h.nextSibling);
     card.appendChild(body);
@@ -4385,12 +4450,14 @@ function brPlan(){
     var m=mine[i], r=real[i];
     if(!m&&!r)return;
     var tx=function(t){return t?'S'+(t.w0+1)+' '+loadLab(L,t.a)+' → S'+(t.w1+1)+' '+loadLab(L,t.b)+' kg':'pas au programme';};
-    cmp.push(esc(L.name)+' : brouillon '+tx(m)+' · réel '+tx(r));
+    cmp.push('<li><b>'+esc(L.name)+'</b> : brouillon '+tx(m)+' · réel '+tx(r)+'</li>');   /* lot 78 */
   });
-  $('simout').insertAdjacentHTML('afterbegin','<div class="flag"><b>Brouillon ('+(B.cur?'suite du bloc en cours':'bloc suivant, départ neuf')+').</b> '+
+  if($('brmodsum'))$('brmodsum').innerHTML='Mouvements du brouillon'+(d.length?' <b>· '+d.length+' écart'+(d.length>1?'s':'')+'</b>':' : comme votre programme');   /* lot 78 (P3) */
+  $('simout').innerHTML='<div class="flag"><b>Brouillon ('+(B.cur?'suite du bloc en cours':'bloc suivant, départ neuf')+').</b> '+
     (d.length?'Écarts avec votre programme : '+d.join(' · ')+'. ':'Mêmes réglages que votre programme. ')+
-    (cmp.length?'<br>Charge la plus lourde, première et dernière semaine : '+cmp.join(' ; ')+'. ':'')+
-    'Rien n’est écrit dans votre programme.</div>');
+    (cmp.length?'<br>Charge la plus lourde, première et dernière semaine :<ul class="brcmp">'+cmp.join('')+'</ul>':'')+
+    'Rien n’est écrit dans votre programme.</div>'+
+    '<details class="chd" data-chd="brweeks"'+(cui().open.brweeks?' open':'')+'><summary>Le brouillon semaine par semaine</summary>'+$('simout').innerHTML+'</details>';
 }
 function brRead(){
   var B=brSync(), n=num($('brnwk').value,null), j=joursLire($('brjours'),B.jours), w=num($('brbw').value,null);
@@ -4559,6 +4626,7 @@ function renderAssign(){
   }).join('');
   if(ASGT==='assign'){var bgi=$('bgoal'); if(bgi&&document.activeElement!==bgi)bgi.value=S.blockGoal||''; bgoalFit(); joursFill();}   /* lot 53 ; lot R1 : conseils des jours */
   Array.prototype.forEach.call($(ASGT).querySelectorAll('[data-f=tpl]'),function(s){s.value=S.lifts[+s.dataset.i].prog.tpl;});
+  if(ASGT==='assign')asgSum();   /* lot 78 (P2) */
   applyFolds();
 }
 /* lot 45 : la saisie (asgSet) est separee de ses effets, pour servir aussi au panneau du brouillon. Elle rend
@@ -4644,7 +4712,7 @@ $('assign').addEventListener('input',function(e){
 /* D5 : incr\u00e9ment libre \u2014 pendant la frappe la derni\u00e8re valeur valide reste appliqu\u00e9e,
    l'alerte tombe \u00e0 la validation du champ. */
 function bgoalFit(){ var t=$('bgoal'); if(!t||!t.style||!t.scrollHeight)return; t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }   /* lot 73 */
-$('bgoal').addEventListener('input',function(){S.blockGoal=this.value; bgoalFit(); save(); $('indout').innerHTML=trackHTML();});   /* lot 53 */
+$('bgoal').addEventListener('input',function(){S.blockGoal=this.value; bgoalFit(); save(); $('indout').innerHTML=indHTML();});   /* lot 53 */
 $('assign').addEventListener('change',function(e){
   var t=e.target, i=t.dataset?t.dataset.i:null;
   if(i!=null&&t.dataset.f==='wm'&&(t.dataset.k==='kg'||t.dataset.k==='pct')){ var Lw=S.lifts[+i]; warmSortM(Lw,Lw.prog); save(); renderAssign(); generate(); renderToday(); return; }   /* lot 60 (Q9) */
@@ -4932,14 +5000,19 @@ function rirExp(x,n,bw){
   var r=(st.cur.rm/d-1)/L.k+1;
   return {r:r,rir:r-n,n:n,st:st,bw:bw,lest:st.cur.rm-eff(L,bw)};
 }
+/* lot 79 (A4) : marge d'une réserve déclarée, ± 1 rep de 0 à 2, ± 2 à partir de 3. On estime bien près de l'échec, mal loin de
+   lui (Halperin) ; le ± 2 est un choix de prudence, pas un chiffre mesuré. */
+function rirMg(v){ return v!=null&&+v>=3?2:1; }
 function rirExpHTML(x,e){
   var tr=saisieOf(e), n=tr&&tr[0]!=null?tr[0]:repMax(x.reps), o=rirExp(x,n,e&&e.bw?e.bw:null); if(!o)return '';
-  var v=Math.round(o.rir*2)/2, L=S.lifts[x.li];
+  var v=Math.round(o.rir*2)/2, L=S.lifts[x.li], mg=rirMg(v);
+  var dit=e?(finCh(e)&&e.fin.rir!=null?e.fin.rir:e.rir):null;   /* lot 79 (A6) : cachée jusqu'à votre saisie, au choix */
+  if(!S.rirExpShow&&dit==null)return '<p class="note" data-rirexp data-rirhid>Réserve attendue : affichée après votre saisie.</p>';
   return '<p class="note" data-rirexp>Réserve attendue à '+n+' reps : '+(v>=0?'<b>≈ '+F(v)+'</b>':'<b>aucune</b>, échec prévu')+' '+   /* lot 64 : l'explication repliée */
-    (v>=0?'(entre '+F(Math.max(0,v-1))+' et '+F(v+1)+') ':'')+   /* lot 68 (Q25) : ± 1 rep, la marge d'une réserve déclarée (Halperin) */
+    (v>=0?'(entre '+F(Math.max(0,v-mg))+' et '+F(v+mg)+') ':'')+(dit!=null?'· vous : <b>'+F(+dit)+'</b> ':'')+   /* lot 79 (A4, A6) */   /* lot 68 (Q25) : ± 1 rep, la marge d'une réserve déclarée (Halperin) */
     whyHTML('Le modèle prédit '+F(Math.round(o.r*10)/10)+' reps à l\'échec à cette charge, sur l\'e1RM '+(o.st.tops?'des top sets ':'')+
     (o.st.prev?'du bloc '+o.st.cb:'du bloc en cours')+', '+F(rnd(o.lest,0.25))+' kg'+(L.useBw?' de lest au PdC de '+F(o.bw)+' kg':'')+
-    (x.sets>1?'. Pour la 1re série ; les suivantes en gardent moins, la fatigue n\'est pas comptée.':'.')+' Une réserve déclarée a une marge d\'environ ± 1 rep : d\'où la fourchette.')+'</p>'+
+    (x.sets>1?'. Pour la 1re série ; les suivantes en gardent moins, la fatigue n\'est pas comptée.':'.')+' Une réserve déclarée a une marge d\'environ ± 1 rep près de l\'échec, ± 2 à partir de 3 en réserve : d\'où la fourchette.')+'</p>'+
     (x.role==='back'?(function(){ var g=boffGap(x.li); return g?'<p class="note" data-boffgap>'+boffTxt(g)+'</p>':''; })():'');   /* lot 69 (Q26) */
 }
 function pctHTML(x){ var v=pctOf(x); return v==null?'':' <span class="pc" title="% de l\'e1RM des top sets du bloc précédent, charge système">'+Math.round(v)+' %</span>'; }
@@ -4965,7 +5038,8 @@ function renderPlan(into,weeks,pfx,scope){
         if(pfx==='p'&&!S.showAcc&&S.lifts[x.li]&&!S.lifts[x.li].main){ hid++;
           txt+='  '+x.name+' '+planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+' ('+x.info+')\n'; return; }
         var st=lineState(x.key);
-        html+='<div class="line '+(st?'s-'+st:'')+'" data-key="'+x.key+'">'+
+        var e80=SIM?null:entryOf(x.key);   /* lot 80 : à compléter, douteuse */
+        html+='<div class="line '+(st?'s-'+st:'')+(e80&&e80.doubt?' dbt':(aComp(e80)?' acp':''))+'" data-key="'+x.key+'">'+
           '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+pctHTML(x)+'</span>'+   /* lot 58 : % du 1RM du moment */
           (pfx==='t'?'':infoHTML(x.info))+'</div>'+(pfx==='t'?'<div class="tdet" data-det="'+x.key+'">'+(x.info?'<p class="note tdin">'+x.info+'</p>':'')+
@@ -5135,12 +5209,69 @@ function trackHTML0(){
     return h+'<p class="note">'+t+'</p>';
   }).join('');
 }
+/* lot 78 (P1) : la semaine en cours ouverte, les autres repliées, quand la semaine change */
+function progWeekFold(){
+  var ns=nextSession(), w=ns?+String(ns).split('|')[0]:NaN;
+  if(w===-1&&S.dload&&S.dload.d&&S.dload.d<todayISO())w=0;   /* deload passé mais pas noté : on montre la semaine 1 */
+  if(isNaN(w)||S.pw78===w)return;
+  S.pw78=w; if(!S.fold)S.fold={};
+  PLAN.forEach(function(wk){ var k='pw'+wk.w;
+    if(wk.w===w){ delete S.fold[k]; wk.days.forEach(function(d){ delete S.fold['pd'+wk.w+'-'+d.label]; }); } else S.fold[k]=1; });
+  save();
+}
+/* lot 78 (P1) : « Où en est le bloc », une ligne par main lift ; le détail d'avant (objectif, record, volume, référence) replié */
+function ouTops(i){
+  var all=[], tops=[];
+  PLAN.forEach(function(wk){ if(wk.dl)return; wk.days.forEach(function(d){ d.lines.forEach(function(x){
+    if(x.li!==i)return; var o={x:x,w:wk.w,d:d.label};
+    if(x.role==='top')tops.push(o); else if(x.role==='work'||x.role==='test'||x.role==='amrap')all.push(o);
+  }); }); });
+  return tops.length?tops:all;
+}
+function ouLine(i){
+  var L=S.lifts[i], tops=ouTops(i); if(!tops.length)return '';
+  var lab=function(o){ return 'S'+(o.w+1)+' '+o.d; }, pr=function(o){ return planLoad(o.x)+S.sep+o.x.reps; };
+  var done=tops.filter(function(o){ return entryOf(o.x.key); }), nx=tops.filter(function(o){ return !entryOf(o.x.key); })[0], fin=tops[tops.length-1];
+  var p=[done.length+' / '+tops.length+' top sets faits'];
+  if(done.length){ var o=done[done.length-1], e=entryOf(o.x.key), r=(e.sets&&e.sets.length)?e.sets[0]:'?', f=loadLab(L,+e.load||0)+S.sep+r;
+    p.push('dernier fait '+lab(o)+' <b>'+f+'</b>'+(f!==pr(o)?' (prévu '+pr(o)+')':'')); }
+  p.push(nx?'prochain '+lab(nx)+' <b>'+pr(nx)+'</b>':'bloc terminé');
+  if(nx&&fin!==nx)p.push('dernier du bloc '+lab(fin)+' '+pr(fin));
+  return '<li><b class="n'+col(i)+'">'+esc(L.name)+'</b> : '+p.join(' · ')+'</li>';
+}
+function indHTML(){
+  buildPlan();
+  var ls=S.lifts.map(function(L,i){ return (L.main&&L.prog&&L.prog.tpl!=='off')?ouLine(i):''; }).join('');
+  return (ls?'<ul class="oulist">'+ls+'</ul>':'')+
+    '<details class="chd" data-chd="inddet"'+(cui().open.inddet?' open':'')+'><summary>Détail : objectif, record, volume, référence</summary>'+trackHTML()+'</details>';
+}
+/* lot 78 (P2) : une ligne de résumé par mouvement des Réglages du bloc ; replié, « modifier » ouvre les listes */
+function asgSumTxt(i,T){
+  var L=S.lifts[i], P=L.prog, t=tplOf(P.tpl); if(P.tpl==='off'||!t)return 'pas programmé dans ce bloc';
+  var s=esc(t.name), o=(T||brTops())[i];
+  if(o&&o.a!=null)s+=' · '+(o.b!=null&&Math.abs(o.b-o.a)>0.01?'S'+(o.w0+1)+' ':'')+loadKg(L,o.a)+(o.b!=null&&o.w1!==o.w0&&Math.abs(o.b-o.a)>0.01?' → S'+(o.w1+1)+' '+loadKg(L,o.b):'');
+  return s;
+}
+function asgSum(){
+  var a=$('assign'); if(!a||!a.querySelectorAll)return; var T=brTops();
+  Array.prototype.forEach.call(a.querySelectorAll(':scope > .liftcard'),function(c){
+    var s=c.querySelector('[data-f=tpl]'), h=c.querySelector('.tagname'); if(!s||!h)return;
+    var i=+s.dataset.i, L=S.lifts[i]; if(!L)return;
+    h.setAttribute('data-fk',L.name);
+    h.insertAdjacentHTML('beforeend','<span class="asgmod">modifier</span><span class="asgsum">'+asgSumTxt(i,T)+'</span>');
+  });
+}
+function progView(){
+  var v=cui().prog==='sim'?'sim':'bloc'; $('p-prog').setAttribute('data-pv',v);
+  Array.prototype.forEach.call(document.querySelectorAll('#pseg [data-pv]'),function(b){ b.setAttribute('aria-pressed',String(b.dataset.pv===v)); });
+}
 function generate(){
   if(BRSWAP)return;   /* lot 45 */
   buildPlan();
+  progWeekFold();   /* lot 78 */
   LASTTXT=renderPlan($('out'),PLAN);
   renderSync(); renderCloseBox();   /* lot 59 */
-  $('indout').innerHTML=trackHTML();
+  $('indout').innerHTML=indHTML();   /* lot 78 */
   reopenPanel('out');
 }
 function renderSync(){
@@ -5412,8 +5543,9 @@ function pdetHTML(key,x,L,e,h){
   if(!isM(L))it.push('validité rep par rep','forme T / C');
   if(x.role==='top'&&!isM(L))it.push('EMOM ou fractionné');
   if(failUI(key,x,L))it.push('suite en cas d\'échec');
-  var open=!!(v||(e&&e.fin)||(e&&e.form&&e.form.some(function(c){return c==='c';}))||(tr&&tr.some(function(t){return t!=null&&t<repMin(x.reps);})));
-  return '<details class="pdet" data-pdet'+(open?' open':'')+'><summary class="note"><span><b>Détails</b> : '+it.join(', ')+'</span></summary>'+h+'</details>';
+  it.push('saisie douteuse');   /* lot 80 (A8) */
+  var open=!!((e&&e.doubt)||v||(e&&e.fin)||(e&&e.form&&e.form.some(function(c){return c==='c';}))||(tr&&tr.some(function(t){return t!=null&&t<repMin(x.reps);})));
+  return '<details class="pdet" data-pdet'+(open?' open':'')+'><summary class="note"><span><b>Détails</b> : '+it.join(', ')+'</span></summary>'+h+doubtHTML(e)+'</details>';
 }
 function panelTop(el){
   if(!el||!el.getBoundingClientRect)return;
@@ -5500,7 +5632,8 @@ function vidSummary(key){
     var q=v.resume||{};
     return '<div class="vidsum">\ud83c\udfa5 <b>Série '+(v.lien.set+1)+'</b> filmée le '+frDate(v.date)+' : rep 1 \u2192 dernière <b>'+
       F(q.v_moy_rep1)+' \u2192 '+F(q.v_moy_derniere)+' m/s</b> ('+F(q.perte_v_moy_pct)+' %). '+
-      '<button class="linkbtn" data-vgo="'+esc(v.id)+'">Voir l\'analyse</button></div>';
+      '<button class="linkbtn" data-vgo="'+esc(v.id)+'">Voir l\'analyse</button>'+
+      (vMiroir(v)?'<br>'+vMiroir(v)+'. <span class="muted">Un repère pour apprendre : votre chiffre reste le vôtre.</span>':'')+'</div>';   /* lot 82 (A1) */
   }).join('');
 }
 function findLine(key){
@@ -5552,6 +5685,7 @@ function panelHTML(key){
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
   var rirNow=e?(finCh(e)&&e.fin.rir!=null?e.fin.rir:(e.rir===null?null:e.rir)):undefined;   /* lot 58 */
+  if(e&&rirNow==null&&!e.rirq&&!finCh(e))rirNow=undefined;   /* lot 80 (A10) : réserve jamais notée ≠ « ? » choisi ; rien de coché */
   var each=x.sets>1&&(e&&e.rirs?true:(e?false:!!S.rirEach));
   var trNow=saisieOf(e);
   var repsNow=x.sets>1?Array.apply(null,{length:x.sets}).map(function(_,q){return trNow&&trNow[q]!=null?trNow[q]:null;})
@@ -5880,6 +6014,8 @@ function saveLine(p,key){
   if(frm.some(Boolean))e.form=sets.map(function(_,q){return frm[q]||null;});
   var fin=finRead(p); if(fin)e.fin=fin;   /* lot 57 bis */
   if(fin&&fin.ch){ if(e.rir!=null)fin.rir=e.rir; e.rir=null; delete e.rirs; }   /* lot 58 : par choix, hors 1RM estimé (réserve gardée pour mémoire) */
+  var dbb=p.querySelector('[data-doubt]');   /* lot 80 (A8) */
+  if(dbb?dbb.getAttribute('aria-pressed')==='true':(kp&&o0.doubt))e.doubt=1;
   var lmb=p.querySelector('[data-lim]'); if(lmb&&lmb.getAttribute('aria-pressed')==='true')e.lim=1;   /* lot 52 (3x6) */
   var at=atSave(p,sets,kp?o0:null); if(at)e.at=at;   /* lot 43 (C2) */
   e.tries=sets.slice(); recount(e); if(!e.state)e.state=stateOf(e);
@@ -5903,8 +6039,8 @@ function rirAsk(p,x,sets){
   if(!row||p.dataset.rirask==='1'||x.role==='deload'||!(sets||[]).some(function(v){return v!=null;}))return false;
   var fin=finRead(p); if(fin&&fin.ch)return false;
   p.dataset.rirask='1'; row.classList.add('rirask');
-  row.insertAdjacentHTML('beforebegin','<p class="note rirq"><b>Réserve de la dernière série ?</b> Touchez un chiffre, ou « ? » si vous ne savez pas : '+
-    'c\'est enregistré aussitôt. « Enregistrer » de nouveau : réserve non notée.</p>');
+  row.insertAdjacentHTML('beforebegin','<p class="note rirq"><b>Réserve de la dernière série ?</b> Un chiffre approximatif vaut mieux que rien. « ? » si vous n\'avez aucune idée. '+
+    'C\'est enregistré aussitôt. « Enregistrer » de nouveau : réserve non notée.</p>');
   if(row.scrollIntoView)row.scrollIntoView({block:'center',behavior:'smooth'});
   return true;
 }
@@ -5954,7 +6090,7 @@ function skipLine(p,key){
    Les reps 😑 ne comptent pas (e.sets est deja net), les lignes sautees non plus.
    1RM estime : le modele de l'outil (predRM), exprime en lest, seulement si la reserve est notee. */
 function entryStats(e){
-  var L=S.lifts[e.li]; if(!L||e.state==='skip'||!e.sets)return null;
+  var L=S.lifts[e.li]; if(!L||e.state==='skip'||e.doubt||!e.sets)return null;   /* lot 80 (A8) */
   var sys=(L.useBw?bwOf(e):0)+(+e.load||0), reps=0, sets=0;
   e.sets.forEach(function(r){ if(r!=null&&r>0){reps+=r; sets++;} });
   reps+=finPlus(e);   /* lot R3 : la fin d'une série ratée (fractionné, EMOM) compte aussi */
@@ -6035,6 +6171,7 @@ function renderBackup(){
   /* B11 : la copie d'avant import n'existe que pendant la session ou l'import a eu lieu ;
      le bouton n'apparait que si elle est la. */
   var ub=$('undoimport'); if(ub&&ub.style)ub.style.display=bkCopy()?'':'none';
+  if($('bksum'))$('bksum').textContent=S.lastExport?'dernière le '+frDate(S.lastExport):'aucune encore';   /* lot 77 */
   if($('bklast'))$('bklast').textContent=S.lastExport?'Dernière sauvegarde : '+frDate(S.lastExport)+' ('+(daysSince(S.lastExport)===0?'aujourd\'hui':'il y a '+daysSince(S.lastExport)+' j')+').':'Aucune sauvegarde faite depuis cet appareil.';
   if(!ban)return;
   var due=n>0&&since>=n&&!(S.bkSnooze&&S.bkSnooze>=todayISO());
@@ -6592,7 +6729,7 @@ $('tfin').addEventListener('change',saveFin); $('tfinh').addEventListener('chang
 function fitLift(li){
   var L=S.lifts[li]; if(isM(L))return {k:0,n:0,d:0};   /* lot 46 */
   var pts=S.log.filter(function(e){
-    if(e.li!==li||e.rir==null)return false;
+    if(e.li!==li||e.rir==null||e.doubt)return false;   /* lot 80 (A8) */
     if(e.role&&['top','amrap','pr'].indexOf(e.role)<0)return false;
     var last=e.sets&&e.sets.length?e.sets[e.sets.length-1]:null;
     if(serieTrichee(e))return false;   /* T1 */
@@ -6628,7 +6765,7 @@ function fitLift(li){
 function rmSeries(i){
   var L=S.lifts[i]; if(!L)return [];
   return (S.log||[]).filter(function(e){
-    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&
+    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&!e.doubt&&   /* lot 80 (A8) */
            e.sets&&e.sets.length&&e.sets[e.sets.length-1];
   }).map(function(e){
     return {e:e,date:e.date||'',
@@ -6705,7 +6842,7 @@ function recSets(li){
   var L=S.lifts[li]; if(!L||isM(L))return [];
   var out=[];
   (S.log||[]).forEach(function(e){
-    if(e.li!==li||e.state==='skip'||finCh(e))return;   /* lot 58 */
+    if(e.li!==li||e.state==='skip'||e.doubt||finCh(e))return;   /* lot 58 ; lot 80 (A8) */
     var bw=bwOf(e), lo=+e.load||0;
     (e.sets||[]).forEach(function(r,st){
       r=+r; if(!(r>0))return;
@@ -6780,7 +6917,8 @@ function rkSysP(L,p){ var bw=p.s&&p.s.bw!=null?+p.s.bw:S.bw; return L.useBw?bw+p
 /* lot 66 (Q21) : les records seuls, en paliers (un nouveau record dépasse l'ancien de RKSEUIL), en charge système */
 function rkChain(st){
   var o=[], c=null;
-  st.pts.forEach(function(p){ if(!c||p.rm>c.rm+RKSEUIL){ c=p; o.push(p); } });
+  var loin=st.pts.some(function(p){return p.s.rir<3;});   /* lot 79 (A5) : le trait des records ignore les séries à 3 ou plus en réserve */
+  st.pts.forEach(function(p){ if(loin&&p.s.rir>=3)return; if(!c||p.rm>c.rm+RKSEUIL){ c=p; o.push(p); } });
   return o;
 }
 function rkPlot(L,st){
@@ -6826,7 +6964,7 @@ function rkPlot(L,st){
 }
 function rkLab(L,s){
   return loadLab(L,s.load)+' '+S.sep+' '+s.reps+(s.rir>0?' à '+F(s.rir)+' en réserve':' à l’échec')+
-    (L.useBw?', PdC '+F(s.bw)+' kg'+(s.est?' estimé':''):'')+rkMen(s);
+    (L.useBw?', PdC '+F(s.bw)+' kg'+(s.est?' estimé':''):'')+rkMen(s)+(s.rir!=null&&learnE(s.e)?' · bloc d’apprentissage':'');   /* lot 81 (A9) */
 }
 function rkRMHTML(L,i){
   var st=rkRM(i), E0=eff(L), u=L.useBw;
@@ -6842,7 +6980,9 @@ function rkRMHTML(L,i){
       '<div><b>'+ec+'</b><span>écart</span></div>'+
     '</div>'+
     '<p class="note"><b>Record</b> : '+rkLab(L,st.rec.s)+(st.rec.date?', du '+frDate(st.rec.date):', sans date')+'.</p>'+
-    (st.top.rm>st.rec.rm+1e-9?'<p class="note">Meilleure estimation brute : '+F(rnd(rkSysP(L,st.top),0.25))+' kg ('+rkLab(L,st.top.s)+
+    (st.top.rm>st.rec.rm+RKSEUIL&&st.top.s.rir>=3?'<p class="note">Meilleure estimation brute : '+F(rnd(rkSysP(L,st.top),0.25))+' kg ('+rkLab(L,st.top.s)+
+      (st.top.date?', '+frDate(st.top.date):'')+'), notée à 3 ou plus en réserve : trop loin de l’échec pour un record (marge ± 2 reps).</p>':   /* lot 79 (A5) */
+     st.top.rm>st.rec.rm+1e-9?'<p class="note">Meilleure estimation brute : '+F(rnd(rkSysP(L,st.top),0.25))+' kg ('+rkLab(L,st.top.s)+
       (st.top.date?', '+frDate(st.top.date):'')+'), à moins de 0,5 kg du record : bruit du modèle, pas un nouveau record.</p>':'')+
     '<p class="note">'+(st.fb
       ? '<b>Rien de noté sur le bloc '+st.bid+'</b> : le 1RM du moment reprend la meilleure série du '+(st.cb?'bloc '+st.cb:'hors bloc')+', '+
@@ -6850,7 +6990,7 @@ function rkRMHTML(L,i){
       : '<b>Du moment</b> : '+rkLab(L,st.cur.s)+(st.cur.date?', du '+frDate(st.cur.date):'')+' — meilleure série du bloc '+st.bid+'.')+'</p>'+
     rkPlot(L,st)+
     '<p class="note">Le trait monte à chaque nouveau record de 1RM estimé (au moins 0,5 kg de plus que l’ancien), toutes séries '+
-    'à réserve connue comprises, back-offs aussi'+(u?' ; charge système = PdC du jour de la série + lest':'')+'. Point plein : à l’échec ; '+
+    'à réserve connue comprises, back-offs aussi, sauf celles notées à 3 ou plus en réserve'+(u?' ; charge système = PdC du jour de la série + lest':'')+'. Point plein : à l’échec ; '+
     'point vide : avec réserve ; contour orange : trichée. L’évolution séance par séance est dans <b>Progression</b>. '+
     '<b>Ce 1RM est une estimation du modèle de charge</b>, pas un test.</p>';
 }
@@ -6907,7 +7047,7 @@ function rkSets(li){
   var L=S.lifts[li]; if(!L||isM(L))return [];
   var out=[];
   (S.log||[]).forEach(function(e,ix){
-    if(e.li!==li||e.state==='skip'||finCh(e))return;   /* lot 58 : EMOM / fractionné par choix hors records par reps */
+    if(e.li!==li||e.state==='skip'||e.doubt||finCh(e))return;   /* lot 80 (A8) : douteuse hors records ; lot 58 : EMOM / fractionné par choix hors records par reps */
     var bw=bwOf(e), lo=+e.load||0, n=(e.sets||[]).length;
     (e.sets||[]).forEach(function(r,st){
       r=+r; if(!(r>0))return;
@@ -6937,11 +7077,14 @@ function rkRM(li){
   });
   if(!pts.length)return null;
   var rec=null, cur=null, top=null, bid=(+S.blockId||1), best={};
+  if(!pts.some(function(p){return p.s.rir<3;}))rec=pts[0];   /* lot 79 : seulement des séries loin de l'échec : la 1re sert de repère */
+  var nb={}; pts.forEach(function(p){ if(p.s.rir<3)nb[blockOfEntry(p.e)]=1; });
   pts.forEach(function(p){
-    if(!rec||p.rm>rec.rm+RKSEUIL)rec=p;
+    if(p.s.rir<3&&(!rec||p.rm>rec.rm+RKSEUIL))rec=p;   /* lot 79 (A5) */
     if(!top||p.rm>top.rm+1e-9)top=p;
     if(/^d\|/.test(String(p.e.key||'')))return;   /* lot 60 B : séance de deload, jamais la base du moment */
-    var b=blockOfEntry(p.e); if(!best[b]||p.rm>best[b].rm+1e-9)best[b]=p;
+    var b=blockOfEntry(p.e); if(nb[b]&&p.s.rir>=3)return;   /* lot 79 (A5) : le 1RM du moment non plus, si le bloc a mieux */
+    if(!best[b]||p.rm>best[b].rm+1e-9)best[b]=p;
   });
   /* lot 60 B (remarque du 11/10, 21:26) : meilleure série du bloc en cours ; s'il n'en a pas encore, meilleure série du
      bloc le plus récent qui en a (avant : la série la plus récente, 27,5 × 7 au lieu de 37,5 × 5) */
@@ -7049,7 +7192,7 @@ function rkEvents(li){
   });
   var rec=null;
   all.forEach(function(s){
-    if(s.rir==null)return;
+    if(s.rir==null||s.rir>=3)return;   /* lot 79 (A5) : à 3 ou plus en réserve, pas de record de 1RM estimé */
     var rm=e1rm(L,s.load,s.reps,s.rir,s.bw);
     if(!rec){ rec=rm; return; }
     if(rm>rec+RKSEUIL){ ev.push({kind:'est',s:s,rm:rm,d:rm-rec,keys:[s.e.key],sig:'est|'+rkSig(s)+'|'+s.rir}); rec=rm; }
@@ -7584,13 +7727,137 @@ function mdBlock(bid){
     hp.forEach(function(e){ var L=S.lifts[e.li]||null; p('- '+frDate(e.date)+', '+(e.lift||'')+' : '+mdDone(L,e)); mdSub(L,e).forEach(p); }); }
   return o.join('\n')+'\n';
 }
+/* ===== lot 83 (A2) : bilan d'apprentissage ===== */
+function apprPts(bid,mv){
+  return (S.velo||[]).filter(function(v){ var e=lienEntry(v); return e&&v.mouvement===mv&&blockOfEntry(e)===bid&&vLisible(v)&&vRir(v)!=null; })
+    .map(function(v){ return {q:vRir(v),v:vLastOk(v)}; });
+}
+function rangs(xs){ var o=xs.map(function(x,i){return {x:x,i:i};}).sort(function(a,b){return a.x-b.x;}), r=[];
+  for(var i=0;i<o.length;){ var j=i; while(j+1<o.length&&o[j+1].x===o[i].x)j++; for(var k=i;k<=j;k++)r[o[k].i]=(i+j)/2+1; i=j+1; } return r; }
+function spearman(P){
+  if(P.length<3)return null;
+  var a=rangs(P.map(function(p){return p.q;})), b=rangs(P.map(function(p){return p.v;})), n=P.length;
+  var ma=a.reduce(function(s,x){return s+x;},0)/n, mb=b.reduce(function(s,x){return s+x;},0)/n, sab=0, saa=0, sbb=0;
+  for(var i=0;i<n;i++){ sab+=(a[i]-ma)*(b[i]-mb); saa+=(a[i]-ma)*(a[i]-ma); sbb+=(b[i]-mb)*(b[i]-mb); }
+  return saa>0&&sbb>0?sab/Math.sqrt(saa*sbb):null;
+}
+var APPG=[['0',0,0.25],['0,5 à 1',0.25,1.25],['1,5 à 2',1.25,2.25],['2,5 et plus',2.25,99]];
+function apprMv(bid){ var m=[]; (S.velo||[]).forEach(function(v){ if(m.indexOf(v.mouvement)<0)m.push(v.mouvement); }); return m.filter(function(mv){ return apprPts(bid,mv).length; }); }
+function boffGapB(li,bid){
+  var L=S.lifts[li]; if(!L||isM(L))return null;
+  var a=progRows(li).filter(function(r){ return r.blk===bid&&r.rm&&r.back; }).map(function(r){
+    var b=r.back, n=+b.sets[b.sets.length-1], q=progLastRir(b); if(!(n>0)||q==null)return null;
+    var d=eff(L,bwOf(b))+(+b.load||0); if(d<=0)return null;
+    return (r.rm/d-1)/L.k+1-n-q;
+  }).filter(function(x){return x!=null;});
+  if(!a.length)return null;
+  var lo=Math.min.apply(null,a), hi=Math.max.apply(null,a);
+  return {n:a.length,m:a.reduce(function(s,x){return s+x;},0)/a.length,lo:lo,hi:hi,d:hi-lo};
+}
+function apprData(bid){
+  var out={mv:[],bo:[]};
+  apprMv(bid).forEach(function(mv){
+    var P=apprPts(bid,mv), pr=apprPts(bid-1,mv);
+    out.mv.push({mv:mv,n:P.length,rho:spearman(P),rho0:spearman(pr),n0:pr.length,
+      g:APPG.map(function(g){ var xs=P.filter(function(p){return p.q>=g[1]&&p.q<g[2];}).map(function(p){return p.v;}); return {t:g[0],n:xs.length,lo:xs.length?Math.min.apply(null,xs):null,hi:xs.length?Math.max.apply(null,xs):null}; }).filter(function(g){return g.n;})});
+  });
+  S.lifts.forEach(function(L,li){ if(!L.main||isM(L))return; var g=boffGapB(li,bid); if(g)out.bo.push({li:li,g:g,g0:boffGapB(li,bid-1)}); });
+  return out;
+}
+function apprLines(bid){
+  var D=apprData(bid), t=[], r2=function(x){return F(Math.round(x*100)/100);}, r1=function(x){return F(Math.round(x*10)/10);};
+  D.mv.forEach(function(m){
+    t.push({b:m.mv.charAt(0).toUpperCase()+m.mv.slice(1),s:m.g.map(function(g){ return 'notées '+g.t+' : '+r2(g.lo)+(g.hi-g.lo>=0.005?'-'+r2(g.hi):'')+' m/s ('+g.n+')'; }).join(' ; ')+
+      (m.rho!=null?'. Accord réserve-vitesse : '+r2(m.rho)+(m.rho0!=null?' (bloc d’avant : '+r2(m.rho0)+')':''):'')+
+      (m.n<15?'. '+m.n+' série'+(m.n>1?'s':'')+' filmée'+(m.n>1?'s':'')+' : indicatif, il en faut une quinzaine':'')});
+  });
+  D.bo.forEach(function(o){
+    t.push({b:'Back-offs, '+S.lifts[o.li].name,s:'la dernière série a gardé en moyenne '+r1(Math.abs(o.g.m))+' rep de '+(o.g.m>=0?'moins':'plus')+' que prévu frais ('+o.g.n+' séance'+(o.g.n>1?'s':'')+')'+
+      (o.g.n>1?' ; dispersion '+r1(o.g.d)+' rep':'')+(o.g0&&o.g0.n>1?' (bloc d’avant : '+r1(o.g0.d)+')':'')});
+  });
+  return t;
+}
+function apprHTML(bid){
+  var t=apprLines(bid); if(!t.length)return '';
+  return '<div data-appr><p class="note"><b>Bilan d’apprentissage</b> : vos réserves notées, rangées par la vitesse de la dernière rep. '+
+    'Si vos chiffres se resserrent, l’accord (de −1 à 1 : plus la réserve notée est grande, plus la dernière rep est rapide) monte et la dispersion des back-offs baisse d’un bloc à l’autre.</p>'+
+    t.map(function(x){ return '<p class="note"><b>'+esc(x.b)+'</b> : '+x.s+'.</p>'; }).join('')+'</div>';
+}
+/* ===== lot 83 (A12-A13) : questionnaire de fin de bloc, mêmes questions à chaque bloc ===== */
+var FQ=[
+  {k:'lim',t:'Ce qui a le plus limité vos top sets',m:['grip','technique','force','fatigue','gêne ou douleur','rien de particulier']},
+  {k:'conf',t:'Confiance technique',lift:1,s:['1 hésitante','2','3','4','5 sûre']},
+  {k:'fat',t:'Fatigue générale sur le bloc',s:['1 frais','2','3','4','5 épuisé']},
+  {k:'rec',t:'Récupération d’une séance à l’autre',s:['1 jamais','2','3','4','5 toujours']},
+  {k:'mot',t:'Motivation',s:['1 très basse','2','3','4','5 très haute']},
+  {k:'pla',t:'Plaisir à vous entraîner',s:['1 aucun','2','3','4','5 beaucoup']},
+  {k:'vie',t:'Charge de vie (travail, sommeil, stress)',s:['1 légère','2','3','4','5 très lourde']},
+  {k:'rir',t:'Votre estimation de la réserve, par rapport au bloc d’avant',o:['plus sûre','pareille','moins sûre','pas de bloc d’avant']},
+  {k:'ref',t:'Ce que vous referiez',x:1},
+  {k:'chg',t:'Ce que vous changeriez',x:1}
+];
+function fqMain(){ var o=[]; S.lifts.forEach(function(L,li){ if(L.main&&!isM(L))o.push(L.name); }); return o; }
+function fqB(bid){ return (S.blocks||[]).filter(function(b){return +b.id===+bid;})[0]||null; }
+function fqA(bid){ var b=fqB(bid); return b&&b.fq&&b.fq.a?b.fq.a:{}; }
+function fqN(bid){ var a=fqA(bid); return FQ.filter(function(q){ var v=a[q.k]; return v!=null&&v!==''&&!(Array.isArray(v)&&!v.length)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length); }).length; }
+function fqSet(bid,k,v,sub){
+  var b=fqB(bid); if(!b)return; if(!b.fq)b.fq={a:{}}; var a=b.fq.a, q=FQ.filter(function(x){return x.k===k;})[0]; if(!q)return;
+  if(q.m){ var l=Array.isArray(a[k])?a[k]:[], i=l.indexOf(v); if(i>=0)l.splice(i,1); else l.push(v); a[k]=l; }
+  else if(q.lift){ var o=a[k]&&typeof a[k]==='object'?a[k]:{}; if(o[sub]===+v)delete o[sub]; else o[sub]=+v; a[k]=o; }
+  else if(q.s){ if(a[k]===+v)delete a[k]; else a[k]=+v; }
+  else if(q.o){ if(a[k]===v)delete a[k]; else a[k]=v; }
+  else a[k]=String(v);
+  b.fq.d=todayISO();
+}
+function fqVal(q,v,sub){
+  if(v==null)return null;
+  if(q.m)return Array.isArray(v)&&v.length?v.join(', '):null;
+  if(q.lift){ var x=v[sub]; return x==null?null:q.s[x-1]; }
+  if(q.s)return q.s[v-1]||null;
+  return String(v).trim()||null;
+}
+function fqHTML(b){
+  var bid=+b.id, a=fqA(bid), a0=fqA(bid-1), n=fqN(bid), pv=fqB(bid-1)&&fqB(bid-1).fq;
+  var pill=function(q,val,lab,on,sub){ return '<button type="button" class="pill" data-fq="'+bid+'|'+q.k+'|'+esc(String(val))+(sub?'|'+esc(sub):'')+'" aria-pressed="'+(on?'true':'false')+'">'+esc(lab)+'</button>'; };
+  var avt=function(q,sub){ if(!pv)return ''; var t=fqVal(q,a0[q.k],sub); return t?' <span class="muted" style="font-weight:400">(bloc d’avant : '+esc(t)+')</span>':''; };
+  var h=FQ.map(function(q){
+    if(q.lift)return fqMain().map(function(nm){ var cur=a[q.k]&&a[q.k][nm];
+      return '<fieldset><legend>'+esc(q.t)+', '+esc(nm)+avt(q,nm)+'</legend><div class="pillrow">'+q.s.map(function(l,i){ return pill(q,i+1,l,cur===i+1,nm); }).join('')+'</div></fieldset>'; }).join('');
+    if(q.x)return '<fieldset><legend>'+esc(q.t)+avt(q)+'</legend><textarea rows="2" data-fqt="'+bid+'|'+q.k+'" aria-label="'+esc(q.t)+'">'+esc(a[q.k]||'')+'</textarea></fieldset>';
+    var opts=q.m||q.o||q.s;
+    return '<fieldset><legend>'+esc(q.t)+(q.m?' <span class="muted" style="font-weight:400">(plusieurs possibles)</span>':'')+avt(q)+'</legend><div class="pillrow">'+opts.map(function(l,i){
+      var val=q.s?i+1:l, on=q.m?(Array.isArray(a[q.k])&&a[q.k].indexOf(l)>=0):a[q.k]===val; return pill(q,val,l,on); }).join('')+'</div></fieldset>';
+  }).join('');
+  return '<details class="chd" data-chd="fq'+bid+'"><summary>Questionnaire de fin de bloc : <b>'+n+'/'+FQ.length+'</b>'+(n?'':' · 2 minutes')+'</summary>'+
+    '<p class="note">Les mêmes questions à chaque bloc : les blocs se comparent. Ce qui se vit au jour le jour (sommeil, gêne) reste noté en séance. '+
+    'Un ressenti, à lire avec prudence. Toucher une réponse choisie l’enlève. Tout est gardé avec le bloc et va dans l’Export pour Claude.</p><div class="fq">'+h+'</div></details>';
+}
+function fqMd(bid){
+  var a=fqA(bid), o=[];
+  FQ.forEach(function(q){
+    if(q.lift){ fqMain().forEach(function(nm){ var t=fqVal(q,a[q.k],nm); if(t)o.push('- '+q.t+', '+nm+' : '+t+' (sur 5)'); }); return; }
+    var t=fqVal(q,a[q.k]); if(t)o.push('- '+q.t+' : '+(q.s?t+' (sur 5)':t));
+  });
+  return o;
+}
+/* ===== lot 83 (A17) : un seul « Export pour Claude » : texte lisible + apprentissage + questionnaire + données complètes ===== */
+function mdAll(){ return S.mdAll!==false; }
+function claudeExport(bid){
+  bid=+bid; var o=[mdBlock(bid).replace(/\n+$/,'')];
+  var ap=fqB(bid)?apprLines(bid):[];
+  if(ap.length){ o.push(''); o.push('## Bilan d’apprentissage'); ap.forEach(function(x){ o.push('- '+x.b+' : '+x.s.replace(/<[^>]+>/g,'')); }); }
+  if(fqB(bid)){ var f=fqMd(bid); o.push(''); o.push('## Questionnaire de fin de bloc (ressenti, à lire avec prudence)'); if(f.length)f.forEach(function(x){o.push(x);}); else o.push('- Pas rempli.'); }
+  if(mdAll()){ o.push(''); o.push('## Données complètes (sauvegarde de l’outil, JSON)'); o.push(''); o.push('\u0060\u0060\u0060json'); o.push(JSON.stringify(S)); o.push('\u0060\u0060\u0060'); }
+  return o.join('\n')+'\n';
+}
 function mdBtn(id){
   id=+id;
-  var h='<div class="btnrow" style="margin-top:6px"><button class="act ghost mini" data-mdx="'+id+'">'+(MDB===id?'Fermer l’export':'Exporter en Markdown')+'</button></div>';
+  var h='<div class="btnrow" style="margin-top:6px"><button class="act ghost mini" data-mdx="'+id+'">'+(MDB===id?'Fermer l’export':'Export pour Claude')+'</button></div>';
   if(MDB!==id)return h;
   return h+'<div class="mdp" data-mdb="'+id+'" style="margin-top:6px">'+
     '<label class="note" style="display:flex;align-items:center;gap:6px"><input type="checkbox" data-mdon'+(mdOn()?' checked':'')+' style="width:auto;margin:0"> Inclure le prompt d’analyse (en tête de l’export)</label>'+
     '<textarea data-mdpr rows="7" style="width:100%;margin-top:4px" aria-label="Prompt d’analyse">'+esc(mdPrompt())+'</textarea>'+
+    '<label class="note" style="display:flex;align-items:center;gap:6px"><input type="checkbox" data-mdall'+(mdAll()?' checked':'')+' style="width:auto;margin:0"> Joindre les données complètes (la sauvegarde, en fin d’export)</label>'+   /* lot 83 (A17) */
     '<p class="note">Le prompt modifié est gardé pour les exports suivants. <button class="linkbtn" data-mdr>Rétablir le modèle</button></p>'+
     '<div class="btnrow"><button class="act mini" data-mdc>Copier</button><button class="act ghost mini" data-mdd>Télécharger (.md)</button></div>'+
     '<textarea data-mdfb rows="10" readonly style="display:none;width:100%;margin-top:6px" aria-label="Export à copier"></textarea></div>';
@@ -7638,9 +7905,9 @@ function renderBilan(){
   if(S.blocks.length){
     h+=S.blocks.slice().reverse().map(function(b){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
-        '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
+        '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b>'+(b.learn?' <span class="lrn">bloc d’apprentissage</span>':'')+' <button class="linkbtn" data-learn="'+b.id+'">'+(b.learn?'retirer ce signal':'bloc d’apprentissage ?')+'</button> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
         ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+bilanPente(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+mdBtn(b.id)+'</div>';   /* lot 59 */   /* lot 55 */
+        statsHTML(b.stats)+bilanPente(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+apprHTML(+b.id)+fqHTML(b)+mdBtn(b.id)+'</div>';   /* lot 83 */   /* lot 59 */   /* lot 55 */
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -7819,7 +8086,7 @@ function renderCloseBox(){
         '<p class="note">Une seule séance, mouvements principaux seulement ; les accessoires reprennent avec le bloc.</p>';
     }
     h+='<div class="row" style="margin-top:6px"><div class="field md"><label>'+(c.m==='close'?'Début du bloc suivant':'Début du bloc (semaine 1)')+'</label><input type="date" data-cl="s" value="'+esc(c.s||'')+'"></div></div>'+
-      (c.m==='close'?'<p class="note">Le bilan est archivé et reste consultable dans Données ; il se complète ensuite depuis le bilan. Le programme du bloc suivant reste modifiable. '+
+      (c.m==='close'?'<p class="note">Le bilan est archivé et reste consultable dans Données ; il se complète ensuite depuis le bilan. Vous y trouverez le questionnaire de fin de bloc (2 minutes), le bilan d’apprentissage et l’Export pour Claude. Le programme du bloc suivant reste modifiable. '+
         '« Rouvrir le bloc '+S.blockId+' » reste possible tant que rien n\'est noté dans le nouveau bloc.</p>':'')+
       '<div class="btnrow"><button class="act" data-cdo="1">'+(c.m==='close'?(ck.length?'Clôturer quand même':'Clôturer le bloc'):'Enregistrer')+'</button>'+
       '<button class="act ghost" data-cno="1">Annuler</button></div></div>';
@@ -7897,6 +8164,7 @@ function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} de
   var bgA=goalArch(); if(bgA)S.blocks[S.blocks.length-1].goal=bgA;
   S.blocks[S.blocks.length-1].bx=bilanX(+S.blockId||1);
   S.blocks[S.blocks.length-1].plan=mdPlan();   /* lot 55 : séances faites ou non, lignes prévues, échauffement proposé */   /* lot 54 : records, run, suggestions figés */   /* lot 53 : objectifs jugés et archivés */
+  cui().open['fq'+S.blockId]=1;   /* lot 83 : le questionnaire de fin de bloc s'ouvre dans le Bilan */
   var bd=blockDescs(); if(bd.length)S.blocks[S.blocks.length-1].desc=bd;   /* lot 46 (R5) */   /* B21 */
   S.lifts.forEach(function(L){
     var e=lastExploitable(L,true,S.blockId);   /* D3 : meilleure s\u00e9rie du bloc cl\u00f4tur\u00e9 ; aucune \u2192 refBlock inchang\u00e9 */
@@ -7918,17 +8186,29 @@ function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} de
 }
 $('newblock').addEventListener('click',function(){ if(CLOSEP&&CLOSEP.m==='close')CLOSEP=null; else closeOpen('close'); renderCloseBox(); });   /* lot 59 */
 /* lot 55 : panneau d'export Markdown du bilan */
+$('bilan').addEventListener('click',function(ev){   /* lot 81 (A9) : le signal se retire ou se remet */
+  var lb=ev.target&&ev.target.closest?ev.target.closest('[data-learn]'):null;
+  if(lb){ (S.blocks||[]).forEach(function(b){ if(+b.id===+lb.dataset.learn)b.learn=b.learn?0:1; }); save(); renderData(); return; }
+});
 $('bilan').addEventListener('click',function(ev){
   var t=ev.target, b=t&&t.closest?t.closest('[data-mdx],[data-mdc],[data-mdd],[data-mdr]'):null; if(!b)return;
   if(b.dataset.mdx!=null){ var n=+b.dataset.mdx; MDB=(MDB===n)?null:n; renderBilan(); return; }
   var w=b.closest('[data-mdb]'); if(!w)return; var id=+w.dataset.mdb;
   if(b.hasAttribute('data-mdr')){ S.mdPrompt=null; save(); renderBilan(); return; }
-  var txt=mdBlock(id);
-  if(b.hasAttribute('data-mdd')){ dl('bloc-'+id+'-'+todayISO()+'.md',txt,'text/markdown'); return; }
+  var txt=claudeExport(id);   /* lot 83 (A17) */
+  if(b.hasAttribute('data-mdd')){ dl('pour-claude-bloc-'+id+'-'+todayISO()+'.md',txt,'text/markdown'); return; }
   var fb=function(){ var a=w.querySelector('[data-mdfb]'); a.style.display=''; a.value=txt; a.focus(); a.select(); };
   var ok=function(){ var o=b.textContent; b.textContent='Copié ('+txt.length+' caractères)'; setTimeout(function(){b.textContent=o;},1600); };
   try{ navigator.clipboard.writeText(txt).then(ok,fb); }catch(e){ fb(); }
 });
+$('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdall')){ S.mdAll=!!t.checked; save(); } });   /* lot 83 */
+$('bilan').addEventListener('click',function(ev){   /* lot 83 (A12-A13) */
+  var b=ev.target&&ev.target.closest?ev.target.closest('[data-fq]'):null; if(!b||!b.dataset||!b.dataset.fq)return;
+  var p=b.dataset.fq.split('|'); fqSet(+p[0],p[1],p[2],p[3]); save(); renderBilan(); chInfo();
+});
+$('bilan').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset||!t.dataset.fqt)return;   /* lot 83 */
+  var p=t.dataset.fqt.split('|'); fqSet(+p[0],p[1],t.value); save();
+  var d=t.closest?t.closest('details'):null, s=d&&d.querySelector('summary b'); if(s)s.textContent=fqN(+p[0])+'/'+FQ.length; });
 $('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdon')){ S.mdOn=!!t.checked; save(); }
   if(t&&t.dataset&&t.dataset.ben)blockEdit(t); });   /* lot 59 */
 $('bilan').addEventListener('input',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdpr')){ S.mdPrompt=t.value; save(); } });
@@ -7943,6 +8223,9 @@ function blockStart(){
   if(S.start&&(f==null||S.start<f))f=S.start;
   return f;
 }
+/* lot 81 (A9) : bloc d'apprentissage (réserves notées en apprenant) ; signalé, jamais retiré des calculs */
+function learnB(id){ return (S.blocks||[]).some(function(b){ return +b.id===+id&&!!b.learn; }); }
+function learnE(e){ return !!e&&learnB(blockOfEntry(e)); }
 function blockOfEntry(e){
   var m=/\|b(\d+)$/.exec(String(e.key||''));
   if(m)return +m[1];
@@ -8028,13 +8311,19 @@ function opts(sel,vals,cur,lab0,fmt){
     return '<option value="'+v+'"'+(String(v)===String(cur)?' selected':'')+'>'+(fmt?fmt(v):v)+'</option>';}).join('');
   if(cur!==''&&vals.map(String).indexOf(String(cur))<0)sel.value='';
 }
+/* lot 77 (D1) : quatre vues ; chacune regroupe des cartes d'avant, rien n'est retiré */
+var DGRP={seances:['series','saisie'],progres:['prog','records','courbe'],bilan:['bilan','suivi'],pesees:['pesees']};
+var DGV={seances:'series',progres:'prog',bilan:'bilan',pesees:'pesees'};
+function dGroup(v){ for(var g in DGRP)if(DGRP[g].indexOf(v)>=0)return g; return 'seances'; }
 function renderDataView(){
-  var q=dq();
-  $('dview').value=q.view;
-  Array.prototype.forEach.call(document.querySelectorAll('[data-dvb]'),function(b){ b.setAttribute('aria-pressed',String(b.dataset.dvb===q.view)); });   /* lot 65 */
+  var q=dq(), g=dGroup(q.view);
+  $('dview').value=q.view==='tout'?'series':q.view;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-dvg]'),function(b){ b.setAttribute('aria-pressed',String(b.dataset.dvg===g)); });
   Array.prototype.forEach.call(document.querySelectorAll('#p-data [data-dv]'),function(c){
-    c.style.display=(q.view==='tout'||c.dataset.dv===q.view)?'':'none';
+    c.style.display=DGRP[g].indexOf(c.dataset.dv)>=0?'':'none';
   });
+  var nf=(q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0)+((q.blks||[]).length?1:0);
+  if($('dfiltsum'))$('dfiltsum').innerHTML='Filtres'+(nf?' <b>· '+nf+' actif'+(nf>1?'s':'')+'</b>':' : mouvement, type, lest, reps, période');
   opts($('dlift'),S.lifts.map(function(_,i){return i;}),q.li,'tous',function(i){return esc(S.lifts[i].name);});
   opts($('rlift'),S.lifts.map(function(_,i){return i;}),q.rli,'tous',function(i){return esc(S.lifts[i].name);});
   $('dper').innerHTML=perHTML(q,'d');   /* lot 60 (Q5) */
@@ -8063,8 +8352,8 @@ function dataSummary(list){
 }
 $('dview').addEventListener('change',function(){ dq().view=this.value; save(); renderData(); });
 $('dtabs').addEventListener('click',function(e){   /* lot 65 (Q16) */
-  var b=e.target.closest?e.target.closest('[data-dvb]'):null; if(!b)return;
-  dq().view=b.dataset.dvb; save(); renderData();
+  var b=e.target.closest?e.target.closest('[data-dvg]'):null; if(!b)return;   /* lot 77 */
+  dq().view=DGV[b.dataset.dvg]; save(); renderData(); applyFolds(); chInfo();
   if(b.scrollIntoView)b.scrollIntoView({block:'nearest',inline:'center'});
 });
 [['dlift','li'],['drole','role'],['dload','load'],['dreps','reps']].forEach(function(a){
@@ -8085,7 +8374,7 @@ function progEntries(li){
     if(e.li!==li||!e.date||!e.sets||!e.sets.length||(e.role!=='top'&&e.role!=='back'))return false;
     var k=String(e.key||''); if(/^d\|/.test(k))return false;
     if(/^m\|/.test(k)&&e.srcKey&&have[e.srcKey])return false;
-    return e.state!=='skip';
+    return e.state!=='skip'&&!e.doubt;   /* lot 80 (A8) */
   });
 }
 function progLastRir(e){
@@ -8106,6 +8395,7 @@ function progRows(li){
     if(!r.miss&&r.rir!=null){
       r.rm=e1rm(L,+t.load||0,+n,r.rir,bw); r.lest=r.rm-eff(L,bw); r.sys=L.useBw?bw+r.lest:r.lest;
       r.u1=L.k*(eff(L,bw)+(+t.load||0));   /* lot 68 (Q24) : e1RM que vaut 1 rep de réserve mal estimée, à cette charge */
+      r.ub=r.u1*rirMg(r.rir);   /* lot 79 (A4) : la bande suit la marge de la réserve notée */
       if(prev[r.day]){ r.d=r.sys-prev[r.day].sys; r.dref=prev[r.day].date; if(r.u1>0)r.drep=r.d/r.u1; }
       prev[r.day]=r;
     }
@@ -8159,7 +8449,7 @@ function progPlot(rows){
   var W=320,H=150,mx=34,my=16;
   var T=function(r){return new Date(r.date+'T12:00:00').getTime();};
   var all=pts.concat(xs0), xs=all.map(T), ys=pts.map(function(r){return r.sys;}).concat(xs0.map(function(r){return r.need;}));
-  pts.forEach(function(r){ if(r.u1>0)ys.push(r.sys-r.u1,r.sys+r.u1); });   /* lot 68 (Q24) : la bande tient dans le cadre */
+  pts.forEach(function(r){ if(r.u1>0)ys.push(r.sys-r.ub,r.sys+r.ub); });   /* lot 68 (Q24) : la bande tient dans le cadre */
   var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs); if(x1<=x0)x1=x0+1;
   var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys), pad=Math.max(1,(y1-y0)*0.2); y0-=pad; y1+=pad;
   var X=function(v){return (mx+(v-x0)/(x1-x0)*(W-mx-8)).toFixed(1);};
@@ -8169,8 +8459,8 @@ function progPlot(rows){
   s+='<line x1="'+mx+'" y1="10" x2="'+mx+'" y2="'+(H-my)+'" stroke="currentColor" opacity=".3"/>';
   progDays(rows).forEach(function(day){   /* lot 68 (Q24) : bande grise de ± 1 rep de réserve autour de chaque jour */
     var p=pts.filter(function(r){return r.day===day&&r.u1>0;}); if(p.length<2)return;
-    s+='<path data-progband d="'+p.map(function(r,j){return (j?'L':'M')+X(T(r))+' '+Y(r.sys+r.u1);}).join(' ')+' '+
-      p.slice().reverse().map(function(r){return 'L'+X(T(r))+' '+Y(r.sys-r.u1);}).join(' ')+' Z" fill="currentColor" opacity=".09" stroke="none"/>';
+    s+='<path data-progband d="'+p.map(function(r,j){return (j?'L':'M')+X(T(r))+' '+Y(r.sys+r.ub);}).join(' ')+' '+
+      p.slice().reverse().map(function(r){return 'L'+X(T(r))+' '+Y(r.sys-r.ub);}).join(' ')+' Z" fill="currentColor" opacity=".09" stroke="none"/>';
   });
   progDays(rows).forEach(function(day){
     var p=pts.filter(function(r){return r.day===day;}), c=progCol(day), d='';
@@ -8189,7 +8479,7 @@ function progPlot(rows){
   s+='</svg>';
   var lg=progDays(rows).map(function(day){ return '<span style="color:'+progCol(day)+'">●</span> '+esc(day||'?'); }).join(' &nbsp; ');
   if(xs0.length)lg+=' &nbsp; ✕ raté : e1RM qu\'il fallait pour réussir';
-  lg+=' &nbsp; <span style="opacity:.5">▮</span> ± 1 rep de réserve';   /* lot 68 */
+  lg+=' &nbsp; <span style="opacity:.5">▮</span> ± 1 rep de réserve (± 2 à 3 et plus)';   /* lot 68 ; lot 79 (A4) */
   return s+'<p class="note" data-proglegende>'+lg+'</p>';
 }
 var progSg=function(v){ var a=Math.round(Math.abs(v)*10)/10; return a===0?'0':(v>=0?'+':'−')+F(a); };   /* lot 69 : plus de « −0 » */
@@ -8244,6 +8534,7 @@ function renderProg(){
     h+='<p class="note" data-progbruit>Une rep de réserve mal estimée fait bouger l’e1RM d’environ '+F(Math.round(rows.filter(function(r){return r.u1>0;}).slice(-1).map(function(r){return r.u1;})[0]*10)/10||0)+
       ' kg ici : sous 1 rep, un écart est dans le bruit ; de 1 à 2, à confirmer ; au-delà, probablement réel.</p>';   /* lot 68 (Q24) */
     var jr=progJours(rows); if(jr.length)h+='<p class="note" data-progjours>'+jr.map(function(o){return o.txt;}).join('<br>')+' Une description de ces semaines, pas une règle.</p>';
+    if(rows.some(function(r){return r.rir!=null&&learnE(r.top);}))h+='<p class="note" data-proglrn>« apprentissage » : réserves notées pendant que vous appreniez à les estimer. Elles comptent, avec leur marge ; à lire avec prudence quand un bloc s’y compare.</p>';   /* lot 81 (A9) */
     var bl=progBlocs(L,rows); if(bl)h+='<ul class="note" data-progbloc>'+bl+'</ul>';
     var bg=boffGap(li); if(bg)h+='<p class="note" data-boffgap>Back-offs : '+boffTxt(bg)+'</p>';   /* lot 69 (Q26) */
     var dt=progHors(li); if(dt)h+='<p class="note" data-progdl>Hors courbe (deload, tests) : '+dt+'.</p>';   /* lot 69 (Q29) */
@@ -8251,7 +8542,7 @@ function renderProg(){
     h+='<div class="scroll" style="margin:8px 0"><table class="progtab" data-progtab><thead><tr><th>séance, top set</th><th>e1RM'+(L.useBw?' syst.':'')+', écart</th><th>back-off, baisse</th></tr></thead><tbody>'+
       rows.map(function(r){
         var t=r.top, b=r.back;
-        return '<tr><td>'+dd(r.date)+' <b style="color:'+progCol(r.day)+'">'+esc(r.day)+'</b> <span class="note">B'+blockLab(t)+'</span><br>'+progSet(L,t,r.rir)+(r.miss?' <i>raté</i>':'')+'</td>'+
+        return '<tr><td>'+dd(r.date)+' <b style="color:'+progCol(r.day)+'">'+esc(r.day)+'</b> <span class="note">B'+blockLab(t)+(learnE(t)?' · apprentissage':'')+'</span><br>'+progSet(L,t,r.rir)+(r.miss?' <i>raté</i>':'')+'</td>'+
           '<td>'+(r.sys!=null?'<b>'+F(Math.round(r.sys*10)/10)+'</b>'+(r.d!=null?'<br><span class="note">'+progSg(r.d)+' ('+dd(r.dref)+')'+(r.drep!=null?'<br><span data-progrep>'+progRep(r.drep)+'</span>':'')+'</span>':''):
             (r.need!=null?'<span class="note">✕ il fallait<br>'+F(Math.round(r.need*10)/10)+'</span>':'—'))+'</td>'+
           '<td>'+(b?progSet(L,b,progLastRir(b))+(r.fp!=null?'<br><b>−'+F(Math.round(r.fp*10)/10)+' %</b>':''):'')+'</td></tr>';
@@ -8316,17 +8607,21 @@ function renderData(){
         return (a&&a.some(Boolean))?'S'+(st+1)+' '+a.map(function(c){return c?VJ[c].e:'\u00b7';}).join(''):'';
       }).filter(Boolean).join(' \u00b7 ');
       var lk=['<button class="linkbtn" data-dcom="'+esc(e.key)+'">commenter</button>'];   /* lot 46 (R10) */
-      if(e.key&&findLine(e.key))lk.push('<button class="linkbtn" data-open="'+esc(e.key)+'">ouvrir la séance</button>');
+      if(e.key&&findLine(e.key))lk.push('<button class="linkbtn" data-open="'+esc(e.key)+'">'+(aComp(e)?'compléter (ouvrir la séance)':'ouvrir la séance')+'</button>');
+      if(e.state!=='skip')lk.push('<button class="linkbtn" data-doubtk="'+esc(e.key)+'">'+(e.doubt?'n’est plus douteuse':'saisie douteuse')+'</button>');   /* lot 80 (A8) */
       veloOfKey(e.key).forEach(function(v){lk.push('<button class="linkbtn" data-vgo="'+esc(v.id)+'">\ud83c\udfa5 vidéo S'+(v.lien.set+1)+'</button>');});
-      return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
+      return '<div class="logrow'+(LGOPEN[e.key]||DCOM===e.key?' lgopen':'')+'" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b>'+rkMark(e)+' '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+(isM(S.lifts[e.li])?' m':'')+   /* R12 */
         (e.rirs?' · réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue'))+
+        ((e.rir!=null||e.rirs)&&learnE(e)?' <span class="lrn">(apprentissage)</span>':'')+   /* lot 81 (A9) */
+        (e.doubt?' <span class="dout">⚠ douteuse</span>':'')+(aComp(e)?' <span class="acomp">à compléter</span>':'')+   /* lot 80 */
+        (veloOfKey(e.key).length?' 🎥':'')+'<span class="lgchev" aria-hidden="true">'+(LGOPEN[e.key]||DCOM===e.key?'▾':'▸')+'</span><span class="lgmore">'+   /* lot 77 */
         '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
         (e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+   /* R12 */
         (e.role==='extra'?'<br><i>ajout ponctuel</i>':'')+
         (vl?'<br>'+vl:'')+(e.fin?'<br><i>'+finTxt(e)+'</i>':'')+dfmHTML(e)+rkMarkTxt(e)+atTxt(e)+   /* lot 48 */   /* lot 43 (C2) */
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+snHTML(e)+   /* lot 46 (R10) */
-        dcomHTML(e)+(lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span>'+
+        dcomHTML(e)+(lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span></span>'+
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'">×</button></div>';
     }).join('');
   }
@@ -8525,7 +8820,7 @@ var VTMAX=20*60000, VTGAP=60000;
 function veloT(v){ var m=/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/.exec(String(v.id||'')); return m?new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime():null; }
 function veloAuto(v){
   if(v.lien)return false;
-  if(/chauf|warm/i.test(String(v.type_serie||'')))return false;
+  if(/chauf|warm|fixe/i.test(String(v.type_serie||'')))return false;   /* lot 82 : montée fixe */
   var es=S.log.filter(function(e){return e.date===v.date&&(v.li<0||e.li===v.li)&&e.sets&&e.sets.length;});
   if(!es.length)return false;
   var n=v.reps.length, ts=String(v.type_serie||'').toLowerCase(), c=[];
@@ -8545,8 +8840,96 @@ function veloAuto(v){
   if(tie.length&&(tie.length===1||tie[1].d-tie[0].d>=VTGAP)){ setLien(v,{key:tie[0].x.e.key,set:tie[0].x.s,auto:1,h:1}); return true; }
   return false;
 }
+/* lot 82 (A16 a) : ce que veloAuto laisse (ex aequo sans heure notée : back-offs de mêmes reps), rattaché par date, mouvement,
+   charge et ordre. Vidéos d'un même jour, mouvement, type et lest, rangées par heure de prise de vue ; une seule entrée du journal
+   à ce lest et de ce rôle (une clé du programme passe avant une série versée 'm|') ; la n-ième vidéo va à la n-ième série encore
+   libre. Marqué ord:1 (« par l'ordre ») jusqu'à « c'est bon » ; plus de vidéos que de séries libres : rien. */
+function vRole(v){ var t=String(v.type_serie||'').toLowerCase(); return /top/.test(t)?'top':/back/.test(t)?'back':/second/.test(t)?'work':null; }
+function veloOrdAll(){
+  var G={}, ch=false;
+  (S.velo||[]).forEach(function(v){
+    if(v.lien||isWarm(v)||isFixe(v)||v.lest_kg==null||!vRole(v))return;
+    var k=v.date+'|'+v.li+'|'+vRole(v)+'|'+(+v.lest_kg); (G[k]=G[k]||[]).push(v);
+  });
+  Object.keys(G).forEach(function(k){
+    var l=G[k], v0=l[0], ro=vRole(v0), lest=+v0.lest_kg;
+    var es=S.log.filter(function(e){ return e.date===v0.date&&(v0.li<0||e.li===v0.li)&&e.sets&&e.sets.length&&e.role===ro&&Math.abs((+e.load||0)-lest)<0.01; });
+    var pg=es.filter(function(e){ return !/^m\|/.test(String(e.key)); }); if(pg.length)es=pg;
+    if(es.length!==1)return;
+    var e=es[0], n=(e.tries||e.sets).length, libres=[];
+    for(var st=0;st<n;st++)if(!(S.velo||[]).some(function(o){ return o.lien&&o.lien.key===e.key&&o.lien.set===st; }))libres.push(st);
+    if(l.length>libres.length)return;
+    l.sort(function(a,b){ var ta=veloT(a), tb=veloT(b); return (ta!=null&&tb!=null&&ta!==tb)?ta-tb:vSortN(a,b); });
+    l.forEach(function(v,i){ setLien(v,{key:e.key,set:libres[i],auto:1,ord:1}); ch=true; });
+  });
+  return ch;
+}
+/* lot 82 (A1, A14) : réserve notée de la série filmée (comme rkSets : e.rirs, sinon e.rir sur la dernière série) ; vitesse
+   d'échec = médiane des dernières reps de vos séries filmées notées 0 (sans variante ni pause avant la dernière rep), 0,20 m/s
+   (Sánchez-Moreno 2017) tant qu'il y en a moins de 2. */
+function vRir(v){
+  var e=lienEntry(v); if(!e||e.doubt||v.lien.set==null)return null;
+  var n=(e.tries||e.sets).length, st=v.lien.set, q=e.rirs?e.rirs[st]:(st===n-1?e.rir:null);
+  return q==null?null:+q;
+}
+function vOk(v){ return (v.reps||[]).filter(function(r){ return !r.tentative_ratee&&r.vitesse_moy_ms!=null; }); }
+function vLastOk(v){ var o=vOk(v); return o.length?+o[o.length-1].vitesse_moy_ms:null; }
+function vLisible(v){ var e=lienEntry(v); return !v.variante&&!isWarm(v)&&!isFixe(v)&&!(e&&e.fin)&&vLastOk(v)!=null; }
+function vEchecs(mv){ return (S.velo||[]).filter(function(v){ return v.mouvement===mv&&vLisible(v)&&vRir(v)===0; }).map(vLastOk); }
+function vEchec(mv){
+  var xs=vEchecs(mv); if(xs.length<2)return {v:0.20,n:xs.length,pub:true};
+  var o=xs.slice().sort(function(a,b){return a-b;}), m=o.length>>1;
+  return {v:o.length%2?o[m]:(o[m-1]+o[m])/2,n:xs.length,lo:o[0],hi:o[o.length-1]};   /* médiane : une série mal notée ne la tire pas */
+}
+function v2(x){ return F(Math.round(x*100)/100); }
+function vPerte(v){
+  var o=vOk(v); if(o.length<2)return null;
+  var b=Math.max.apply(null,o.map(function(r){return +r.vitesse_moy_ms;})), z=+o[o.length-1].vitesse_moy_ms;
+  return {b:b,z:z,p:b>0?(1-z/b)*100:null};
+}
+function vMiroir(v){
+  if(!vLisible(v))return '';
+  var q=vRir(v); if(q==null)return '';
+  var xs=vEchecs(v.mouvement), lo=xs.length?Math.min.apply(null,xs):null, hi=xs.length?Math.max.apply(null,xs):null;
+  return 'Réserve notée <b>'+F(q)+'</b> · dernière rep <b>'+v2(vLastOk(v))+' m/s</b>'+
+    (xs.length?' · vos séries notées 0 : '+v2(lo)+(hi-lo>=0.005?'-'+v2(hi):'')+' m/s':'');
+}
+function vLienTxt(v){
+  if(isFixe(v))return 'montée fixe : jamais rattachée';
+  var e=lienEntry(v);
+  if(!e)return '<b class="vswarn">non rattachée</b> <span class="muted">(détail › pour choisir)</span>';
+  var n=(e.tries||e.sets).length;
+  return roleLab(e.role,e.key)+(n>1?', série '+(v.lien.set+1)+' sur '+n:'')+
+    (v.lien.ord?' · <span class="vswarn">par l’ordre, à vérifier</span> <button class="linkbtn" data-vok="'+esc(v.id)+'">c’est bon</button>':'');
+}
+/* lot 82 (A15 a) : montée fixe (même mouvement, lest, reps et forme) : vitesse moyenne des reps, comparée à la moyenne de vos
+   montées fixes des séances d'avant ; 3 d'abord pour calibrer. Écart « habituel » : dans vos variations (écart-type), 3 % au moins. */
+var FIXN=3;
+function vMoy(v){ var o=vOk(v); return o.length?o.reduce(function(a,r){return a+(+r.vitesse_moy_ms);},0)/o.length:null; }
+function vFixeRefs(v){
+  return (S.velo||[]).filter(function(o){ return o!==v&&isFixe(o)&&o.mouvement===v.mouvement&&(o.variante||'')===(v.variante||'')&&
+    Math.abs((+o.lest_kg||0)-(+v.lest_kg||0))<0.01&&vOk(o).length===vOk(v).length&&String(o.date)<String(v.date)&&vMoy(o)!=null; });
+}
+function vFixe(v){
+  var m=vMoy(v), R=vFixeRefs(v).map(vMoy); if(m==null)return null;
+  if(R.length<FIXN)return {m:m,n:R.length,cal:true};
+  var mo=R.reduce(function(a,b){return a+b;},0)/R.length, sd=Math.sqrt(R.reduce(function(a,x){return a+(x-mo)*(x-mo);},0)/(R.length-1));
+  var p=(m/mo-1)*100, sp=sd/mo*100, tol=Math.max(3,sp);
+  return {m:m,mo:mo,n:R.length,p:p,sp:sp,tol:tol,c:Math.abs(p)<=tol?0:(p<0?-1:1)};
+}
+function vFixeRow(v){
+  var f=vFixe(v), h;
+  if(!f)h='—';
+  else if(f.cal)h='calibrage : '+f.n+' montée'+(f.n>1?'s':'')+' de référence sur '+FIXN+' <span class="muted">(même lest, mêmes reps, même forme)</span>';
+  else h=(f.c===0?'habituelle':'<b class="'+(f.c<0?'vswarn':'vsok')+'">'+F(Math.round(Math.abs(f.p)))+' % plus '+(f.c<0?'lente':'rapide')+' que d’habitude</b>')+
+    ' <span class="muted">('+F(Math.round(f.p*10)/10)+' % ; vos montées varient de ± '+F(Math.round(f.sp*10)/10)+' %, sur '+f.n+')</span>';
+  return '<div class="vsv" data-vopen="'+esc(v.id)+'"><div class="vsvh"><b>'+serieLab(v)+'</b><span class="muted">détail ›</span></div>'+
+    '<dl class="vsvl"><dt>Vitesse moyenne</dt><dd>'+(f?v2(f.m)+' m/s'+(f.mo!=null?' <span class="muted">(habituelle '+v2(f.mo)+')</span>':''):'—')+'</dd>'+
+    '<dt>Forme du jour</dt><dd>'+h+'</dd></dl></div>';
+}
 function veloAutoAll(){
   var ch=false; (S.velo||[]).forEach(function(v){ if(veloAuto(v))ch=true; });
+  if(veloOrdAll())ch=true;   /* lot 82 (A16) */
   if(ch)save();
 }
 function roleLab(r,k){if(r==='test'&&/^r\|/.test(String(k||'')))return 'test du single';   /* lot R1 */
@@ -8769,9 +9152,10 @@ function seuilOf(v){
     src:'vidéo étalon du 19/09, positions tenues à 15 kg',sure:false};
 }
 function isWarm(v){ return /chauf|warm/i.test(String(v.type_serie||'')); }
+function isFixe(v){ return /fixe/i.test(String(v.type_serie||'')); }   /* lot 82 (A15) : montée fixe, jamais rattachée à une série */
 function typeLab(v){
   var t=String(v.type_serie||'').toLowerCase();
-  return /chauf|warm/.test(t)?'Échauffement':/top/.test(t)?'Top set':/back/.test(t)?'Back-off':/max|amrap/.test(t)?'Série max':'Série';
+  return /fixe/.test(t)?'Montée fixe':/chauf|warm/.test(t)?'Échauffement':/top/.test(t)?'Top set':/back/.test(t)?'Back-off':/max|amrap/.test(t)?'Série max':'Série';
 }
 function serieLab(v){
   var le=lienEntry(v);   /* lot 57 bis */
@@ -9045,8 +9429,21 @@ function vsRow(v,P,hi){
     '<dl class="vsvl">'+
       '<dt>Reps valides</dt><dd>'+(hasH?'<b'+(nv<n?' class="vsbad"':'')+'>'+(nv<n?'✗ ':'')+nv+' / '+n+'</b>'+(s&&!s.sure?' <span class="muted">(seuil provisoire)</span>':''):'—')+'</dd>'+
       '<dt>Dernière rep</dt><dd><b class="'+vd.c+'">'+vd.t+'</b>'+(vl!=null?' <span class="muted">('+F(vl)+' m/s)</span>':'')+'</dd>'+
-      '<dt>Forme du jour</dt><dd>'+fo+'</dd>'+
+      '<dt>Forme du jour</dt><dd>'+fo+'</dd>'+vsRow82(v)+   /* lot 82 */
     '</dl>'+vsBars(v,hi)+'</div>';
+}
+/* lot 82 : perte de vitesse et distance à l'échec (A14), réserve notée en miroir (A1), série rattachée (A16) */
+function vsRow82(v){
+  var le=lienEntry(v), pe=vPerte(v), vl=vLastOk(v), h='';
+  if(pe&&pe.p!=null&&!(le&&le.fin))h+='<dt>Perte de vitesse</dt><dd><b>'+F(Math.round(pe.p))+' %</b> <span class="muted">(meilleure rep '+v2(pe.b)+' → dernière '+v2(pe.z)+' m/s)</span></dd>';
+  if(vLisible(v)){
+    var ec=vEchec(v.mouvement), d=vl-ec.v;
+    var rf=ec.pub?'0,20 m/s (vitesse publiée du 1RM ; la vôtre dès 2 séries notées 0)':'votre vitesse d’échec, '+v2(ec.v)+' m/s ('+ec.n+' séries notées 0)';
+    h+='<dt>Jusqu’à l’échec</dt><dd>'+(Math.abs(d)<0.005?'<b>0 m/s</b> <span class="muted">: à '+rf:'<b>'+(d>0?'+':'−')+v2(Math.abs(d))+' m/s</b> <span class="muted">'+(d>0?'au-dessus de ':'en dessous de ')+rf)+'</span></dd>';
+  }
+  var mi=vMiroir(v); if(mi)h+='<dt>Votre réserve</dt><dd>'+mi+'</dd>';
+  if(!isWarm(v))h+='<dt>Série</dt><dd>'+vLienTxt(v)+'</dd>';
+  return h;
 }
 function vsSeance(){
   var U=vui(), all=vDates(), ds=vFiltre(all);
@@ -9057,13 +9454,14 @@ function vsSeance(){
   var day=S.velo.filter(function(v){return v.date===U.date;}), mvs=[];
   day.forEach(function(v){ if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
   if(mvs.indexOf(U.mv)<0)U.mv=mvs[0];
-  var l=day.filter(function(v){return v.mouvement===U.mv;}).sort(vSortN), work=l.filter(function(v){return !isWarm(v);}), warm=l.filter(isWarm);
+  var l=day.filter(function(v){return v.mouvement===U.mv;}).sort(vSortN), work=l.filter(function(v){return !isWarm(v)&&!isFixe(v);}), warm=l.filter(isWarm), fx=l.filter(isFixe);   /* lot 82 */
   var P=vsFit(U.mv), mx=0.6;
   l.forEach(function(v){ v.reps.forEach(function(r){ if(r.vitesse_moy_ms!=null&&r.vitesse_moy_ms*1.15>mx)mx=r.vitesse_moy_ms*1.15; }); });
   return '<div class="card" data-chk="vseance"><div class="vtitle">Mes reps étaient-elles bonnes ?'+chIB('vseance')+'</div>'+
     '<div class="row"><div class="field md"><label>Séance</label>'+vSel('date',ds,U.date,frDate)+'</div>'+
     (mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('mv',mvs,U.mv)+'</div>':'')+'</div>'+
     '<details class="chd" data-chd="vfilt"><summary>Filtres : bloc, type de séance</summary>'+fl+'</details>'+
+    fx.map(vFixeRow).join('')+   /* lot 82 (A15) */
     work.map(function(v){ return vsRow(v,P,mx); }).join('')+
     (warm.length?'<button class="vwarm" data-vwarm="1">Échauffements ('+warm.length+') '+(U.warm?'▾':'▸')+'</button>'+
       (U.warm?warm.map(function(v){ return vsRow(v,P,mx); }).join(''):''):'')+
@@ -9072,6 +9470,11 @@ function vsSeance(){
     'la vitesse du 1RM aux tractions vaut 0,20 ± 0,05 m/s quel que soit le niveau (Sánchez-Moreno 2017). Au-dessus de 0,33 m/s il restait des reps ; '+
     'combien, la vitesse seule ne le dit pas encore. <b>Forme du jour</b> : vitesse de la 1re rep comparée à votre droite charge-vitesse (écran Profil) ; '+
     'un écart de moins de 0,07 m/s n’est pas mesurable (Weakley 2021), d’où la fourchette. Ligne rouge : 0,20 m/s. '+
+    '<b>Perte de vitesse</b> : de la meilleure rep à la dernière. <b>Jusqu’à l’échec</b> : vitesse de la dernière rep moins votre vitesse d’échec, '+
+    'la médiane des dernières reps de vos séries notées 0 (0,20 m/s publiée tant qu’il y en a moins de 2) ; les m/s restent affichés. '+
+    '<b>Votre réserve</b> : votre chiffre à côté de la vitesse, pour apprendre ; il n’est jamais corrigé. '+
+    '<b>Série</b> : rattachement par date, charge et ordre des vidéos quand rien d’autre ne tranche ; « c’est bon » le confirme, le détail permet de le changer. '+
+    '<b>Montée fixe</b> (type choisi dans la page vidéo) : vitesse moyenne de ses reps, comparée à vos montées fixes d’avant au même lest, aux mêmes reps et à la même forme. '+
     'Touchez une série pour le détail : hauteurs rep par rep, jugements, rattachement.</p></div>';
 }
 function vsProfil(){
@@ -9140,6 +9543,8 @@ function renderVelo(){
   chInfo();
 }
 $('p-velo').addEventListener('click',function(e){
+  var ok=e.target.closest?e.target.closest('[data-vok]'):null;   /* lot 82 (A16) */
+  if(ok){ var vv=vById(ok.dataset.vok); if(vv&&vv.lien){ delete vv.lien.ord; save(); renderVelo(); } return; }
   var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
   if(!b||e.target.closest('[data-juge],[data-velodel],select,a,[data-open]'))return;
   var U=vui();
@@ -9313,6 +9718,7 @@ function renderAll(){
   if(!$('ldate').value)$('ldate').value=todayISO();
   lbwFill();   /* N6 */
   $('verbo').value=S.verbo;
+  $('rirexpm').value=S.rirExpShow?'1':'';   /* lot 79 (A6) */
   $('showacc').checked=!!S.showAcc; $('accchip').classList.toggle('on',!!S.showAcc);
   fillSelects(); renderHead(); renderLifts();
   if(CTOUCH)renderCharges(); else fillCharges();
@@ -9323,6 +9729,7 @@ $('showacc').addEventListener('change',function(){
   S.showAcc=this.checked; $('accchip').classList.toggle('on',S.showAcc); save(); generate(); applyFolds();
 });
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
+$('rirexpm').addEventListener('change',function(){ S.rirExpShow=this.value==='1'; save(); renderToday(); });   /* lot 79 (A6) */
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
 /* B11 : une copie d'avant import laissee par une session precedente n'a plus de sens
    (l'etat courant a pu changer depuis) : on l'efface avant de charger. */
@@ -9331,7 +9738,22 @@ load();
 if(S.bkEvery==null)S.bkEvery=7;          /* rappel de sauvegarde : chaque semaine par defaut */
 if(!S.firstUse)S.firstUse=todayISO();
 renderAll(); applyNavMin(); renderBackup();
+(function(){   /* lot 77 : Ajouter sous Séries, Progression avant Records, Bilan avant Bloc en cours */
+  var c=$('p-data'), dv=function(k){ return c.querySelector(':scope > .card[data-dv="'+k+'"]'); };
+  try{ dv('series').insertAdjacentElement('afterend',dv('saisie')); c.insertBefore(dv('prog'),dv('records')); c.insertBefore(dv('bilan'),dv('suivi')); }catch(e){}
+})();
+(function(){   /* lot 78 (P1) : Bloc en cours = le programme, puis Où en est le bloc, puis Réglages du bloc */
+  var p=$('p-prog'); try{ p.insertBefore($('cardassign'),$('cardsim')); }catch(e){}
+})();
 ['prog','charges','data','velo','lifts'].forEach(applyOrder);
+progView();   /* lot 78 */
+$('pseg').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-pv]'):null; if(!b)return;
+  cui().prog=b.dataset.pv; save(); progView(); applyFolds(); chInfo(); window.scrollTo(0,0);
+});
+$('appmen').addEventListener('click',function(){   /* lot 78 (P4) */
+  var m=$('appmenu'), on=!!m.hidden; m.hidden=!on; this.setAttribute('aria-expanded',String(on));
+});
 $('nav').addEventListener('click',function(){ if(document.body.classList.contains('reorg')){ reoBanner(); drawBars(); } });
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
 

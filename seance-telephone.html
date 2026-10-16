@@ -80,6 +80,7 @@ th:first-child,td:first-child{text-align:left}
 <p class="petit"><b>Les lignes ci-dessous sont rangées par heure de prise de vue</b> (la plus ancienne en haut), quel que soit l'ordre dans lequel vous avez touché les vidéos. Vérifiez l'heure avant de taper chaque légende.</p>
 <label id="nechl" style="display:grid;gap:.25rem;margin:.75rem 0 .25rem;font-weight:600">Échauffements filmés avant le top set<select id="nech"><option value="0">Aucun</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
 <p class="petit">Les premières vidéos (par heure) passent alors en « Échauffement », la suivante en « Top set », les autres en « Back-off ». Une vidéo d'échauffement est rangée à part dans Vitesse et n'est jamais rattachée à une série de travail. Tapez son lest (0 au poids du corps) et ses reps. Laissez la variante sur « Aucune » pour qu'elle compte dans la droite charge-vitesse.</p>
+<p class="petit"><b>Montée fixe (forme du jour)</b> : la même montée à chaque séance, avant les séries de travail (même lest, mêmes reps, même forme), chaque rep le plus vite possible. Comptez-la dans les échauffements ci-dessus, puis choisissez « Montée fixe » sur sa ligne ; forme haute : variante « hautes ». L'app la compare à vos montées fixes d'avant (Vitesse › Séance) ; il en faut 3 pour calibrer.</p>
 <p id="nechmsg" role="status" hidden></p>
 <div id="liste" style="display:grid;gap:.75rem"></div></section>
 
@@ -4196,6 +4197,7 @@ function demuxerMaison(buf) {
   // serie et l'app l'affiche apres le titre (« … · stato »). Sans secondaire ni variante, rien
   // ne change : meme objet que S34.lireSaisieSeance, fichier au bit.
   const SECONDAIRE = "secondaire";
+  const SANS_TYPE = [SECONDAIRE, "montee fixe"];   // lot 82 (A15) : la montée fixe passe comme une ligne secondaire
   const VARIANTES = ["hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
   const PAR_VIDEO = S34.PAR_VIDEO.concat(["variante"]);
   function lireSaisieSeance(s) {
@@ -4210,15 +4212,15 @@ function demuxerMaison(buf) {
     const pour34 = { commun: s.commun, videos: vids.map(function (v) {
       const w = {}; w.nom = v.nom;
       for (const k of S34.PAR_VIDEO) w[k] = v[k];
-      if (String(v.type_serie || "") === SECONDAIRE) w.type_serie = "";
+      if (SANS_TYPE.indexOf(String(v.type_serie || "")) >= 0) w.type_serie = "";
       return w;
     }) };
     const e = S34.lireSaisieSeance(pour34);
     vids.forEach(function (v) {
-      const sec = String(v.type_serie || "") === SECONDAIRE, va = String(v.variante || "");
+      const sec = SANS_TYPE.indexOf(String(v.type_serie || "")) >= 0, va = String(v.variante || "");
       if (!sec && va === "") return;
       const l = e.legendes[v.nom].leg, leg = {};
-      leg.type_serie = sec ? SECONDAIRE : l.type_serie;
+      leg.type_serie = sec ? String(v.type_serie) : l.type_serie;
       if (leg.type_serie === undefined) delete leg.type_serie;
       for (const k of Object.keys(l)) if (k !== "type_serie") leg[k] = l[k];
       if (va !== "") leg.variante = va;
@@ -4301,7 +4303,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 74b","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"lot 82","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4337,7 +4339,7 @@ function ligneVideo(f, i) {
   d.appendChild(h3);
   const g = el('div', { class: 'trois' });
   const lt = el('label', {}, 'Type'); const s = el('select', { id: 'v' + i + '-type_serie' });
-  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
+  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['montee fixe', 'Montée fixe (forme du jour)'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
   s.value = S40.typeLigne(i, +$('nech').value || 0, $('typeseance').value === 'secondaire'); /* lot 74 B */ lt.appendChild(s); g.appendChild(lt);
   const ll = el('label', {}, 'Lest (kg)'); ll.appendChild(el('input', { id: 'v' + i + '-lest_kg', inputmode: 'decimal', autocomplete: 'off', placeholder: '25' })); g.appendChild(ll);
   const lr = el('label', {}, 'Reps ann.'); lr.appendChild(el('input', { id: 'v' + i + '-reps_annoncees', inputmode: 'numeric', autocomplete: 'off', placeholder: '7' })); g.appendChild(lr);
@@ -4633,7 +4635,7 @@ function afficher(vs, sortie) {
   "use strict";
   // ecrit par l'app (index.html, seancesPage) dans le stockage du site, a chaque affichage de la Seance du jour
   const CLE = "cp-seances-page";
-  const TYPES = ["top set", "back-off", "secondaire", "echauffement", ""];
+  const TYPES = ["top set", "back-off", "secondaire", "echauffement", "montee fixe", ""];
   const VARIANTES = ["", "hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
 
   function lireResume(texte) {
