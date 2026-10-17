@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-dir="A">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -317,6 +317,7 @@ details.failfold>summary{cursor:pointer}
 .pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .fq{display:grid;gap:12px;margin-top:6px}.fq fieldset{border:0;padding:0;margin:0;min-width:0}.fq legend{font:600 13px/1.35 var(--txt);padding:0;margin-bottom:2px}   /* lot 83 */
 .fq .pill{min-width:0;font-size:12.5px;padding:7px 9px}.fq textarea{width:100%}
+[data-plusform]{border-top:1px dashed var(--rule);margin-top:8px;padding-top:8px}   /* lot 84 */
 /* lot 75 : Charges simplifié */
 .chi{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;border-radius:50%;
   border:1px solid var(--rule);background:transparent;color:var(--muted);font:600 13px/1 var(--txt);cursor:pointer;vertical-align:middle;padding:0}
@@ -530,6 +531,109 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 .rkm{color:var(--ok);font-weight:600}
 .dfm .linkbtn{margin-right:4px}
 #rkbadge{position:fixed;left:10px;right:10px;top:10px;z-index:60;border-left-color:var(--ok);font-size:14px;line-height:1.45}
+/* ===== lot 85 (17/10/2026) : refonte graphique, socle (réponses du 16/10 : S1-S6, S11, direction A + chiffres gras de B).
+   Active sous html[data-dir] (posé d'office, « Style : v87 » dans ⚙ le retire). Lectures 13-16, chantier-outil/refonte-graphique/. */
+
+/* ---------- socle ---------- */
+:root[data-dir]{
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;           /* RUI p. 72-73 */
+  --t-xs:12px;--t-s:13px;--t-m:15px;--t-l:17px;--t-xl:22px;--t-xxl:30px; /* 6 crans, rien sous 12 px */
+  --hit:48px;                                                            /* Material 48 dp, Hoober p. 521 */
+  --rr:8px;--rp:8px;
+  --sh1:0 1px 3px rgba(15,18,22,.10),0 1px 2px rgba(15,18,22,.06);       /* RUI p. 183, 186 */
+  --sh2:0 4px 12px rgba(15,18,22,.12),0 2px 4px rgba(15,18,22,.06);
+  --ease:cubic-bezier(.05,.7,.1,1);                                      /* Material emphasized-decelerate */
+}
+:root[data-dir][data-theme="dark"]{--sh1:none;--sh2:none}
+:root[data-dir] body{font:400 var(--t-m)/1.5 var(--txt);font-variant-numeric:tabular-nums lining-nums}
+:root[data-dir] .wrap{padding:0 var(--s4)}
+/* en-tête : plus de trait noir, l'espace sépare */
+:root[data-dir] header{border-bottom:0;padding:var(--s4) 0 var(--s2)}
+:root[data-dir] .iconbtn{border:0;background:var(--soft);color:var(--ink);border-radius:var(--rp);min-height:40px;font-size:var(--t-xs)}
+:root[data-dir] .iconbtn.hlab,:root[data-dir] .iconbtn.sq{height:40px}
+:root[data-dir] .bwmen{font-size:var(--t-xs)}
+:root[data-dir] .bwmen b{font-size:var(--t-m)}
+/* cartes : marge 16, rayon unique, ombre douce en clair, surface plus claire en sombre */
+:root[data-dir] .card{border-radius:var(--rr);padding:var(--s4);margin-bottom:var(--s3);box-shadow:var(--sh1)}
+:root[data-dir] .card>h2{font-size:var(--t-l);margin-bottom:var(--s3)}
+:root[data-dir] .card>h2 em{font-size:var(--t-xs)}
+/* texte : notes, étiquettes, lignes */
+:root[data-dir] .note{font-size:var(--t-s);line-height:1.5;margin-top:var(--s2)}
+:root[data-dir] label{font-size:var(--t-xs);margin-bottom:var(--s1)}
+:root[data-dir] .flag{font-size:var(--t-s);padding:var(--s2) 0 var(--s2) var(--s3)}
+:root[data-dir] summary{font-size:var(--t-s)}
+:root[data-dir] details{border-top:0;padding-top:var(--s1);margin-top:var(--s3)}
+:root[data-dir] .line{padding:var(--s2) 0 var(--s2) var(--s2);margin-left:calc(-1*var(--s2));border-radius:4px}
+/* grands nombres seulement en Séance du jour ; le programme reste un tableau serré */
+:root[data-dir] #p-today .line .nm{font-size:var(--t-m);font-weight:600}
+:root[data-dir] #p-today .line .pr{font-size:var(--t-xl)}
+:root[data-dir] .line .in,:root[data-dir] .line .inx,:root[data-dir] .lastp,:root[data-dir] .lpd,:root[data-dir] .tbl,:root[data-dir] .mk{font-size:var(--t-xs)}
+:root[data-dir] .pr .pc{font-size:.62em}
+:root[data-dir] .logrow .t{font-size:var(--t-s)}
+:root[data-dir] .logrow .d{font-size:var(--t-xs)}
+:root[data-dir] .linkbtn{font-size:var(--t-s);text-decoration-thickness:1px;text-underline-offset:3px}
+/* tableaux : sans filets, chiffres en colonne */
+:root[data-dir] table{font-variant-numeric:tabular-nums}
+:root[data-dir] th,:root[data-dir] td{border-bottom:0;padding:6px 6px}
+:root[data-dir] thead th{border-bottom:1px solid var(--rule);font-size:var(--t-xs)}
+/* boutons et pastilles : 48 px, un seul rayon, état pressé visible (Material state 12 %, Apple Buttons) */
+:root[data-dir] button.act{min-height:44px;padding:0 var(--s4);border-radius:var(--rp);font-size:var(--t-s)}
+:root[data-dir] button.act.mini{min-height:36px;padding:0 var(--s3);font-size:var(--t-xs)}
+:root[data-dir] .pill{min-height:var(--hit);border-radius:var(--rp);font-size:var(--t-m)}
+:where(:root[data-dir]) .pill{min-width:44px}   /* faible priorité : les rangées qui se partagent la largeur (réserve, ½) gardent leur règle */
+:root[data-dir] .dchip{min-height:40px}
+:root[data-dir] button,:root[data-dir] .pill,:root[data-dir] .dchip,:root[data-dir] .line,:root[data-dir] .pdcbtn{position:relative;transition:transform .1s ease,background-color .15s ease}
+:root[data-dir] button:active,:root[data-dir] .pill:active,:root[data-dir] .dchip:active,:root[data-dir] .pdcbtn:active{transform:scale(.97)}
+:root[data-dir] .line:active{background:color-mix(in srgb,var(--ink) 8%,transparent)}
+/* champs : 48 px, contour gardé (3:1, lot 72) */
+:root[data-dir] input,:root[data-dir] select{min-height:var(--hit);border-radius:var(--rp);padding:0 var(--s3)}
+:root[data-dir] textarea{border-radius:var(--rp);padding:var(--s2) var(--s3)}
+/* panneau de série : plus de double contour noir, un fond et un rayon */
+:root[data-dir] .panel{border:0;border-radius:var(--rr);padding:var(--s4);margin:var(--s2) 0 var(--s3);box-shadow:inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel .savebar{margin:var(--s3) calc(-1*var(--s4)) 0;padding:var(--s3) var(--s4) var(--s5)}
+:root[data-dir] .panel .pill,:root[data-dir] .panel button.act{min-height:var(--hit)}
+:root[data-dir] .panel .savebar button.act:not(.ghost){min-height:56px;font-size:var(--t-m)}
+/* semaines du programme */
+:root[data-dir] .wk{border:0;border-radius:var(--rr);box-shadow:var(--sh1)}
+:root[data-dir] .wkh{border-bottom:0;border-radius:var(--rr) var(--rr) 0 0}
+:root[data-dir] .day{border-bottom:0;padding:var(--s2) 0}
+/* barre d'onglets */
+:root[data-dir] nav{border-top:0;box-shadow:0 -1px 0 var(--rule)}
+:root[data-dir] nav button{font-size:11px;font-weight:600}
+:root[data-dir] nav button[aria-selected="true"]{box-shadow:none;font-weight:700}
+/* mouvement : panneaux et onglets, réduits si le téléphone le demande */
+@media (prefers-reduced-motion:reduce){:root[data-dir] *{transition:none!important;animation:none!important}}
+
+/* ---------- A « Atelier » : l'identité actuelle, remise d'aplomb ---------- */
+:root[data-dir="A"]{--rr:8px;--rp:8px}
+
+/* ---------- retouches après captures ---------- */
+:root[data-dir] .bwmen b{white-space:nowrap}
+:root[data-dir] .dtabs .pill{font-size:var(--t-s);padding:0 12px}
+:root[data-dir] .logrow{grid-template-columns:auto 1fr auto}
+:root[data-dir] .logrow .d{white-space:nowrap}
+/* chiffres en gras (repris de B) */
+:root[data-dir] #p-today .line .pr,:root[data-dir] .big{font-weight:700}
+/* polices à l'essai (⚙ › Police) ; les non condensées gardent le programme sur une ligne */
+:root[data-font="plex"]{--txt:'IBM Plex Sans',system-ui,sans-serif;--num:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif}
+:root[data-font="inter"]{--txt:Inter,system-ui,sans-serif;--num:Inter,system-ui,sans-serif}
+:root[data-font="atk"]{--txt:'Atkinson Hyperlegible',system-ui,sans-serif;--num:'Atkinson Hyperlegible',system-ui,sans-serif}
+:root[data-font="sys"]{--txt:system-ui,Roboto,sans-serif;--num:system-ui,Roboto,sans-serif}
+:root[data-font="inter"] #p-prog .line .pr,:root[data-font="atk"] #p-prog .line .pr,:root[data-font="sys"] #p-prog .line .pr{font-size:15px}
+.appmenu .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}.appmenu .chk{margin-top:6px}
+:root[data-dir] input[type=checkbox],:root[data-dir] input[type=radio]{min-height:0;padding:0}
+.appmenu .row .field{flex:1 1 9em;min-width:0}.appmenu .row select{width:100%}
+/* lot 86 : S9, trait de la couleur du mouvement sur la série ouverte */
+:root[data-dir] .panel.pn0{box-shadow:inset 4px 0 0 var(--a1),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn1{box-shadow:inset 4px 0 0 var(--a2),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn2{box-shadow:inset 4px 0 0 var(--a3),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn3{box-shadow:inset 4px 0 0 var(--a4),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn4{box-shadow:inset 4px 0 0 var(--a5),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn5{box-shadow:inset 4px 0 0 var(--a6),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn6{box-shadow:inset 4px 0 0 var(--a7),inset 0 0 0 1px var(--rule)}
+:root[data-dir] .panel.pn7{box-shadow:inset 4px 0 0 var(--a8),inset 0 0 0 1px var(--rule)}
+/* lot 87 : cinq vues de Données sur une ligne à 360 px */
+#dtabs .pill[data-dvg],:root[data-dir] #dtabs .pill[data-dvg]{flex:1 1 0;min-width:0;padding-left:2px;padding-right:2px}
 </style>
 </head>
 <body>
@@ -549,6 +653,14 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <p class="note">Réglages de l'app</p>
     <button type="button" class="act ghost" id="pal" title="Palette" aria-label="Palette">🎨</button>
     <button type="button" class="act ghost" id="theme" title="Thème" aria-label="Thème">☀️</button>
+    <div class="row">   <!-- lot 85 : refonte -->
+      <div class="field sm"><label for="uidir">Style</label><select id="uidir"><option value="A">nouveau</option><option value="">v87</option></select></div>
+      <div class="field md"><label for="uifont">Police (à l'essai)</label><select id="uifont"><option value="">Archivo + Barlow</option><option value="plex">IBM Plex Sans</option><option value="inter">Inter</option><option value="atk">Atkinson Hyperlegible</option><option value="sys">Police du téléphone</option></select></div>
+      <div class="field sm"><label for="sep">Séparateur</label>
+        <select id="sep"><option value="×" selected>×</option><option value="*">*</option></select></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="uibw" checked>PdC en haut de l'écran</label>
+    <label class="chk"><input type="checkbox" id="uivib" checked>Vibration quand une série est enregistrée</label>
   </div>
 </header>
 
@@ -558,7 +670,6 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   <button data-p="prog" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Programme</button>
   <button data-p="charges" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14M3 9v6M21 9v6M6 12h12"/></svg>Charges</button>
   <button data-p="data" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4M4 20h16"/><path d="M7 15l4-4 3 3 5-6"/></svg>Données</button>
-  <button data-p="velo" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/></svg>Vitesse</button>
   <button data-p="lifts" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Mouvements</button>
 </nav>
 <button id="navtog" aria-label="Replier les onglets" aria-expanded="true"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
@@ -617,8 +728,6 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
         <select id="nwk"><option>4</option><option>5</option><option selected>6</option><option>8</option><option>10</option><option>12</option></select></div>
       <div class="field md"><label for="verbo">Commentaires</label>
         <select id="verbo"><option value="norm">repliés</option><option value="full">dépliés</option><option value="min">écarts seulement</option></select></div>
-      <div class="field sm"><label for="sep">Séparateur</label>
-        <select id="sep"><option value="×">×</option><option value="*" selected>*</option></select></div>
       <div class="field md"><label for="rirexpm">Réserve attendue</label>   <!-- lot 79 (A6) -->
         <select id="rirexpm"><option value="">cachée jusqu'à ma saisie</option><option value="1">affichée avant la série</option></select></div>
     </div>
@@ -769,6 +878,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
     <h2>Données <em>une chose à la fois</em></h2>
     <div class="dtabs" id="dtabs" role="group" aria-label="Afficher">   <!-- lot 65 (Q16) -->
       <button type="button" class="pill" data-dvg="seances">Séances</button>
+      <button type="button" class="pill" data-dvg="vitesse">Vitesse</button>
       <button type="button" class="pill" data-dvg="progres">Progrès</button>
       <button type="button" class="pill" data-dvg="bilan">Bilan</button>
       <button type="button" class="pill" data-dvg="pesees">Pesées</button>
@@ -783,9 +893,25 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
         <option value="courbe">Courbe — coût d'une répétition</option>
         <option value="pesees">Pesées — tous les PdC connus</option>
         <option value="saisie">Ajouter une performance hors programme</option>
+        <option value="vitesse">Vitesse — analyses vidéo</option>
         <option value="tout">Tout</option>
       </select></div></div>
   </div>
+
+  <div id="p-velo" data-dv="vitesse">   <!-- lot 87 : l'onglet Vitesse rejoint Données -->
+    <div class="vhead">
+      <div class="vtabs">
+        <button class="pill" data-vs="seance">Séance</button>
+        <button class="pill" data-vs="profil">Profil</button>
+        <button class="pill" data-vs="seuil">Réglages</button>
+      </div>
+      <button class="act ghost mini" id="veloadd" hidden>Importer</button>
+      <input type="file" id="velofile" accept=".json,application/json" multiple style="display:none">
+      <p class="note" id="velomsg" style="margin:4px 0 0"></p>
+      <p class="note" style="margin:2px 0 0"><a class="linkbtn" href="seance-telephone.html">Analyser les vidéos d'une séance sur ce téléphone ›</a></p>
+    </div>
+    <div id="velolist"></div>
+    </div>
 
   <div class="card" data-dv="suivi">
     <h2>Suivi du bloc <em>prescrit contre réalisé</em></h2>
@@ -915,22 +1041,6 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
   </div>
 </section>
 
-<!-- ======================= VITESSE ======================= -->
-<section class="page" id="p-velo">
-  <div class="vhead">
-    <div class="vtabs">
-      <button class="pill" data-vs="seance">Séance</button>
-      <button class="pill" data-vs="profil">Profil</button>
-      <button class="pill" data-vs="seuil">Réglages</button>
-    </div>
-    <button class="act ghost mini" id="veloadd" hidden>Importer</button>
-    <input type="file" id="velofile" accept=".json,application/json" multiple style="display:none">
-    <p class="note" id="velomsg" style="margin:4px 0 0"></p>
-    <p class="note" style="margin:2px 0 0"><a class="linkbtn" href="seance-telephone.html">Analyser les vidéos d'une séance sur ce téléphone ›</a></p>
-  </div>
-  <div id="velolist"></div>
-</section>
-
 <!-- ======================= MOUVEMENTS ======================= -->
 <section class="page" id="p-lifts">
   <div id="liftlist"></div>
@@ -995,7 +1105,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v87';   /* lot 74 */
+var APPV='v91';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1081,7 +1191,7 @@ function load(){
       });
     }
     S.v=SCHEMA; S.vFrom=from;
-    if(!S.log)S.log=[]; if(!S.sep)S.sep='*'; if(!S.nwk)S.nwk=6;
+    if(!S.log)S.log=[]; if(!S.sep)S.sep='×'; if(!S.nwk)S.nwk=6;
     if(!S.jours)S.jours='dim,mar,jeu'; if(!S.theme)S.theme='auto'; if(!PALS[S.pal])S.pal='1';   /* lot 63 */   /* lot 57 B */
     if(!S.dayNotes)S.dayNotes={}; if(S.blockNote==null)S.blockNote=''; if(S.blockGoal==null)S.blockGoal=''; if(!S.fold)S.fold={};
     if(!S.cat)S.cat=[]; if(!S.catHide)S.catHide={}; if(S.tbw===undefined)S.tbw=null; tbwStale();   /* lot 40 */
@@ -1096,6 +1206,8 @@ function load(){
     if(!S.rappels)S.rappels=[];
     if(S.rapB0==null){ var rb0=+S.blockId||1; S.rapB0=(S.log||[]).some(function(e){return inBlock(e.key);})?rb0:rb0-1; }   /* lot 74 : rappels dès le bloc en cours s'il n'a encore rien d'enregistré, sinon à partir du suivant */
     if(!S.rapFait)S.rapFait={};
+    if(!S.m86){ if(!S.fold)S.fold={}; S.fold['c:cardrappel']=1; S.m86=1; }   /* lot 86 (T1) : le rappel part replié, une fois */
+    if(!S.m85){ if(S.sep==='*')S.sep='×'; S.m85=1; }   /* lot 85 : × par défaut (réponses refonte du 16/10) */
     if(!S.m83){ var lb83=(S.blocks||[])[(S.blocks||[]).length-1]; if(lb83&&!lb83.fq){ if(!S.cui||typeof S.cui!=='object')S.cui={}; if(!S.cui.open)S.cui.open={}; S.cui.open['fq'+lb83.id]=1; } S.m83=1; }   /* lot 83 : questionnaire du dernier bloc clos ouvert */
     if(!S.m81){ (S.blocks||[]).forEach(function(b){ if(+b.id===1&&b.learn==null)b.learn=1; }); S.m81=1; }   /* lot 81 (A9) : le bloc 1 */
     if(!S.m78){ if(!S.fold)S.fold={}; (S.lifts||[]).forEach(function(L){ S.fold['a:'+L.name]=1; }); S.m78=1; }   /* lot 78 (P2) : mouvements repliés sur leur résumé */
@@ -3195,7 +3307,7 @@ function goLog(key){
 }
 function goVelo(id){
   var U=vui(); U.from='seance'; U.open=id; U.scr='serie';
-  save(); goTab('velo'); window.scrollTo(0,0);
+  dq().view='vitesse'; save(); if(curTab()==='data')renderData(); else goTab('data'); window.scrollTo(0,0);   /* lot 87 */
 }
 document.addEventListener('click',function(ev){
   var t=ev.target; if(!t||!t.closest)return;
@@ -3218,7 +3330,30 @@ function applyTheme(){
   $('pal').title=pl; $('pal').setAttribute('aria-label',pl); $('pal').textContent='🎨 '+PALS[pk];   /* lot 65 */
   var mt=document.querySelector&&document.querySelector('meta[name="theme-color"]');
   if(mt&&window.getComputedStyle){ var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg'); if(bg)mt.setAttribute('content',String(bg).trim()); }
+  uiApply();   /* lot 85 */
 }
+/* lot 85 : style, police à l'essai, PdC d'en-tête, vibration (⚙) */
+var UIFONTS={plex:'IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700',inter:'Inter:wght@400;600;700',atk:'Atkinson+Hyperlegible:wght@400;700'};
+function uiApply(){
+  var de=document.documentElement, d=S.dir==null?'A':S.dir, f=UIFONTS[S.font]||S.font==='sys'?S.font:'';
+  try{
+    if(d)de.setAttribute('data-dir',d); else if(de.removeAttribute)de.removeAttribute('data-dir');
+    if(f)de.setAttribute('data-font',f); else if(de.removeAttribute)de.removeAttribute('data-font');
+    if(UIFONTS[f]&&document.head&&!document.getElementById('font-'+f)){ var l=document.createElement('link'); l.id='font-'+f; l.rel='stylesheet';
+      l.href='https://fonts.googleapis.com/css2?family='+UIFONTS[f]+'&display=swap'; document.head.appendChild(l); }
+  }catch(_){}
+  var m=$('bwmen'); if(m&&m.style)m.style.display=S.hdrBw===false?'none':'';
+  if($('uidir'))$('uidir').value=d; if($('uifont'))$('uifont').value=f;
+  if($('uibw'))$('uibw').checked=S.hdrBw!==false; if($('uivib'))$('uivib').checked=S.vib!==false;
+}
+function uiVib(){ if(S.vib===false)return; try{ if(navigator.vibrate)navigator.vibrate(12); }catch(_){} }   /* S4 : Hoober p. 398, 413 ; 10-15 ms */
+['uidir','uifont','uibw','uivib'].forEach(function(id){ var el=$(id); if(!el)return;
+  el.addEventListener('change',function(){
+    if(id==='uidir')S.dir=this.value; else if(id==='uifont')S.font=this.value;
+    else if(id==='uibw')S.hdrBw=!!this.checked; else S.vib=!!this.checked;
+    save(); uiApply(); if(id==='uivib'&&this.checked)uiVib();
+  });
+});
 $('pal').addEventListener('click',function(){   /* lot 57 B */
   S.pal=PALORD[(PALORD.indexOf(PALS[S.pal]?S.pal:'1')+1)%PALORD.length];   /* lot 63 */
   save(); applyTheme(); renderData(); msgBar('Palette '+PALS[S.pal]);
@@ -3398,7 +3533,7 @@ function renderPesees(){
       return '<tr><td>'+frDate(r.d)+'</td><td>'+(r.b?r.b:'hors bloc')+'</td><td>'+c(r.j)+'</td><td>'+c(r.s)+(r.ns>1?' <small>('+r.ns+')</small>':'')+'</td><td>'+c(r.v)+'</td><td>'+
         (f?F(f.kg)+(f.hab?' habillé':' non habillé')+' <small>'+esc(pesSeance(f))+'</small>':'—')+'</td></tr>'; }).join('')+
     '</tbody></table></div><p class="note">Séries : moyenne des PdC notés avec les séries du jour (leur nombre entre parenthèses quand il y en a plusieurs).</p>'
-    :'<p class="note">'+(all.length?'Aucune pesée sur cette période.':'Aucun PdC connu pour l\'instant.')+'</p>';
+    :'<p class="note">'+(all.length?'Aucune pesée sur cette période.':'Aucun PdC connu pour l\'instant. Touchez la ligne PdC de Séance du jour pour le saisir.')+'</p>';
 }
 $('pexp').addEventListener('click',function(){   /* lot 60 (Q4) */
   var n=function(v){ return v!=null?String(v).replace('.',','):''; };
@@ -4881,8 +5016,14 @@ function buildPlan(){
         /* ajouts ponctuels : rattaches a une seance precise du bloc, rien d'autre ne bouge */
         (S.extra[w+'|'+lab+BK()]||[]).forEach(function(xa){
           var XL=S.lifts[xa.li]; if(!XL)return;
-          day.lines.push({li:xa.li,name:XL.name,role:'extra',sets:+xa.sets||1,reps:String(xa.reps),
-            load:+xa.load||0,info:'ajout ponctuel',key:'x|'+xa.li+'|'+w+'|'+lab+'|'+xa.id+BK()});
+          var xl={li:xa.li,name:XL.name,role:'extra',sets:+xa.sets||1,reps:String(xa.reps),
+            load:+xa.load||0,info:'ajout ponctuel',key:'x|'+xa.li+'|'+w+'|'+lab+'|'+xa.id+BK()};
+          if(xa.src){   /* lot 84 : série ajoutée à une ligne prévue, rangée juste dessous */
+            xl.tg='série ajoutée'; xl.src=xa.src; xl.info=xa.info||'série ajoutée';
+            var at=-1; day.lines.forEach(function(y,yi){ if(y.key===xa.src||y.src===xa.src)at=yi; });
+            if(at>=0){ day.lines.splice(at+1,0,xl); return; }
+          }
+          day.lines.push(xl);
         });
         week.days.push(day);
       }
@@ -5713,7 +5854,7 @@ function panelHTML(key){
     '<div class="pillrow" data-brushes>'+VJO.map(function(c){
       return '<button class="pill brush" data-brush="'+c+'" aria-pressed="'+(PBRUSH===c)+'">'+VJ[c].e+'<small>'+VJ[c].n+'</small></button>';
     }).join('')+'</div></div></div>';   /* lot 73 : les reps à juger sont dans vQuick */
-  return '<div class="panel" data-panel="'+key+'">'+
+  return '<div class="panel pn'+col(x.li)+'" data-panel="'+key+'">'+   /* lot 86 : S9 */
     '<h4 class="n'+col(x.li)+'" data-ptit="1" role="button" tabindex="0" title="refermer">'+x.name+' — prescrit '+(x.load==null?'lest à saisir':F(x.load))+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+descHTML(L)+   /* lot 46 (R5) */
     '<div class="row">'+
       '<div class="field sm"><label>'+(L.useBw?'Lest fait (kg)':'Charge faite (kg)')+'</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
@@ -5732,7 +5873,7 @@ function panelHTML(key){
           '<input data-setnote="'+q+'" type="text" value="'+esc(e&&e.setNotes?e.setNotes[q]:'')+'" placeholder="repos, exécution, sensation"></div>';
       }).join('')+'</details>':'')+
     nxt+
-    pdetHTML(key,x,L,e,validBlock+frmHTML(x,L,e)+finHTML(x,L,e)+failFold(key,x,L,e))+   /* B2 ; lot 58 ; lot 64 : replié sur une ligne vierge ; lot 73 */
+    pdetHTML(key,x,L,e,validBlock+frmHTML(x,L,e)+finHTML(x,L,e)+failFold(key,x,L,e))+plusHTML(key,x,L,e)+   /* B2 ; lot 58 ; lot 64 : replié sur une ligne vierge ; lot 73 */
     '<div class="btnrow savebar"><button class="act" style="flex:1 1 auto;min-height:48px" data-save="'+key+'">Enregistrer</button>'+
       '<button class="act ghost" style="min-height:48px" data-close="1">Fermer</button>'+
       (e?'':'<button class="act ghost" style="min-height:48px" data-skip="'+key+'">Sauté</button>')+'</div>'+   /* lot 63 : pas sur une ligne déjà faite */
@@ -5929,6 +6070,7 @@ function panelClick(e){
       for(z=0;z<fn;z++)PV[fs][z]=all?null:PBRUSH;
       refreshV(p); e.stopPropagation(); return;
     }
+    if(b.dataset.plus||b.dataset.pmode||b.dataset.ppct||b.dataset.psets||b.dataset.padd){ plusClick(p,b); e.stopPropagation(); return; }   /* lot 84 */
     if(b.dataset.xdel){delExtra(b.dataset.xdel);e.stopPropagation();return;}
     if(b.dataset.skip){skipLine(p,b.dataset.skip);e.stopPropagation();return;}
     if(b.dataset.rir!=null){
@@ -6028,7 +6170,7 @@ function saveLine(p,key){
   /* la ligne devient la reference des jugements de ses analyses video */
   veloOfKey(key).forEach(function(v){ v.reps.forEach(function(r){ delete S.veloJuge[v.id+'|'+r.rep]; }); });
   var inToday=!!(p.closest&&p.closest('#todayout'));
-  save(); closePanel(); refreshPlans(); rkBadge(x.li,rk0,key);   /* lot 48 */
+  save(); uiVib(); closePanel(); refreshPlans(); rkBadge(x.li,rk0,key);   /* lot 48 ; lot 85 : vibration */
   if(fAuto&&(fNow||!inToday)){ failReopen(key,inToday?'todayout':'out'); return; }   /* B2 : le choix apres echec s'affiche ; lot 58 : en Séance du jour, seulement si « décider maintenant » est coché */
   if(inToday)openNext(key);
 }
@@ -6150,7 +6292,7 @@ function renderWeekVol(){
       st.order.forEach(function(li){ var a=st.by[li]; if(!agg[li])agg[li]={sets:0,ton:0}; agg[li].sets+=a.sets; agg[li].ton+=a.ton; }); });
     if(any)rows.push({w:wk.w,agg:agg,tot:tot});
   });
-  if(!rows.length){el.innerHTML='<p class="note" style="margin-top:0">Aucune série enregistrée sur ce bloc.</p>';return;}
+  if(!rows.length){el.innerHTML='<p class="note" style="margin-top:0"><b>Aucune série enregistrée sur ce bloc.</b> Le suivi se remplit dès la première série enregistrée dans Séance du jour.</p>';return;}
   var h='<div class="scroll"><table class="stt"><thead><tr><th>Sem.</th>'+lifts.map(function(i){return '<th>'+esc(S.lifts[i].name)+'<br>séries \u00b7 t</th>';}).join('')+
     '<th>tonnage<br>total</th></tr></thead><tbody>';
   rows.forEach(function(r){
@@ -6562,6 +6704,84 @@ function xFill(li){
   c.querySelector('[data-xf=sets]').value=g.sets;
   c.querySelector('[data-xsrc]').textContent=g.src;
 }
+/* ===== lot 84 : ajouter une série à une ligne prévue =====
+   Base = charge de la ligne : faite si elle est enregistrée, sinon prescrite. Le % porte sur la charge système
+   (lest + PdC du jour, convention de l'onglet Charges) ; le lest qui en sort est arrondi au pas du mouvement. */
+function plusBase(key){ var f=findLine(key); if(!f)return null; var x=f.line, e=entryOf(key);
+  return {f:f,x:x,L:S.lifts[x.li],base:e&&e.load!=null?+e.load:(x.load==null?null:+x.load)}; }
+function plusLoad(key,m,pct,free){
+  var b=plusBase(key); if(!b)return {load:null,txt:''};
+  var L=b.L, bw=num($('tbw')?$('tbw').value:'',(S.tbw!=null?S.tbw:S.bw));
+  if(m==='free'){ var fv=String(free==null?'':free).trim().replace(',','.');
+    if(!/^[-+]?(\d+(\.\d*)?|\.\d+)$/.test(fv))return {load:null,txt:fv===''?'Saisissez la charge.':'Charge illisible : un nombre en kg, par exemple 27,5.'};
+    return {load:+fv,txt:'Charge saisie : '+loadKg(L,+fv)+'.'}; }
+  if(b.base==null)return {load:null,txt:'Pas de charge de référence sur cette ligne : saisissez-la.'};
+  if(m==='same')return {load:b.base,txt:'Même charge : '+loadKg(L,b.base)+'.'};
+  var p=+String(pct==null?'':pct).replace(',','.'); if(!(p>0&&p<=150))return {load:null,txt:'Choisissez un pourcentage.'};
+  var ef=eff(L,bw), sys=b.base+ef, tg=sys*p/100, v=rnd(tg-ef,L.step);
+  return {load:v,pct:p,txt:F(p)+' % de '+(L.useBw?F(rnd(sys,0.1))+' kg en charge système (PdC '+F(bw)+' kg) = '+F(rnd(tg,0.1))+' kg, soit '+(Math.abs(v)<0.01?'au PdC':'un lest de '+F(v)+' kg'):F(b.base)+' kg = '+F(v)+' kg')+
+    (Math.abs((tg-ef)-v)>0.01?' (arrondi au pas de '+F(L.step)+' kg)':'')+'.'};
+}
+function plusHTML(key,x,L,e){
+  if(SIM||x.role==='deload')return '';
+  var b=plusBase(key), base=b?b.base:null, m=base==null?'free':'same', r=repDflt(x.reps);
+  var md=function(v,t){return '<button class="pill" data-pmode="'+v+'" aria-pressed="'+(v===m)+'"'+(base==null&&v!=='free'?' disabled':'')+'>'+t+'</button>';};
+  return '<div data-plusw data-pm="'+m+'" data-pp="90" data-ps="1">'+
+    '<div class="btnrow" style="justify-content:flex-end;margin-top:8px"><button class="act ghost mini" data-plus="1" aria-expanded="false">＋ Ajouter une série</button></div>'+
+    '<div data-plusform hidden>'+
+      '<label>Charge de la série ajoutée</label><div class="pillrow">'+md('same','Même charge')+md('pct','En %')+md('free','À saisir')+'</div>'+
+      '<div data-ppctw hidden style="margin-top:6px"><div class="pillrow">'+[95,90,85,80,75].map(function(v){
+        return '<button class="pill" data-ppct="'+v+'" aria-pressed="'+(v===90)+'">'+v+' %</button>';}).join('')+'</div>'+
+        '<div class="field sm" style="margin-top:6px"><label>Autre %</label><input data-pin="pct" class="numin" type="text" inputmode="decimal"></div></div>'+
+      '<div data-pfreew class="field sm" style="margin-top:6px"'+(m==='free'?'':' hidden')+'><label>'+(L.useBw?'Lest (kg)':'Charge (kg)')+'</label>'+
+        '<input data-pin="load" class="numin" type="text" inputmode="decimal" value="'+(base==null?'':F(base))+'"></div>'+
+      '<div class="row" style="margin-top:6px"><div class="field sm"><label>'+(isM(L)?'Mètres':'Reps')+'</label>'+
+        '<input data-pin="reps" class="numin" type="text" inputmode="numeric" value="'+(r==null?'':r)+'"></div>'+
+        '<div class="field"><label>Séries</label><div class="pillrow">'+[1,2,3].map(function(v){
+          return '<button class="pill" data-psets="'+v+'" aria-pressed="'+(v===1)+'">'+v+'</button>';}).join('')+'</div></div></div>'+
+      '<p class="note" data-pprev>'+esc(plusLoad(key,m,90,base==null?'':F(base)).txt)+'</p>'+
+      '<div class="btnrow"><button class="act" data-padd="'+esc(key)+'">Ajouter à la séance</button></div>'+
+      '<p class="note">La série se place sous cette ligne, marquée « série ajoutée ». Elle s\'enregistre comme les autres, sans compter dans la conformité ni dans le volume prévu. « Retirer de la séance » l\'enlève.</p>'+
+    '</div></div>';
+}
+function plusRead(p){
+  var w=p.querySelector('[data-plusw]'), g=function(k){var el=p.querySelector('[data-pin='+k+']'); return el?String(el.value==null?'':el.value).trim():'';};
+  var pc=g('pct');
+  return {m:w?w.dataset.pm:'same',pct:pc!==''?pc:(w?w.dataset.pp:'90'),free:g('load'),reps:g('reps'),sets:w?(+w.dataset.ps||1):1};
+}
+function plusPrev(p){
+  var key=p.dataset.panel, r=plusRead(p), c=plusLoad(key,r.m,r.pct,r.free), el=p.querySelector('[data-pprev]');
+  if(el)el.textContent=c.txt+(c.load!=null&&/^\d+$/.test(r.reps)?' '+r.reps+(r.sets>1?' '+S.sep+' '+r.sets:'')+(r.sets>1?' séries.':' reps, une série.'):'');
+}
+function plusClick(p,b){
+  var w=p.querySelector('[data-plusw]'); if(!w)return;
+  var pick=function(sel,on){ Array.prototype.forEach.call(p.querySelectorAll(sel),function(x){x.setAttribute('aria-pressed',x===on?'true':'false');}); };
+  if(b.dataset.plus){ var pf=p.querySelector('[data-plusform]'); if(pf){ pf.hidden=!pf.hidden; b.setAttribute('aria-expanded',pf.hidden?'false':'true'); } return; }
+  if(b.dataset.pmode){ w.dataset.pm=b.dataset.pmode; pick('[data-pmode]',b);
+    var pw=p.querySelector('[data-ppctw]'), fw=p.querySelector('[data-pfreew]');
+    if(pw)pw.hidden=b.dataset.pmode!=='pct'; if(fw)fw.hidden=b.dataset.pmode!=='free'; plusPrev(p); return; }
+  if(b.dataset.ppct){ w.dataset.pp=b.dataset.ppct; pick('[data-ppct]',b); var pi=p.querySelector('[data-pin=pct]'); if(pi)pi.value=''; plusPrev(p); return; }
+  if(b.dataset.psets){ w.dataset.ps=b.dataset.psets; pick('[data-psets]',b); plusPrev(p); return; }
+  if(b.dataset.padd)plusAdd(p,b.dataset.padd);
+}
+function plusAdd(p,key){
+  var f=findLine(key); if(!f)return;
+  var x=f.line, r=plusRead(p), c=plusLoad(key,r.m,r.pct,r.free), pe=p.querySelector('[data-pprev]');
+  if(c.load==null){ if(pe)pe.textContent=c.txt; return; }
+  if(!/^\d+$/.test(r.reps)||+r.reps<1){ if(pe)pe.textContent='Reps illisibles : un nombre entier. Rien n\'est ajouté.'; return; }
+  var src=x.src||x.key, fs=findLine(src), sl=fs?fs.line:x;
+  var sn=sl.name+(sl.tg?' '+sl.tg:sl.role==='back'?' back-off':sl.role==='top'?' top set':sl.role==='acc'?' accessoire':'');
+  var info=(r.m==='same'?'même charge que ':r.m==='pct'?F(c.pct)+' % de la charge système de ':'charge saisie, après ')+sn;
+  var sk=f.w+'|'+f.day+BK(), id='a'+Date.now().toString(36);
+  if(!S.extra[sk])S.extra[sk]=[];
+  S.extra[sk].push({id:id,li:x.li,load:c.load,reps:r.reps,sets:r.sets,src:src,info:info});
+  var inT=!!(p.closest&&p.closest('#todayout'));
+  LASTOPEN=null; save(); closePanel(); refreshPlans();
+  var nk='x|'+x.li+'|'+f.w+'|'+f.day+'|'+id+BK(), el=document.querySelector((inT?'#todayout':'#out')+' .line[data-key="'+nk+'"]');
+  if(el){ openPanel(el,nk); if(el.scrollIntoView)el.scrollIntoView({block:'center'}); }
+}
+$('todayout').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset||t.dataset.pin==null)return; var p=t.closest('[data-panel]'); if(p)plusPrev(p); });   /* lot 84 */
+$('out').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset||t.dataset.pin==null)return; var p=t.closest('[data-panel]'); if(p)plusPrev(p); });
 function delExtra(key){
   var q=String(key).split('|'), sk=q[2]+'|'+q[3]+(q[5]?'|'+q[5]:''), id=q[4];
   var e=entryOf(key);
@@ -6616,7 +6836,7 @@ function rapbOf(k){
 function rappelCard(k){
   var l=(S.rappels||[]).filter(function(r){return r.k===k;}), b=rapbOf(k);
   if(!l.length&&!b.length)return '';
-  return '<div class="card" id="cardrappel"><h2>Rappel <em>'+(b.length?'données à filmer':'ponctuel, propre à cette séance')+'</em></h2>'+
+  return '<div class="card" id="cardrappel"><h2>Rappel <em>'+(b.length?'données à filmer'+(b.length>1?' · '+b.length:'')+(l.length?' · ponctuel':''):'ponctuel, propre à cette séance')+'</em></h2>'+
     b.map(function(r){
       return '<div class="flag rapb" data-rapb="'+r.id+'">'+esc(r.t)+'<details><summary class="note">Pourquoi</summary><p class="note">'+esc(r.p)+'</p></details></div>'+
         '<div class="btnrow"><button class="act ghost mini" data-rapbok="'+r.id+'">Fait</button></div>';
@@ -8312,8 +8532,8 @@ function opts(sel,vals,cur,lab0,fmt){
   if(cur!==''&&vals.map(String).indexOf(String(cur))<0)sel.value='';
 }
 /* lot 77 (D1) : quatre vues ; chacune regroupe des cartes d'avant, rien n'est retiré */
-var DGRP={seances:['series','saisie'],progres:['prog','records','courbe'],bilan:['bilan','suivi'],pesees:['pesees']};
-var DGV={seances:'series',progres:'prog',bilan:'bilan',pesees:'pesees'};
+var DGRP={seances:['series','saisie'],vitesse:['vitesse'],progres:['prog','records','courbe'],bilan:['bilan','suivi'],pesees:['pesees']};   /* lot 87 : Vitesse */
+var DGV={seances:'series',vitesse:'vitesse',progres:'prog',bilan:'bilan',pesees:'pesees'};
 function dGroup(v){ for(var g in DGRP)if(DGRP[g].indexOf(v)>=0)return g; return 'seances'; }
 function renderDataView(){
   var q=dq(), g=dGroup(q.view);
@@ -8337,7 +8557,7 @@ function renderDataView(){
 }
 /* comparaison : a lest fixe, ce qui a change (reps, reserve, vitesse) ; a reps fixes, le lest */
 function dataSummary(list){
-  var q=dq(); if(!list.length)return '<p class="note">Aucune série ne correspond.</p>';
+  var q=dq(); if(!list.length)return '<p class="note"><b>Aucune série ne correspond.</b> Élargissez les filtres (mouvement, type, lest, reps, période).</p>';
   var byDate=list.slice().sort(byDateAsc);   /* R12 */
   var vid=function(e){ var v=veloOfKey(e.key)[0]; return v&&v.resume&&v.resume.v_moy_derniere!=null?F(v.resume.v_moy_derniere)+' m/s':'—'; };
   if(q.load!==''||q.reps!==''){
@@ -8548,10 +8768,11 @@ function renderProg(){
           '<td>'+(b?progSet(L,b,progLastRir(b))+(r.fp!=null?'<br><b>−'+F(Math.round(r.fp*10)/10)+' %</b>':''):'')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   });
-  box.innerHTML=h||'<p class="note">Aucun top set enregistré sur un mouvement principal.</p>';
+  box.innerHTML=h||'<p class="note"><b>Aucun top set enregistré sur un mouvement principal.</b> La progression apparaît dès le premier top set noté dans Séance du jour.</p>';
 }
 function renderData(){
   renderDataView();
+  if(dq().view==='vitesse')renderVelo();   /* lot 87 */
   if(!BRSWAP&&(dq().view==='bilan'||dq().view==='tout'))renderBilan();   /* lot 72 : le Bilan suit les séries */
   renderWeekVol(); renderBackup(); renderRecords(); renderPesees(); renderProg();   /* lot 62 */   /* lot 48 : 1RM dans Records */   /* lot 44 (R9) */
   /* conformité — B24 : bloc en cours seulement (le titre de la carte le dit), sinon
@@ -9229,7 +9450,7 @@ function serieRow(v,sc,idx){
 }
 function vScrSeance(){
   var U=vui(), all=vDates(), ds=vFiltre(all);   /* lot 47 (R17) */
-  if(!all.length)return '<div class="card"><p class="note">Aucune analyse importée. Touchez <b>Importer</b> et choisissez le fichier <b>seance-…json</b> du jour.</p></div>';
+  if(!all.length)return '<div class="card"><p class="note"><b>Aucune analyse vidéo pour l\'instant.</b> Filmez une série, analysez la séance avec le lien ci-dessus, téléchargez le fichier de séance, puis importez-le : <b>Réglages › Importer</b>.</p></div>';
   var fl=vFiltres();
   if(!ds.length)return '<div class="card">'+fl+'<p class="note">Aucune séance filmée pour ces filtres.</p></div>';
   if(ds.indexOf(U.date)<0)U.date=ds[0];
@@ -9347,7 +9568,7 @@ function vScrSerie(v){
 function vScrSeuil(){
   var mvs=[]; (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
   var h='<div class="card">';
-  if(!mvs.length)h+='<p class="note">Aucune analyse.</p>';
+  if(!mvs.length)h+='<p class="note"><b>Pas encore de profil.</b> Il se construit dès vos premières séries filmées et importées (<b>Réglages › Importer</b>).</p>';
   mvs.forEach(function(mv){
     ['depart','bas'].forEach(function(ref){
       var l=S.velo.filter(function(v){return v.mouvement===mv&&vRef(v)===ref;}); if(!l.length)return;
