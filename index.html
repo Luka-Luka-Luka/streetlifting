@@ -638,6 +638,11 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 :root[data-dir="M"]{--t-xs:12px;--t-s:12.5px;--t-m:14px;--t-l:15.5px;--t-xl:19px;--t-xxl:25px;--s4:14px;--s5:20px}
 /* lot 89 */
 .pickother{display:inline-flex;gap:6px;align-items:center}
+/* lot 92 (B1) : barre du bas plus foncée (clair) / plus claire (sombre), trait au-dessus, onglet actif sur le fond des cartes */
+nav,:root[data-dir] nav{background:var(--soft);border-top:0;box-shadow:0 -1px 0 color-mix(in srgb,var(--ink) 22%,transparent)}
+nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"]{background:var(--surface)}
+#chnout{margin:8px 0 0}
+#chnout b{font-size:1.25em}
 </style>
 </head>
 <body>
@@ -710,7 +715,10 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="field sm"><label for="tfin">PdC fin de séance</label><input id="tfin" class="numin" type="text" inputmode="decimal"></div>
       <div class="field md"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="tfinh">habillé</label></div>
     </div>
-    <p class="note"><span id="tfinnote"></span>Le PdC de fin de séance est seulement noté (Données › Pesées) : il ne change ni le PdC courant ni les calculs.</p>
+    <div class="row" style="margin-top:8px">   <!-- lot 93 -->
+      <div class="field sm"><label for="tnu">PdC non habillé</label><input id="tnu" class="numin" type="text" inputmode="decimal"></div>
+    </div>
+    <p class="note"><span id="tfinnote"></span>Le PdC de fin de séance et le PdC non habillé sont seulement notés (Données › Pesées) : ils ne changent ni le PdC courant ni les calculs.</p>
     <p class="note" id="tstate"></p>
     <p class="note">Le poids de corps du jour s'applique à toutes les séries enregistrées aujourd'hui et devient le PdC courant (en-tête) ; vide, c'est celui de l'en-tête.
     Marquer une séance comme faite ne verrouille rien : vous pouvez y revenir pour corriger ou ajouter une note.</p>
@@ -796,6 +804,13 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
       <div class="chsub" id="chtot"></div>
     </div>
     <p class="note chex">Le gros chiffre est le lest pour ce nombre de reps avec cette réserve, d'après la base ci-dessous. Même modèle de charge que Séance du jour.</p>
+    <details class="chd" data-chd="nreps"><summary>Combien de reps à ce lest ?</summary>   <!-- lot 92 (C1) -->
+      <div class="row">
+        <div class="field sm" id="chnbwf"><label for="chnbw">PdC</label><input id="chnbw" class="numin" type="text" inputmode="decimal"></div>
+        <div class="field sm"><label for="chnlo">Lest (kg)</label><input id="chnlo" class="numin" type="text" inputmode="decimal"></div>
+      </div>
+      <p class="note" id="chnout"></p>
+    </details>
     <details class="chd" data-chd="base"><summary id="chbasesum">Base</summary>
       <div class="chsrc" role="radiogroup" aria-label="Base du calcul">
         <label><input type="radio" name="chsrc" value="jour"> 1RM de Séance du jour</label>
@@ -1109,7 +1124,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v93';   /* lot 74 */
+var APPV='v98';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1210,6 +1225,9 @@ function load(){
     if(!S.rappels)S.rappels=[];
     if(S.rapB0==null){ var rb0=+S.blockId||1; S.rapB0=(S.log||[]).some(function(e){return inBlock(e.key);})?rb0:rb0-1; }   /* lot 74 : rappels dès le bloc en cours s'il n'a encore rien d'enregistré, sinon à partir du suivant */
     if(!S.rapFait)S.rapFait={};
+    if(!S.m90){ S.m90=1; (S.velo||[]).forEach(function(v){   /* lot 90 (V3) : rattachements automatiques à une autre charge, défaits une fois */
+      if(!v.lien||!v.lien.auto||v.lest_kg==null)return; var e=entryOf(v.lien.key);
+      if(e&&e.load!=null&&Math.abs(+e.load-(+v.lest_kg))>1.25){ delete v.lien; S.m90n=(S.m90n||0)+1; } }); }
     if(!S.m86){ if(!S.fold)S.fold={}; S.fold['c:cardrappel']=1; S.m86=1; }   /* lot 86 (T1) : le rappel part replié, une fois */
     if(!S.m85){ if(S.sep==='*')S.sep='×'; S.m85=1; }   /* lot 85 : × par défaut (réponses refonte du 16/10) */
     if(!S.m83){ var lb83=(S.blocks||[])[(S.blocks||[]).length-1]; if(lb83&&!lb83.fq){ if(!S.cui||typeof S.cui!=='object')S.cui={}; if(!S.cui.open)S.cui.open={}; S.cui.open['fq'+lb83.id]=1; } S.m83=1; }   /* lot 83 : questionnaire du dernier bloc clos ouvert */
@@ -1388,15 +1406,22 @@ function cur(){var L=S.lifts[S.active]||S.lifts[0]; if(isM(L)){ for(var k=0;k<S.
    gabarit Accessoire seul ; il n'entre dans aucun calcul de 1RM (Charges, records, courbe, reference de cloture,
    icone PR, tonnage). Description d'execution (R5) : permanente (L.desc) ou pour ce bloc (L.prog.desc, prioritaire). */
 var ACCMMAX=5000;
-function isM(L){return !!(L&&L.unit==='m');}
-function uRep(L){return isM(L)?' m':' reps';}
+/* lot 94 : isM = pas de 1RM ni de records (mètres, secondes, EMOM, Tabata) ; isU = unité autre que des reps (libellés) */
+function isM(L){return !!(L&&(L.unit==='m'||L.unit==='s'||fmtOf(L)));}
+function isU(L){return !!(L&&(L.unit==='m'||L.unit==='s'));}
+function uM(L){return L&&L.unit==='s'?' s':L&&L.unit==='m'?' m':'';}
+function uW(L,m,s,r){return L&&L.unit==='s'?s:L&&L.unit==='m'?m:r;}
+function fmtOf(L){var P=L&&L.prog; return P&&P.tpl==='acc'&&(P.accFmt==='emom'||P.accFmt==='tabata')?P.accFmt:'';}
+function fmtTg(L,n){var P=L.prog, f=fmtOf(L); if(!f)return '';
+  return (f==='emom'?'EMOM toutes les '+(String(P.fmtInt||'').trim()||'1:00'):'Tabata '+(+P.fmtOn||20)+' s / '+(P.fmtOff!=null?+P.fmtOff:10)+' s')+' · '+n+' tour'+(n>1?'s':''); }
+function uRep(L){return isU(L)?uM(L):' reps';}
 function accStepOf(P){var s=Math.round(+(P&&P.accStep)||5); return s>=1?s:5;}
-function mInit(L){ var P=L.prog; L.unit='m'; P.accLo=20; P.accHi=40; P.accStep=5; if(P.tpl!=='acc')P.tpl='off'; }
+function mInit(L,u){ var P=L.prog; L.unit=u||'m'; P.accLo=u==='s'?10:20; P.accHi=u==='s'?30:40; P.accStep=5; if(P.tpl!=='acc')P.tpl='off'; }   /* lot 94 : secondes */
 function hasLog(i){ return (S.log||[]).some(function(e){return e.li===i;}); }
 function setUnit(L,v){
   var i=S.lifts.indexOf(L), P=L.prog; if(i<0||hasLog(i))return false;
-  if(v==='m'){ if(!isM(L))mInit(L); }
-  else if(isM(L)){ delete L.unit; delete P.accStep; P.accLo=Math.min(30,+P.accLo||8); P.accHi=Math.min(30,Math.max(P.accLo,+P.accHi||10)); }
+  if(v==='m'||v==='s'){ if(L.unit!==v)mInit(L,v); }
+  else if(isU(L)){ delete L.unit; delete P.accStep; P.accLo=Math.min(30,+P.accLo||8); P.accHi=Math.min(30,Math.max(P.accLo,+P.accHi||10)); }
   return true;
 }
 function tplGroupsM(){
@@ -2704,7 +2729,7 @@ function accDaysOf(P){
    d'une seance a la suivante, meme quand l'accessoire tombe plusieurs fois dans la semaine ;
    le calendrier, lui, compte en semaines. */
 function accPlan(L,i){
-  var P=L.prog, mm=isM(L), ast=mm?accStepOf(P):1, lo=+P.accLo||8, hi=Math.min(mm?ACCMMAX:30,Math.max(lo,+P.accHi||10)), inc=+P.inc||2.5, days=accDaysOf(P);   /* lot 46 : carries */   /* D8 : borne haute born\u00e9e */
+  var P=L.prog, mm=isU(L), ast=mm?accStepOf(P):1, lo=+P.accLo||8, hi=Math.min(mm?ACCMMAX:30,Math.max(lo,+P.accHi||10)), inc=+P.inc||2.5, days=accDaysOf(P);   /* lot 46 : carries */   /* D8 : borne haute born\u00e9e */
   var load=+P.accLoad||0, reps=lo, miss=0, out=[], G=hGdl();
   for(var w=0;w<S.nwk;w++){
     days.forEach(function(lab){
@@ -2737,15 +2762,15 @@ function accPlan(L,i){
 /* Lot 51 (p. 113) : après 2 échecs d'affilée en double progression, proposer d'élargir la fourchette. */
 function accWideHTML(L,i,P,pl){
   if(P.accMode==='maintien'||P.accMode==='calendrier'||!pl.some(function(q){return q.wide;}))return '';
-  var hi=+P.accHi||10, cap=isM(L)?ACCMMAX:30, nh=Math.min(cap,hi+2);
+  var hi=+P.accHi||10, cap=isU(L)?ACCMMAX:30, nh=Math.min(cap,hi+2);
   return '<p class="note" style="color:var(--warn)">Deux échecs d\'affilée à la même prescription. Le livre conseille d\'élargir la fourchette plutôt que de baisser la charge (p. 113).</p>'+
     (nh>hi?'<div class="btnrow"><button class="act ghost mini" onclick="accWiden('+i+')">Élargir à '+(+P.accLo||8)+'-'+nh+'</button></div>':'');
 }
-function accWiden(i){ var L=S.lifts[i], P=L.prog; P.accHi=Math.min(isM(L)?ACCMMAX:30,(+P.accHi||10)+2); save(); renderAssign(); refreshPlans(); }
+function accWiden(i){ var L=S.lifts[i], P=L.prog; P.accHi=Math.min(isU(L)?ACCMMAX:30,(+P.accHi||10)+2); save(); renderAssign(); refreshPlans(); }
 function accInfo(P,L){
   if(P.accMode==='maintien')return 'entretien';
   if(P.accMode==='calendrier')return '+'+F(P.inc)+' / '+(+P.accEvery||3)+' sem.';
-  var alo=+P.accLo||8; if(isM(L))return 'double progression '+alo+'-'+Math.min(ACCMMAX,Math.max(alo,+P.accHi||10))+' m, +'+accStepOf(P)+' m';   /* lot 46 */
+  var alo=+P.accLo||8; if(isU(L))return 'double progression '+alo+'-'+Math.min(ACCMMAX,Math.max(alo,+P.accHi||10))+uM(L)+', +'+accStepOf(P)+uM(L);   /* lot 46 */
   return 'double progression '+alo+'-'+Math.min(30,Math.max(alo,+P.accHi||10));
 }
 /* ================= catalogue de mouvements =================
@@ -3464,6 +3489,16 @@ function renderFin(){
   if(document.activeElement!==$('tfin'))$('tfin').value=f?F(f.kg):'';
   $('tfinh').checked=!!(f&&f.hab);
   $('tfinnote').textContent=f?'Noté le '+frDate(f.d)+'. ':'';
+  var u=k?nuOf(k):null; if(document.activeElement!==$('tnu'))$('tnu').value=u?F(u.kg):'';   /* lot 93 */
+}
+/* lot 93 : PdC non habillé, noté par séance comme le PdC de fin de séance */
+function nuOf(k){ return (S.nuPdc||[]).filter(function(x){return x.k===k&&x.b===(+S.blockId||1);})[0]||null; }
+function saveNu(){
+  var k=S.tsel; if(!k)return;
+  var v=num($('tnu').value,null), b=+S.blockId||1;
+  S.nuPdc=(S.nuPdc||[]).filter(function(x){return !(x.k===k&&x.b===b);});
+  if(v!==null&&v>0)S.nuPdc.push({k:k,b:b,d:todayISO(),kg:Math.round(v*100)/100});
+  save(); renderFin();
 }
 function saveFin(){
   var k=S.tsel; if(!k)return;
@@ -3480,9 +3515,10 @@ function pesRows(){
   (S.log||[]).forEach(function(e){ var r=R(e.date); if(!r)return; r.b[blockOfEntry(e)]=1; if(hasBw(e))r.s.push(+e.bw); });
   (S.velo||[]).forEach(function(v){ var r=R(v.date); if(r&&+v.poids_corps_kg>0)r.v.push(+v.poids_corps_kg); });
   (S.finPdc||[]).forEach(function(x){ var r=R(x.d); if(r){ r.f=x; r.b[+x.b]=1; } });
+  (S.nuPdc||[]).forEach(function(x){ var r=R(x.d); if(r){ r.n=x; r.b[+x.b]=1; } });   /* lot 93 */
   var moy=function(a){ return a.length?Math.round(a.reduce(function(s,x){return s+x;},0)/a.length*100)/100:null; };
   return Object.keys(m).sort().reverse().map(function(d){ var r=m[d], bs=Object.keys(r.b).map(Number);
-    return {d:d,b:bs.length?Math.max.apply(null,bs):blockOfDate(d),j:r.j!=null?r.j:null,s:moy(r.s),ns:r.s.length,v:moy(r.v),f:r.f||null};
+    return {d:d,b:bs.length?Math.max.apply(null,bs):blockOfDate(d),j:r.j!=null?r.j:null,s:moy(r.s),ns:r.s.length,v:moy(r.v),f:r.f||null,n:r.n||null};
   }).filter(function(r){ return r.j!=null||r.s!=null||r.v!=null||r.f; });
 }
 function pesFiltered(){ var q=dq(); return pesRows().filter(function(r){ return perOk(q,'p',r.b,r.d); }); }
@@ -3532,17 +3568,32 @@ function renderPesees(){
   var q=dq(), all=pesRows(), rs=all.filter(function(r){ return perOk(q,'p',r.b,r.d); }), c=function(v){ return v!=null?F(v):'—'; };
   $('pper').innerHTML=perHTML(q,'p');
   $('pescount').textContent=rs.length+' date'+(rs.length>1?'s':'')+' sur '+all.length;
-  o.innerHTML=rs.length?pesPlot(rs)+'<div class="scroll"><table><thead><tr><th>date</th><th>bloc</th><th>tapé en séance</th><th>séries</th><th>vidéo</th><th>fin de séance</th></tr></thead><tbody>'+
+  o.innerHTML=fltNote(all.length-rs.length,'pesée','p')+(rs.length?pesPlot(rs)+'<div class="scroll"><table><thead><tr><th>date</th><th>bloc</th><th>tapé en séance</th><th>non habillé</th><th>séries</th><th>vidéo</th><th>fin de séance</th></tr></thead><tbody>'+
     rs.map(function(r){ var f=r.f;
-      return '<tr><td>'+frDate(r.d)+'</td><td>'+(r.b?r.b:'hors bloc')+'</td><td>'+c(r.j)+'</td><td>'+c(r.s)+(r.ns>1?' <small>('+r.ns+')</small>':'')+'</td><td>'+c(r.v)+'</td><td>'+
+      return '<tr><td>'+frDate(r.d)+'</td><td>'+(r.b?r.b:'hors bloc')+'</td><td>'+c(r.j)+'</td><td>'+nuCell(r)+'</td><td>'+c(r.s)+(r.ns>1?' <small>('+r.ns+')</small>':'')+'</td><td>'+c(r.v)+'</td><td>'+
         (f?F(f.kg)+(f.hab?' habillé':' non habillé')+' <small>'+esc(pesSeance(f))+'</small>':'—')+'</td></tr>'; }).join('')+
     '</tbody></table></div><p class="note">Séries : moyenne des PdC notés avec les séries du jour (leur nombre entre parenthèses quand il y en a plusieurs).</p>'
-    :'<p class="note">'+(all.length?'Aucune pesée sur cette période.':'Aucun PdC connu pour l\'instant. Touchez la ligne PdC de Séance du jour pour le saisir.')+'</p>';
+    :'<p class="note">'+(all.length?'Aucune pesée sur cette période.':'Aucun PdC connu pour l\'instant. Touchez la ligne PdC de Séance du jour pour le saisir.')+'</p>');
 }
+/* lot 93 : PdC non habillé ; l'écart avec le PdC tapé le même jour = les vêtements */
+function nuCell(r){ if(!r.n)return '—'; var d=r.j!=null?Math.round((r.j-r.n.kg)*100)/100:null;
+  return F(r.n.kg)+(d!=null&&d>0&&d<6?' <small>(vêtements '+F(d)+')</small>':''); }
+/* lot 91 : des filtres gardés d'une fois sur l'autre (bloc, dates, mouvement…) cachaient le deload sans le dire */
+function fltNote(n,mot,p){
+  if(!(n>0))return '';
+  return '<p class="note fltnote"><b>'+n+' '+mot+(n>1?'s':'')+' masquée'+(n>1?'s':'')+' par vos filtres.</b> <button class="linkbtn" data-fltall="'+p+'">Tout afficher</button></p>';
+}
+document.addEventListener('click',function(ev){
+  var b=ev.target&&ev.target.closest?ev.target.closest('[data-fltall]'):null; if(!b)return;
+  var q=dq();
+  if(b.dataset.fltall==='p'){ q.pblks=[]; q.pd1=''; q.pd2=''; }
+  else { q.li=''; q.role=''; q.load=''; q.reps=''; q.vid=false; q.blks=[]; q.d1=''; q.d2=''; }
+  save(); renderData(); applyFolds();
+});
 $('pexp').addEventListener('click',function(){   /* lot 60 (Q4) */
   var n=function(v){ return v!=null?String(v).replace('.',','):''; };
-  var rows=['date;bloc;tape_en_seance;series;nb_series;video;fin_de_seance;fin_habille;fin_seance'].concat(pesFiltered().slice().reverse().map(function(r){ var f=r.f;
-    return [r.d,r.b,n(r.j),n(r.s),r.ns||'',n(r.v),f?n(f.kg):'',f?(f.hab?'oui':'non'):'',f?pesSeance(f):''].join(';'); }));
+  var rows=['date;bloc;tape_en_seance;non_habille;series;nb_series;video;fin_de_seance;fin_habille;fin_seance'].concat(pesFiltered().slice().reverse().map(function(r){ var f=r.f;
+    return [r.d,r.b,n(r.j),r.n?n(r.n.kg):'',n(r.s),r.ns||'',n(r.v),f?n(f.kg):'',f?(f.hab?'oui':'non'):'',f?pesSeance(f):''].join(';'); }));
   dl('pesees-'+todayISO()+'.csv','\ufeff'+rows.join('\n'),'text/csv');
 });
 function renderHead(){ if(BRSWAP)return; withBw(chBw(),renderHead0); bwMen(); }   /* lot 45 */
@@ -3579,7 +3630,7 @@ function renderLifts(){
   if(BRSWAP)return;   /* lot 45 */
   $('liftlist').innerHTML=S.lifts.map(function(L,i){
     return '<div class="card liftcard c'+col(i)+'">'+
-      '<h2><span class="tagname n'+col(i)+'">'+esc(L.name)+'</span><em>'+(isM(L)?'charge × mètres':(L.useBw?'poids de corps inclus':'charge seule'))+'</em></h2>'+
+      '<h2><span class="tagname n'+col(i)+'">'+esc(L.name)+'</span><em>'+(isU(L)?uW(L,'charge × mètres','charge × secondes',''):(L.useBw?'poids de corps inclus':'charge seule'))+'</em></h2>'+
       '<div class="row">'+
         '<div class="field"><label>Nom</label><input type="text" data-i="'+i+'" data-f="name" value="'+esc(L.name)+'"></div>'+
         '<div class="field md"><label>Suivi</label><select data-i="'+i+'" data-f="main">'+
@@ -3588,7 +3639,7 @@ function renderLifts(){
       '<div class="row" style="margin-top:8px">'+
         '<div class="field w" style="flex:1 1 100%"><label>Description d\'exécution — permanente</label><input type="text" data-i="'+i+'" data-f="desc" value="'+esc(L.desc||'')+'" placeholder="ex. prise pronation, largeur d\'épaules, tempo 2 s en bas"></div>'+
       '</div>'+
-      (isM(L)?'<p class="note">Se mesure en <b>mètres</b> (charge × distance) : pas de 1RM ni de référence ; il se programme avec le gabarit Accessoire.</p>':
+      (isU(L)?'<p class="note">Se mesure en <b>'+uW(L,'mètres</b> (charge × distance)','secondes</b> (charge × durée)','')+' : pas de 1RM ni de référence ; il se programme avec le gabarit Accessoire.</p>':
       '<div class="row" style="margin-top:8px">'+
         '<div class="field sm"><label>Réf. lest</label><input class="numin" type="text" inputmode="decimal" data-i="'+i+'" data-f="rload" value="'+L.ref.load+'"></div>'+
         '<div class="field sm"><label>Réf. reps</label><input data-i="'+i+'" data-f="rreps" type="number" step="1" min="1" value="'+L.ref.reps+'"></div>'+
@@ -3632,7 +3683,7 @@ function renderLifts(){
       '</div>'+
       '<div class="row" style="margin-top:8px">'+
         '<div class="field md"><label>Se mesure en</label><select data-i="'+i+'" data-f="unit"'+(hasLog(i)?' disabled':'')+'>'+
-          '<option value=""'+(isM(L)?'':' selected')+'>reps</option><option value="m"'+(isM(L)?' selected':'')+'>mètres (carry)</option></select></div>'+
+          '<option value=""'+(isU(L)?'':' selected')+'>reps</option><option value="m"'+(L.unit==='m'?' selected':'')+'>mètres (carry)</option><option value="s"'+(L.unit==='s'?' selected':'')+'>secondes (tenue)</option></select></div>'+
       '</div>'+
       (hasLog(i)?'<p class="note">Des séries sont enregistrées pour ce mouvement : l\'unité ne change plus (elles seraient mal relues).</p>':'')+
       '</details>'+
@@ -3821,7 +3872,7 @@ $('addlift').addEventListener('click',function(){
     if($('catunit').value==='m')mInit(L);   /* lot 46 (Q-46a) */
     if($('catkeep').value==='1'){
       var id='u'+Date.now();
-      S.cat.push({id:id,g:'mine',r:null,bw:bw?1:0,n:nm,unit:isM(L)?'m':undefined});
+      S.cat.push({id:id,g:'mine',r:null,bw:bw?1:0,n:nm,unit:isU(L)?L.unit:undefined});
       L.catId=id;
     }
     $('catname').value='';
@@ -3996,9 +4047,24 @@ function chComb(){
   $('chjour').hidden=c.src!=='jour'; $('chperf').hidden=c.src!=='perf';
   var rl=rnd(CRM-eff(L),0.25), rt=rnd(CRM-eff(L)+bwZ(L),0.25);
   var lo=num($('cload').value,0), rp=Math.max(1,num($('creps').value,1)), ri=num($('crir').value,0);
+  chReps();   /* lot 92 */
   $('chbasesum').innerHTML='Base : 1RM <b>'+(L.useBw?F(rt)+' kg</b> ('+F(rl)+' de lest)':F(rl)+' kg</b>')+
     ' <span style="font-weight:400">· '+(c.src==='jour'?'Séance du jour':F(lo)+' × '+rp+(ri?', '+F(ri)+' en réserve':''))+'</span> · <u>changer</u>';
 }
+/* lot 92 (C1) : l'inverse du gros chiffre : à ce lest, combien de reps ? Même 1RM système (CRM), même modèle */
+function chReps(){
+  var L=cur(), p=num($('chnbw').value,null), lo=num($('chnlo').value,null), o=$('chnout');
+  $('chnbwf').hidden=!L.useBw; $('chnbw').placeholder=F(chBw());
+  $('chnlo').placeholder=L.useBw?'négatif = assistance':'kg';
+  if(lo===null){ o.innerHTML='Tapez un lest'+(L.useBw?' (et votre PdC si ce n’est pas '+F(chBw())+' kg)':'')+' : l’outil donne les reps jusqu’à l’échec.'; return; }
+  var P=L.useBw?((p!==null&&p>=30&&p<=250)?p:chBw()):0, sys=eff(L,P)+lo, n=sys>0?(CRM/sys-1)/L.k+1:NaN;
+  if(!(n>=1)){ o.innerHTML='<b>Au-dessus du 1RM estimé</b> ('+F(rnd(CRM-eff(L,P),0.25))+' kg de lest à ce PdC).'; return; }
+  var f=Math.floor(n+1e-9), t=function(x){ return x>=1?x+' rep'+(x>1?'s':''):'—'; };
+  o.innerHTML=f>30?'<b>Plus de 30 reps</b> jusqu’à l’échec : hors du domaine du modèle.':
+    '<b>≈ '+t(f)+'</b> jusqu’à l’échec (± 1, modèle) · à 1 en réserve : '+t(f-1)+' · à 2 : '+t(f-2)+
+    (L.useBw?'<br>Charge totale '+F(rnd(P+lo,0.25))+' kg (PdC '+F(P)+' + '+F(lo)+').':'');
+}
+['chnbw','chnlo'].forEach(function(id){ $(id).addEventListener('input',chReps); });
 function chInfo(){
   var c=cui();
   [['cardch','ch'],['cardpct','pct']].forEach(function(p){ var el=$(p[0]); if(!el)return; var on=!!c.info[p[1]]; el.classList.toggle('chinfo',on);
@@ -4612,7 +4678,7 @@ function renderAssign(){
 
   $(ASGT).innerHTML=S.lifts.map(function(L,i){   /* lot 45 : #brassign pour le brouillon */
     if(ASGSKIP[i])return '';
-    var P=L.prog, t=tplOf(P.tpl), groups=isM(L)?tplGroupsM():GRPS0;   /* lot 46 : carry = Accessoire seul */
+    var P=L.prog, t=tplOf(P.tpl), groups=isU(L)?tplGroupsM():GRPS0;   /* lot 46 : carry = Accessoire seul */
     if(P.tpl==='off'||!t){
       return '<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
         '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+'</div>'+
@@ -4627,11 +4693,19 @@ function renderAssign(){
           '<div class="field w" style="flex:1 1 100%"><label>Jours</label><div class="daypick">'+
             ADAYS.map(function(d){var on=accDaysOf(P).indexOf(d)>=0;
               return '<label class="dchip'+(on?' on':'')+'"><input type="checkbox" data-i="'+i+'" data-f="accDayT" data-d="'+d+'"'+(on?' checked':'')+'>'+d+'</label>';}).join('')+'</div></div>'+
-          '<div class="field sm"><label>Séries</label><input data-i="'+i+'" data-f="accSets" type="number" min="1" step="1" value="'+(+P.accSets||3)+'"></div>'+
-          '<div class="field sm"><label>'+(isM(L)?'Mètres de':'Reps de')+'</label><input data-i="'+i+'" data-f="accLo" type="number" min="1" step="1" value="'+(+P.accLo||8)+'"></div>'+
+          '<div class="field sm"><label>'+(fmtOf(L)?'Tours':'Séries')+'</label><input data-i="'+i+'" data-f="accSets" type="number" min="1" step="1" value="'+(+P.accSets||3)+'"></div>'+
+          '<div class="field sm"><label>'+uW(L,'Mètres de','Secondes de','Reps de')+(fmtOf(L)?' par tour':'')+'</label><input data-i="'+i+'" data-f="accLo" type="number" min="1" step="1" value="'+(+P.accLo||8)+'"></div>'+
           '<div class="field sm"><label>à</label><input data-i="'+i+'" data-f="accHi" type="number" min="1" step="1" value="'+(+P.accHi||10)+'"></div>'+
-          (isM(L)?'<div class="field sm"><label>Pas (m)</label><input data-i="'+i+'" data-f="accStep" type="number" min="1" step="1" value="'+accStepOf(P)+'"></div>':'')+
+          (isU(L)?'<div class="field sm"><label>Pas ('+uM(L).trim()+')</label><input data-i="'+i+'" data-f="accStep" type="number" min="1" step="1" value="'+accStepOf(P)+'"></div>':'')+
         '</div>'+
+        '<div class="row" style="margin-top:8px">'+   /* lot 94 : EMOM, Tabata */
+          '<div class="field md"><label>Format</label><select data-i="'+i+'" data-f="accFmt">'+
+            [['','séries'],['emom','EMOM'],['tabata','Tabata']].map(function(o){ return '<option value="'+o[0]+'"'+((P.accFmt||'')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>'+
+          (P.accFmt==='emom'?'<div class="field sm"><label>Toutes les</label><input type="text" data-i="'+i+'" data-f="fmtInt" value="'+esc(P.fmtInt||'1:00')+'" placeholder="1:30"></div>':'')+
+          (P.accFmt==='tabata'?'<div class="field sm"><label>Effort (s)</label><input type="number" min="1" step="1" data-i="'+i+'" data-f="fmtOn" value="'+(+P.fmtOn||20)+'"></div>'+
+            '<div class="field sm"><label>Repos (s)</label><input type="number" min="0" step="1" data-i="'+i+'" data-f="fmtOff" value="'+(P.fmtOff!=null?+P.fmtOff:10)+'"></div>':'')+
+        '</div>'+
+        (P.accFmt?'<p class="note">Chaque tour = une case en séance, comme une série. « '+uW(L,'Mètres','Secondes','Reps')+' de … à » : ce que vous faites à chaque tour ; la double progression ajoute 1 par tour jusqu\'en haut, puis la charge monte. Hors 1RM et records. Le minuteur reste le vôtre.</p>':'')+
         '<div class="row" style="margin-top:8px">'+
           '<div class="field md"><label>Progression</label><select data-i="'+i+'" data-f="accMode">'+
             '<option value="double"'+(P.accMode!=='maintien'&&P.accMode!=='calendrier'?' selected':'')+'>double progression</option>'+
@@ -4641,8 +4715,8 @@ function renderAssign(){
           incField(i,P)+
           (P.accMode==='calendrier'?'<div class="field sm"><label>Toutes les</label><input data-i="'+i+'" data-f="accEvery" type="number" min="1" step="1" value="'+(+P.accEvery||3)+'"></div>':'')+
         '</div>'+
-        '<p class="note">'+accDaysOf(P).length+' séance'+(accDaysOf(P).length>1?'s':'')+' par semaine, la progression avance à chaque séance. Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+(isM(L)?' m':'')+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
-          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+(isM(L)?' m':'')+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
+        '<p class="note">'+accDaysOf(P).length+' séance'+(accDaysOf(P).length>1?'s':'')+' par semaine, la progression avance à chaque séance. Projection : départ <b>'+(+P.accSets||3)+S.sep+(+P.accLo||8)+uM(L)+' à '+loadKg(L,+P.accLoad||0)+'</b>'+
+          ' · arrivée en S'+S.nwk+' <b>'+(+P.accSets||3)+S.sep+last.reps+uM(L)+' à '+loadKg(L,last.load)+'</b> si tout passe.</p>'+
         accWideHTML(L,i,P,pl)+   /* lot 51 */
         (P.accHiWas?hardFlag('Fourchette de reps corrigée',   /* D8 */
           'La borne haute était à '+F(P.accHiWas)+' reps, ce qui ne peut venir que d\'une saisie. Elle est ramenée à '+
@@ -4773,7 +4847,7 @@ function renderAssign(){
 function asgSet(t){
   var i=t.dataset.i; if(i==null)return null; var L=S.lifts[+i], P=L.prog, f=t.dataset.f, v=t.value;
   if(f==='tpl'){
-    if(isM(L)&&v!=='acc'&&v!=='off')return null;   /* lot 46 : carry = Accessoire seul */
+    if(isU(L)&&v!=='acc'&&v!=='off')return null;   /* lot 46 : carry = Accessoire seul */
     /* lot 40 (Q1) : refus du gabarit retire */
     P.tpl=v;P.top=null;P.prLoad=null;P.prBw=null;P.pair='';P.hdl=[];
     if(ZRIR0[v]!=null)P.rir=ZRIR0[v];
@@ -4825,9 +4899,13 @@ function asgSet(t){
   else if(f==='rbLest'){ var rd3=t.dataset.d, rl=String(v).trim()===''?null:parseFloat(String(v).replace(',','.')); if(RBVX[rd3]&&(rl==null||isFinite(rl)))(P.rbLest=P.rbLest||{})[rd3]=rl; }
   else if(f==='rbRnd')P.rbRnd=(v==='bas'?'bas':'proche');
   else if(f==='accSets')P.accSets=Math.max(1,+v||1);
-  else if(f==='accLo'){P.accLo=Math.min(isM(L)?ACCMMAX:30,Math.max(1,+v||1));   /* D8 */
+  else if(f==='accFmt'){ P.accFmt=(v==='emom'||v==='tabata')?v:''; return {f:f,ra:1,today:1}; }   /* lot 94 */
+  else if(f==='fmtInt')P.fmtInt=String(v).trim().slice(0,12);
+  else if(f==='fmtOn')P.fmtOn=Math.max(1,Math.round(+v)||20);
+  else if(f==='fmtOff')P.fmtOff=Math.max(0,Math.round(+v)||0);
+  else if(f==='accLo'){P.accLo=Math.min(isU(L)?ACCMMAX:30,Math.max(1,+v||1));   /* D8 */
     if(+P.accHi<P.accLo)P.accHi=P.accLo;}
-  else if(f==='accHi')P.accHi=Math.min(isM(L)?ACCMMAX:30,Math.max(+P.accLo||8,+v||1));   /* D8 */
+  else if(f==='accHi')P.accHi=Math.min(isU(L)?ACCMMAX:30,Math.max(+P.accLo||8,+v||1));   /* D8 */
   else if(f==='accLoad')P.accLoad=num(v,0)||0;
   else if(f==='accStep')P.accStep=Math.max(1,Math.round(+v||5));   /* lot 46 */
   else if(f==='gLoad'||f==='gReps'||f==='gRm'){   /* lot 53 : objectif chiffré, saisi en lest avec le PdC du jour */
@@ -4904,7 +4982,8 @@ function buildPlan(){
         if(t.acc){
           if(accDaysOf(P).indexOf(lab)<0||w>=S.nwk)return;
           var st=(APC[o.i]||(APC[o.i]=accPlan(L,o.i))).filter(function(q){return q.w===w&&q.lab===lab;})[0]; if(!st)return;   /* R1 */
-          day.lines.push({li:o.i,name:L.name,role:'acc',sets:st.dl?Math.max(1,Math.round((+P.accSets||3)*2/3)):(+P.accSets||3),reps:String(st.reps)+(isM(L)?' m':''),   /* lot 57 */
+          var ns=st.dl?Math.max(1,Math.round((+P.accSets||3)*2/3)):(+P.accSets||3);   /* lot 94 : tg = format EMOM / Tabata */
+          day.lines.push({li:o.i,name:L.name,role:'acc',sets:ns,tg:fmtTg(L,ns)||undefined,reps:String(st.reps)+uM(L),   /* lot 57 */
             load:rnd(st.load,hGrain(L,+P.inc||2.5)),info:(st.dl?'deload de tous les mouvements (blocage de '+st.dl.join(', ')+', p. 244) : bas de la fourchette, 2/3 des séries (p. 112) · ':'')+accInfo(P,L)+(st.wide?' · bloque : élargir la fourchette (livre p. 113)':''),key:'c|'+o.i+'|'+w+'|'+lab+'|0'+BK()});
           return;
         }
@@ -5116,7 +5195,7 @@ function lastPerfHTML(x){
     ' \u00b7 '+(d>0?'+':'\u2212')+F(Math.abs(d))+' kg');
   var rs=(e.rir==null)?' \u00b7 r\u00e9serve inconnue':(+e.rir?' \u00b7 r\u00e9serve '+F(e.rir):' \u00b7 \u00e0 l\u2019\u00e9chec');
   return '<div class="lastp lpd">derni\u00e8re : '+(e.date?frDate(e.date):'sans date')+' \u00b7 <b>'+
-    loadLab(L,e.load)+' '+S.sep+' '+reps+(isM(L)?' m':'')+'</b>'+tr+(e.fin?' <i>('+finCourt(e)+')</i>':'')+rs+dl+'</div>';
+    loadLab(L,e.load)+' '+S.sep+' '+reps+uM(L)+'</b>'+tr+(e.fin?' <i>('+finCourt(e)+')</i>':'')+rs+dl+'</div>';
 }
 function lineState(key,date){
   if(SIM)return '';
@@ -5659,7 +5738,7 @@ function countLine(reps){
 }
 /* lot 64 : petites aides du panneau de série */
 function whyHTML(t,lab){ return '<button type="button" class="whyb" data-why>'+(lab||'pourquoi ?')+'</button><span class="whyt" hidden>'+t+'</span>'; }
-function uRepN(L,n){ return isM(L)?' m':(+n>1?' reps':' rep'); }
+function uRepN(L,n){ return isU(L)?uM(L):(+n>1?' reps':' rep'); }
 function prescHTML(x,v){
   if(x.load==null||v==null||!isFinite(v)||Math.abs(v-x.load)<0.005)return '';
   return '<p class="nwarn">'+F(v)+' kg ≠ prescrit '+F(x.load)+' kg</p>';
@@ -5826,7 +5905,7 @@ function panelHTML(key){
     var pl=accPlan(L,x.li), ix=-1;
     pl.forEach(function(q,k){if(q.w===f.w&&q.lab===f.day)ix=k;});
     var n=ix>=0?pl[ix+1]:null;
-    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+(isM(L)?' m':'')+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
+    nxt=n?'<p class="note">Séance suivante si celle-ci passe en entier : <b>'+(+L.prog.accSets||3)+' '+S.sep+' '+n.reps+uM(L)+' à '+loadKg(L,rnd(n.load,L.step))+'</b>. Enregistrez le résultat et la suite du bloc se recalcule.</p>'
         :'<p class="note">Dernière séance programmée de ce mouvement dans le bloc.</p>';
   }
   var rirNow=e?(finCh(e)&&e.fin.rir!=null?e.fin.rir:(e.rir===null?null:e.rir)):undefined;   /* lot 58 */
@@ -5862,8 +5941,8 @@ function panelHTML(key){
     '<h4 class="n'+col(x.li)+'" data-ptit="1" role="button" tabindex="0" title="refermer">'+x.name+' — prescrit '+(x.load==null?'lest à saisir':F(x.load))+' '+S.sep+' '+x.reps+(x.sets>1?' '+S.sep+' '+x.sets:'')+'</h4>'+descHTML(L)+   /* lot 46 (R5) */
     '<div class="row">'+
       '<div class="field sm"><label>'+(L.useBw?'Lest fait (kg)':'Charge faite (kg)')+'</label><input data-fld="load" class="numin" type="text" inputmode="decimal" value="'+((e&&e.load!=null?e.load:x.load)==null?'':F(e&&e.load!=null?e.load:x.load))+'"></div>'+
-      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>'+(isM(L)?'Mètres par série':'Reps réussies par série')+' — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
-        :'<div class="field sm"><label>'+(isM(L)?'Mètres faits':'Reps réussies')+'</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
+      (x.sets>1?'<div class="field" style="flex:1 1 auto"><label>'+uW(L,'Mètres par série','Secondes par série','Reps réussies par série').replace(' série',fmtOf(L)?' tour':' série')+' — touchez pour valider</label><div class="pillrow">'+sets.join('')+'</div></div>'
+        :'<div class="field sm"><label>'+uW(L,'Mètres faits','Secondes tenues','Reps réussies')+'</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
     '</div>'+
     '<div data-presc>'+prescHTML(x,e&&e.load!=null?e.load:x.load)+'</div>'+   /* lot 64 (réponse 9) */
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
@@ -6005,14 +6084,14 @@ window.addEventListener('pagehide',draftFlush);
 function showPick(p,b,line){
   Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(x){x.removeAttribute('data-sel');});
   b.setAttribute('data-sel','1');
-  var mn=repMin(line.reps), hi=repMax(line.reps), list=[], v, Lp=S.lifts[line.li], sp=isM(Lp)?accStepOf(Lp.prog):1;   /* lot 46 */
+  var mn=repMin(line.reps), hi=repMax(line.reps), list=[], v, Lp=S.lifts[line.li], sp=isU(Lp)?accStepOf(Lp.prog):1;   /* lot 46 */
   if(/^\d/.test(String(line.reps))){ for(v=Math.max(0,hi-4*sp);v<=hi+6*sp;v+=sp)list.push(v);   /* lot 89 : jusqu'à prescrit + 6 */ }
   else { for(v=1;v<=15;v++)list.push(v); }
   p.querySelector('[data-pickrow]').innerHTML=list.map(function(q){
     return '<button class="pill'+(q>=mn?'':' sub')+'" data-pick="'+q+'">'+q+'</button>';
   }).join('')+'<button class="pill sub" data-pick="">effacer</button>'+
     '<span class="pickother"><input class="numin" data-pickin type="text" inputmode="numeric" placeholder="autre" aria-label="autre nombre" style="width:4.5em"><button class="pill" data-pickok="1">OK</button></span>';   /* lot 89 : n'importe quel nombre */
-  p.querySelector('[data-picklab]').textContent=(isM(Lp)?'M\u00e8tres faits':'Reps r\u00e9ussies')+' sur la s\u00e9rie '+(+b.dataset.set+1)+
+  p.querySelector('[data-picklab]').textContent=(Lp&&Lp.unit==='s'?'Secondes tenues':isU(Lp)?'M\u00e8tres faits':'Reps r\u00e9ussies')+' sur la s\u00e9rie '+(+b.dataset.set+1)+
     ' \u2014 prescrit '+line.reps;
   p.querySelector('[data-pickwrap]').style.display='';
 }
@@ -6617,6 +6696,10 @@ $('tdone').addEventListener('click',function(){
   var k=S.tsel; if(!k)return;
   if(S.done[k]){ delete S.done[k]; }
   else{
+    buildPlan();   /* lot 90 : pas de séance close en oubliant des lignes sans le savoir */
+    var wq=+k.split('|')[0], lq=k.split('|')[1], vide=[];
+    PLAN.forEach(function(wk){ if(wk.w===wq)wk.days.forEach(function(dd){ if(dd.label===lq)dd.lines.forEach(function(l){ if(!entryOf(l.key))vide.push(l.name+(l.role==='back'?' back-off':l.role==='top'?' top set':'')); }); }); });
+    if(vide.length&&!confirm(vide.length+' ligne'+(vide.length>1?'s':'')+' pas enregistrée'+(vide.length>1?'s':'')+' : '+vide.join(', ')+'.\n\nMarquer quand même la séance comme faite ?'))return;
     S.done[k]=todayISO();
     buildPlan();
     var sess=sessions(), i=sess.indexOf(k);
@@ -6745,7 +6828,7 @@ function plusHTML(key,x,L,e){
         '<div class="field sm" style="margin-top:6px"><label>Autre %</label><input data-pin="pct" class="numin" type="text" inputmode="decimal"></div></div>'+
       '<div data-pfreew class="field sm" style="margin-top:6px"'+(m==='free'?'':' hidden')+'><label>'+(L.useBw?'Lest (kg)':'Charge (kg)')+'</label>'+
         '<input data-pin="load" class="numin" type="text" inputmode="decimal" value="'+(base==null?'':F(base))+'"></div>'+
-      '<div class="row" style="margin-top:6px"><div class="field sm"><label>'+(isM(L)?'Mètres':'Reps')+'</label>'+
+      '<div class="row" style="margin-top:6px"><div class="field sm"><label>'+uW(L,'Mètres','Secondes','Reps')+'</label>'+
         '<input data-pin="reps" class="numin" type="text" inputmode="numeric" value="'+(r==null?'':r)+'"></div>'+
         '<div class="field"><label>Séries</label><div class="pillrow">'+[1,2,3].map(function(v){
           return '<button class="pill" data-psets="'+v+'" aria-pressed="'+(v===1)+'">'+v+'</button>';}).join('')+'</div></div></div>'+
@@ -6953,7 +7036,7 @@ $('tbw').addEventListener('change',function(){   /* lot 44 : le PdC du jour est 
   if(S.tbw!=null&&S.tbw>=30&&S.tbw<=250)S.pesees[d]=S.tbw; else delete S.pesees[d];
   save(); if(!bwFollow())renderHead();
 });
-$('tfin').addEventListener('change',saveFin); $('tfinh').addEventListener('change',saveFin);   /* lot 44 (R9) */
+$('tfin').addEventListener('change',saveFin); $('tfinh').addEventListener('change',saveFin); $('tnu').addEventListener('change',saveNu);   /* lot 93 */   /* lot 44 (R9) */
 
 /* ================= Données ================= */
 function fitLift(li){
@@ -7772,7 +7855,7 @@ function pxMD(o,titre){
     if(d.w!==w0){ w0=d.w; t.push('### '+(d.dl?'Deload':'Semaine '+(d.w+1))+(d.tag&&!d.dl?' ('+d.tag+')':''),''); }
     t.push('#### '+d.d+(d.date?', '+frDate(d.date):'')+(d.done?' (faite)':d.skip?' (sautée)':''),'');
     d.l.forEach(function(x){ var L=S.lifts[x.li];
-      t.push('- '+x.n+(x.r?', '+x.r:'')+' : '+(x.c==null?'lest à saisir':loadKg(L||{},x.c))+', '+(x.s>1?x.s+' × ':'')+x.p+(isM(L)?'':' reps')+
+      t.push('- '+x.n+(x.r?', '+x.r:'')+' : '+(x.c==null?'lest à saisir':loadKg(L||{},x.c))+', '+(x.s>1?x.s+' × ':'')+x.p+(uM(L)||' reps')+
         (x.sys!=null?' ('+F(x.sys)+' kg système'+(x.pct!=null?', '+x.pct+' %':'')+')':(x.pct!=null?' ('+x.pct+' %)':''))+(x.info?' — '+x.info:''));
     });
     Object.keys(d.wm).forEach(function(li){ t.push('- échauffement proposé, '+S.lifts[+li].name+' : '+d.wm[li]); });
@@ -7820,14 +7903,14 @@ function mdFromLog(es){   /* séances retrouvées par les séries saisies (bloc 
 }
 function mdPres(L,x){
   if(x.c==null&&x.p==null)return 'sans prescription';
-  return loadKg(L||{},x.c)+', '+(+x.s>1?x.s+' × ':'')+x.p+(isM(L)?'':' reps');
+  return loadKg(L||{},x.c)+', '+(+x.s>1?x.s+' × ':'')+x.p+(uM(L)||' reps');
 }
 function mdDone(L,e){
   if(e.state==='skip')return 'sautée';
-  var s=e.sets||[], m=isM(L);
+  var s=e.sets||[], m=isU(L);
   if(!s.some(function(v){return v!=null;}))return 'rien de saisi';
   var j=function(a){return a.map(function(v){return v==null?'—':v;}).join('/');};
-  var t=loadKg(L||{},e.load)+', '+j(s)+(m?' m':' reps');
+  var t=loadKg(L||{},e.load)+', '+j(s)+(m?uM(L):' reps');
   if(e.tries&&j(e.tries)!==j(s))t+=' (tentées '+j(e.tries)+')';
   t+=e.rirs?', réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?', réserve '+F(e.rir):e.rirq?', réserve « ? » (non estimable)':', réserve inconnue');   /* lot 59 */
   if(hasBw(e))t+=', PdC '+F(e.bw)+' kg';
@@ -8824,12 +8907,12 @@ function renderData(){
   var FL=dataFilter();
   $('logcount').textContent=FL.length+' / '+S.log.length;
   $('dsum').innerHTML=S.log.length?dataSummary(FL):'';
-  if(!FL.length){$('loglist').innerHTML=S.log.length?'':'<p class="note">Vide.</p>';}
+  if(!FL.length){$('loglist').innerHTML=S.log.length?fltNote(S.log.length,'série','d'):'<p class="note">Vide.</p>';}
   else{
-    $('loglist').innerHTML=FL.slice().sort(byDateDesc).map(function(e){   /* R12 */
+    $('loglist').innerHTML=fltNote(S.log.length-FL.length,'série','d')+FL.slice().sort(byDateDesc).map(function(e){   /* R12 */   /* lot 91 : filtres visibles */
       if(e.state==='skip')return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
-        '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
+        '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:e.day==='DL'?' · Deload':'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+'<br><button class="linkbtn" data-dcom="'+esc(e.key)+'">commenter</button>'+dcomHTML(e)+'</span>'+   /* lot 46 (R10) */
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'" aria-label="Supprimer">\u00d7</button></div>';
       var reps=(e.sets||[]).map(function(v){return v==null?'—':v;}).join('/')+
@@ -8842,12 +8925,12 @@ function renderData(){
       if(e.state!=='skip')lk.push('<button class="linkbtn" data-doubtk="'+esc(e.key)+'">'+(e.doubt?'n’est plus douteuse':'saisie douteuse')+'</button>');   /* lot 80 (A8) */
       veloOfKey(e.key).forEach(function(v){lk.push('<button class="linkbtn" data-vgo="'+esc(v.id)+'">\ud83c\udfa5 vidéo S'+(v.lien.set+1)+'</button>');});
       return '<div class="logrow'+(LGOPEN[e.key]||DCOM===e.key?' lgopen':'')+'" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
-        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b>'+rkMark(e)+' '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+(isM(S.lifts[e.li])?' m':'')+   /* R12 */
+        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b>'+rkMark(e)+' '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+uM(S.lifts[e.li])+   /* R12 */
         (e.rirs?' · réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue'))+
         ((e.rir!=null||e.rirs)&&learnE(e)?' <span class="lrn">(apprentissage)</span>':'')+   /* lot 81 (A9) */
         (e.doubt?' <span class="dout">⚠ douteuse</span>':'')+(aComp(e)?' <span class="acomp">à compléter</span>':'')+   /* lot 80 */
         (veloOfKey(e.key).length?' 🎥':'')+'<span class="lgchev" aria-hidden="true">'+(LGOPEN[e.key]||DCOM===e.key?'▾':'▸')+'</span><span class="lgmore">'+   /* lot 77 */
-        '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:'')+
+        '<br><i>'+(e.tpl||'hors programme')+(e.week?' · S'+e.week+' '+e.day:e.day==='DL'?' · Deload':'')+
         (e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+   /* R12 */
         (e.role==='extra'?'<br><i>ajout ponctuel</i>':'')+
         (vl?'<br>'+vl:'')+(e.fin?'<br><i>'+finTxt(e)+'</i>':'')+dfmHTML(e)+rkMarkTxt(e)+atTxt(e)+   /* lot 48 */   /* lot 43 (C2) */
@@ -8884,8 +8967,8 @@ $('addlog').addEventListener('click',function(){
      born\u00e9 \u00e0 \u00b1 500 kg. R\u00e9serve : d\u00e9j\u00e0 born\u00e9e par le s\u00e9lecteur. */
   var repsRaw=num($('lreps').value,null), loadRaw=num($('lload').value,null);
   if(repsRaw===null&&loadRaw===null){alert('Indiquez au moins le nombre de reps.');return;}
-  if(repsRaw===null||repsRaw<1||repsRaw>(isM(L)?ACCMMAX:100)||Math.round(repsRaw)!==repsRaw){
-    alert(isM(L)?'Distance : un entier de 1 à '+ACCMMAX+' m.':'Nombre de reps : un entier entre 1 et 100.');return;}
+  if(repsRaw===null||repsRaw<1||repsRaw>(isU(L)?ACCMMAX:100)||Math.round(repsRaw)!==repsRaw){
+    alert(isU(L)?uW(L,'Distance','Durée','')+' : un entier de 1 à '+ACCMMAX+uM(L)+'.':'Nombre de reps : un entier entre 1 et 100.');return;}
   if(loadRaw!==null&&Math.abs(loadRaw)>500){alert('Lest : au-del\u00e0 de 500 kg, c\u2019est une faute de frappe.');return;}
   var reps=repsRaw, load=loadRaw||0, rk0=rkSnap(li);   /* lot 48 */
   S.log.push({v:SCHEMA,id:'pr'+Date.now(),key:'pr'+Date.now(),date:$('ldate').value||todayISO(),
@@ -9047,7 +9130,7 @@ function setLien(v,lien){
    Lot 57 (reponse 11) : des ex aequo sont departages par l'heure, celle de la video (tiree de son nom, VID_AAAAMMJJ_HHMMSS)
    contre l'heure notee de chaque serie (lot 43) : la serie validee le plus tot apres le debut de la video, dans les
    VTMAX minutes, si la suivante est au moins VTGAP plus loin ; une serie deja rattachee a une autre video est ecartee. */
-var VTMAX=20*60000, VTGAP=60000;
+var VTMAX=20*60000, VTGAP=60000, VLOADTOL=1.25;   /* lot 90 */
 function veloT(v){ var m=/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/.exec(String(v.id||'')); return m?new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime():null; }
 function veloAuto(v){
   if(v.lien)return false;
@@ -9056,8 +9139,10 @@ function veloAuto(v){
   if(!es.length)return false;
   var n=v.reps.length, ts=String(v.type_serie||'').toLowerCase(), c=[];
   var nOk=v.reps.filter(function(r){return !r.tentative_ratee;}).length;   /* lot 37 : saisie des reps réussies */
+  if(v.lest_kg!=null)es=es.filter(function(e){ return e.load==null||Math.abs(+e.load-(+v.lest_kg))<=VLOADTOL; });   /* lot 90 (V1) : la charge compte */
+  if(!es.length)return false;
   es.forEach(function(e){ (e.tries||e.sets).forEach(function(r,st){
-    var role=(/top/.test(ts)&&e.role==='top')||(/back/.test(ts)&&e.role==='back');
+    var role=(/top/.test(ts)&&e.role==='top')||(/back/.test(ts)&&e.role==='back')||(/deload/.test(ts)&&e.role==='deload');
     var ft=st===(e.tries||e.sets).length-1?finTot(e):null;   /* lot 57 bis : 4 + 1 filmés d'un bloc = 5 */
     c.push({e:e,s:st,m:(r===n||r===nOk||(ft&&ft===n)?2:0)+(role?1:0)});
   });});
@@ -9075,7 +9160,7 @@ function veloAuto(v){
    charge et ordre. Vidéos d'un même jour, mouvement, type et lest, rangées par heure de prise de vue ; une seule entrée du journal
    à ce lest et de ce rôle (une clé du programme passe avant une série versée 'm|') ; la n-ième vidéo va à la n-ième série encore
    libre. Marqué ord:1 (« par l'ordre ») jusqu'à « c'est bon » ; plus de vidéos que de séries libres : rien. */
-function vRole(v){ var t=String(v.type_serie||'').toLowerCase(); return /top/.test(t)?'top':/back/.test(t)?'back':/second/.test(t)?'work':null; }
+function vRole(v){ var t=String(v.type_serie||'').toLowerCase(); return /top/.test(t)?'top':/back/.test(t)?'back':/deload/.test(t)?'deload':/second/.test(t)?'work':null; }
 function veloOrdAll(){
   var G={}, ch=false;
   (S.velo||[]).forEach(function(v){
@@ -9128,7 +9213,8 @@ function vMiroir(v){
 function vLienTxt(v){
   if(isFixe(v))return 'montée fixe : jamais rattachée';
   var e=lienEntry(v);
-  if(!e)return '<b class="vswarn">non rattachée</b> <span class="muted">(détail › pour choisir)</span>';
+  if(!e)return '<b class="vswarn">non rattachée</b> <span class="muted">: '+vWhy(v)+' (détail › pour choisir)</span>'+
+    (isWarm(v)?'':' <button class="linkbtn" data-vrec="'+esc(v.id)+'">Enregistrer cette série</button>');   /* lot 90 (V5, V2) */
   var n=(e.tries||e.sets).length;
   return roleLab(e.role,e.key)+(n>1?', série '+(v.lien.set+1)+' sur '+n:'')+
     (v.lien.ord?' · <span class="vswarn">par l’ordre, à vérifier</span> <button class="linkbtn" data-vok="'+esc(v.id)+'">c’est bon</button>':'');
@@ -9158,6 +9244,67 @@ function vFixeRow(v){
     '<dl class="vsvl"><dt>Vitesse moyenne</dt><dd>'+(f?v2(f.m)+' m/s'+(f.mo!=null?' <span class="muted">(habituelle '+v2(f.mo)+')</span>':''):'—')+'</dd>'+
     '<dt>Forme du jour</dt><dd>'+h+'</dd></dl></div>';
 }
+/* lot 90 (V5) : pourquoi une vidéo reste sans série */
+function vWhy(v){
+  if(isWarm(v))return 'échauffement, jamais rattaché';
+  var mv=v.li>=0&&S.lifts[v.li]?S.lifts[v.li].name:(v.mouvement||'ce mouvement');
+  var es=S.log.filter(function(e){ return e.date===v.date&&(v.li<0||e.li===v.li)&&e.sets&&e.sets.length; });
+  if(!es.length)return 'aucune série de '+esc(mv)+' enregistrée le '+frDate(v.date);
+  var ec=v.lest_kg==null?es:es.filter(function(e){ return e.load==null||Math.abs(+e.load-(+v.lest_kg))<=VLOADTOL; });
+  if(!ec.length)return 'aucune série à '+(+v.lest_kg?F(v.lest_kg)+' kg':'PdC')+' enregistrée ce jour-là';
+  var n=v.reps.length, nOk=vOk(v).length;
+  if(!ec.some(function(e){ return (e.tries||e.sets).some(function(r){ return r===n||r===nOk; }); }))return 'aucune série de '+nOk+' reps à cette charge ce jour-là';
+  return 'plusieurs séries possibles';
+}
+/* lot 90 (V2) : la vidéo crée sa série. Séance de ce jour-là (d'après les séries déjà enregistrées, sinon la séance choisie),
+   ligne prévue du même mouvement et du même type : vide → elle reçoit la série ; même charge → une série de plus ; sinon ajout ponctuel. */
+function vRecord(v){
+  if(!v||v.lien)return 'déjà rattachée';
+  buildPlan();
+  var L=S.lifts[v.li]; if(!L)return 'mouvement inconnu dans l\'outil';
+  var lest=v.lest_kg==null?null:+v.lest_kg, n=vOk(v).length||v.reps.length, ro=vRole(v)||'back';
+  var d0=S.log.filter(function(e){ return e.date===v.date&&e.week!=null&&e.day; })[0], w, lab;
+  if(d0){ w=+d0.week-1; lab=d0.day; } else if(S.tsel){ w=+S.tsel.split('|')[0]; lab=S.tsel.split('|')[1]; } else return 'aucune séance trouvée ce jour-là';
+  var day=null; PLAN.forEach(function(wk){ if(wk.w===w)wk.days.forEach(function(dd){ if(dd.label===lab)day=dd; }); });
+  if(!day)return 'séance introuvable dans le programme';
+  var x=day.lines.filter(function(l){ return l.li===v.li&&l.role===ro&&l.role!=='extra'; })[0], key, st;
+  var o=x?entryOf(x.key):null;
+  if(x&&(!o||o.state==='skip'||(o.load!=null&&lest!=null&&Math.abs(+o.load-lest)<0.01))){
+    key=x.key;
+    if(o&&o.state!=='skip'){ o.sets.push(n); o.tries=(o.tries||o.sets.slice(0,-1)).concat([n]); if(o.at)o.at.push(veloT(v)||Date.now()); recount(o); o.state=stateOf(o); st=o.sets.length-1; }
+    else {
+      var e={v:SCHEMA,id:key,key:key,date:v.date,li:x.li,lift:L.name,tpl:L.prog.tpl,week:w+1,day:lab,role:x.role,presLoad:x.load,presReps:x.reps,presSets:x.sets,
+        load:lest,sets:[n],rir:null,bw:v.poids_corps_kg!=null?+v.poids_corps_kg:S.bw,note:'',setNotes:[],state:null,vrec:1};
+      e.tries=e.sets.slice(); recount(e); e.state=stateOf(e);
+      if(/^[zhr]\|/.test(String(key)))fzEnsure(L);   /* lot 90 */
+      S.log=S.log.filter(function(z){ return z.key!==key; }); S.log.push(e); st=0;
+    }
+  } else {
+    var sk=w+'|'+lab+BK(), id='v'+Date.now().toString(36);
+    if(!S.extra[sk])S.extra[sk]=[];
+    S.extra[sk].push({id:id,li:v.li,load:lest,reps:String(n),sets:1,src:x?x.key:null,info:'enregistrée depuis la vidéo'});
+    buildPlan(); key='x|'+v.li+'|'+w+'|'+lab+'|'+id+BK();
+    var f=findLine(key); if(!f)return 'ajout impossible';
+    var e2={v:SCHEMA,id:key,key:key,date:v.date,li:v.li,lift:L.name,tpl:L.prog.tpl,week:w+1,day:lab,role:f.line.role,presLoad:lest,presReps:String(n),presSets:1,
+      load:lest,sets:[n],rir:null,bw:v.poids_corps_kg!=null?+v.poids_corps_kg:S.bw,note:'',setNotes:[],state:null,vrec:1};
+    e2.tries=e2.sets.slice(); recount(e2); e2.state=stateOf(e2); S.log.push(e2); st=0;
+  }
+  setLien(v,{key:key,set:st});
+  return '';
+}
+/* lot 90 (V4) : séances envoyées par la page vidéo (même site) : localStorage['cp-inbox'], tableau de textes JSON */
+function inboxPull(){
+  var a; try{ a=JSON.parse(localStorage.getItem('cp-inbox')||'[]'); }catch(e){ a=[]; }
+  if(!Array.isArray(a)||!a.length)return;
+  try{ localStorage.removeItem('cp-inbox'); }catch(e){}
+  var ok=0, ko=[];
+  a.forEach(function(t){ var r; try{ r=veloImportAny(typeof t==='string'?JSON.parse(t):t); }catch(e){ r={ok:0,ko:['JSON illisible']}; } ok+=r.ok; ko=ko.concat(r.ko); });
+  veloAutoAll(); save();
+  if(curTab()==='data')renderData();
+  msgBar(ok+' analyse'+(ok>1?'s':'')+' reçue'+(ok>1?'s':'')+' et rangée'+(ok>1?'s':'')+(ko.length?' ; '+ko.length+' refusée'+(ko.length>1?'s':''):'')+' (Données › Vitesse)');
+}
+document.addEventListener('visibilitychange',function(){ if(!document.hidden)inboxPull(); });
+window.addEventListener('storage',function(ev){ if(ev.key==='cp-inbox'&&ev.newValue)inboxPull(); });
 function veloAutoAll(){
   var ch=false; (S.velo||[]).forEach(function(v){ if(veloAuto(v))ch=true; });
   if(veloOrdAll())ch=true;   /* lot 82 (A16) */
@@ -9386,7 +9533,7 @@ function isWarm(v){ return /chauf|warm/i.test(String(v.type_serie||'')); }
 function isFixe(v){ return /fixe/i.test(String(v.type_serie||'')); }   /* lot 82 (A15) : montée fixe, jamais rattachée à une série */
 function typeLab(v){
   var t=String(v.type_serie||'').toLowerCase();
-  return /fixe/.test(t)?'Montée fixe':/chauf|warm/.test(t)?'Échauffement':/top/.test(t)?'Top set':/back/.test(t)?'Back-off':/max|amrap/.test(t)?'Série max':'Série';
+  return /fixe/.test(t)?'Montée fixe':/chauf|warm/.test(t)?'Échauffement':/top/.test(t)?'Top set':/back/.test(t)?'Back-off':/deload/.test(t)?'Deload':/max|amrap/.test(t)?'Série max':'Série';
 }
 function serieLab(v){
   var le=lienEntry(v);   /* lot 57 bis */
@@ -9776,6 +9923,8 @@ function renderVelo(){
 $('p-velo').addEventListener('click',function(e){
   var ok=e.target.closest?e.target.closest('[data-vok]'):null;   /* lot 82 (A16) */
   if(ok){ var vv=vById(ok.dataset.vok); if(vv&&vv.lien){ delete vv.lien.ord; save(); renderVelo(); } return; }
+  var rc=e.target.closest?e.target.closest('[data-vrec]'):null;   /* lot 90 (V2) */
+  if(rc){ var vr=vById(rc.dataset.vrec), m=vRecord(vr); save(); renderVelo(); msgBar(m?'Pas enregistrée : '+m+'.':'Série enregistrée et rattachée.'); return; }
   var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
   if(!b||e.target.closest('[data-juge],[data-velodel],select,a,[data-open]'))return;
   var U=vui();
@@ -9977,6 +10126,7 @@ renderAll(); applyNavMin(); renderBackup();
   var p=$('p-prog'); try{ p.insertBefore($('cardassign'),$('cardsim')); }catch(e){}
 })();
 ['prog','charges','data','velo','lifts'].forEach(applyOrder);
+setTimeout(function(){ inboxPull(); if(S.m90n){ msgBar(S.m90n+' rattachement'+(S.m90n>1?'s':'')+' automatique'+(S.m90n>1?'s':'')+' défait'+(S.m90n>1?'s':'')+' : charge différente (Données › Vitesse)'); delete S.m90n; save(); } },400);   /* lot 90 */
 progView();   /* lot 78 */
 $('pseg').addEventListener('click',function(e){
   var b=e.target.closest?e.target.closest('[data-pv]'):null; if(!b)return;

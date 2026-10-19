@@ -115,9 +115,11 @@ th:first-child,td:first-child{text-align:left}
 <p class="petit" id="r-note"></p></section>
 
 <section class="carte" id="fseance" style="display:none"><h2>Fichier de séance</h2>
+<button id="send" type="button">Envoyer vers l'outil</button>
+<p class="petit" id="sendmsg"></p>
 <button id="dls" type="button">Télécharger le fichier de séance</button>
 <p class="petit" id="fseance-nom"></p>
-<p class="petit">Un seul fichier pour toute la séance : c'est celui que le script Python aurait écrit. Il arrive dans <b>Téléchargements</b>. Pour le lire dans l'outil : onglet <b>Vitesse</b> → <b>Importer</b> → choisissez ce fichier.</p></section>
+<p class="petit">Un seul fichier pour toute la séance : c'est celui que le script Python aurait écrit. Il arrive dans <b>Téléchargements</b>. Plus simple : « Envoyer vers l'outil », puis ouvrez l'outil (même navigateur). Sinon : <b>Données › Vitesse › Réglages</b> → <b>Importer</b> → choisissez ce fichier.</p></section>
 
 <section class="carte" id="controle" style="display:none"><h2>Fichier de contrôle</h2>
 <button id="dl" class="second" type="button">Télécharger le fichier de contrôle</button>
@@ -4197,7 +4199,7 @@ function demuxerMaison(buf) {
   // serie et l'app l'affiche apres le titre (« … · stato »). Sans secondaire ni variante, rien
   // ne change : meme objet que S34.lireSaisieSeance, fichier au bit.
   const SECONDAIRE = "secondaire";
-  const SANS_TYPE = [SECONDAIRE, "montee fixe"];   // lot 82 (A15) : la montée fixe passe comme une ligne secondaire
+  const SANS_TYPE = [SECONDAIRE, "montee fixe", "deload"];   // lot 90 (V6) : le deload passe comme une ligne secondaire   // lot 82 (A15) : la montée fixe passe comme une ligne secondaire
   const VARIANTES = ["hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
   const PAR_VIDEO = S34.PAR_VIDEO.concat(["variante"]);
   function lireSaisieSeance(s) {
@@ -4303,7 +4305,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 82","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4311,6 +4313,7 @@ const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
 const FATALS = ['Page ouverte sans https', 'Navigateur sans décodeur vidéo (WebCodecs)', 'Ce navigateur ne sait pas décoder cette vidéo', 'Configuration du décodeur refusée'];
 const $ = (i) => document.getElementById(i);
 const pause = () => new Promise((r) => setTimeout(r, 0));
+let texteSeance = null;   // lot 90 (V4)
 let fichiers = [], memo = null, blobUrl = null, nomControle = '', masquee = 0, enCours = false, blobSeance = null, nomSeance = '', prefixe = '';
 
 class Echec extends Error { constructor(titre, quoi, faire, tech) { super(titre); this.titre = titre; this.quoi = quoi; this.faire = faire; this.tech = tech || ''; } }
@@ -4339,7 +4342,7 @@ function ligneVideo(f, i) {
   d.appendChild(h3);
   const g = el('div', { class: 'trois' });
   const lt = el('label', {}, 'Type'); const s = el('select', { id: 'v' + i + '-type_serie' });
-  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['montee fixe', 'Montée fixe (forme du jour)'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
+  for (const [v, t] of [['top set', 'Top set'], ['back-off', 'Back-off'], ['deload', 'Deload'], ['secondaire', 'Secondaire (légère)'], ['echauffement', 'Échauffement'], ['montee fixe', 'Montée fixe (forme du jour)'], ['', 'Non lu']]) { const o = el('option', { value: v }, t); s.appendChild(o); }
   s.value = S40.typeLigne(i, +$('nech').value || 0, $('typeseance').value === 'secondaire'); /* lot 74 B */ lt.appendChild(s); g.appendChild(lt);
   const ll = el('label', {}, 'Lest (kg)'); ll.appendChild(el('input', { id: 'v' + i + '-lest_kg', inputmode: 'decimal', autocomplete: 'off', placeholder: '25' })); g.appendChild(ll);
   const lr = el('label', {}, 'Reps ann.'); lr.appendChild(el('input', { id: 'v' + i + '-reps_annoncees', inputmode: 'numeric', autocomplete: 'off', placeholder: '7' })); g.appendChild(lr);
@@ -4391,6 +4394,12 @@ $('go').addEventListener('click', async () => {
 $('dl').addEventListener('click', () => {
   const a = document.createElement('a'); a.href = blobUrl; a.download = nomControle;
   document.body.appendChild(a); a.click(); a.remove();
+});
+$('send').addEventListener('click', () => {   // lot 90 (V4) : même site que l'outil, il lit cp-inbox
+  if (!texteSeance) return;
+  try { const a = JSON.parse(localStorage.getItem('cp-inbox') || '[]'); a.push(texteSeance); localStorage.setItem('cp-inbox', JSON.stringify(a));
+    $('sendmsg').textContent = "Envoyé. Ouvrez l'outil : les analyses y sont rangées (Données › Vitesse)."; }
+  catch (e) { $('sendmsg').textContent = "Envoi impossible (" + e.message + ") : téléchargez le fichier et importez-le."; }
 });
 $('dls').addEventListener('click', () => {
   const a = document.createElement('a'); a.href = blobSeance; a.download = nomSeance;
@@ -4539,7 +4548,7 @@ function finir(entrees, saisie, echange) {
   if (fs) {
     if (blobSeance) URL.revokeObjectURL(blobSeance);
     const blob = new Blob([fs.texte], { type: 'application/json' });
-    blobSeance = URL.createObjectURL(blob); nomSeance = fs.nom;
+    blobSeance = URL.createObjectURL(blob); nomSeance = fs.nom; texteSeance = fs.texte; $('sendmsg').textContent = '';
     $('fseance-nom').textContent = fs.nom + ' · ' + r.sortie.series.length + ' série' + (r.sortie.series.length > 1 ? 's' : '') + ' · ' + (blob.size / 1024).toFixed(1).replace('.', ',') + ' Ko';
     $('fseance').style.display = 'grid';
   }
@@ -4635,7 +4644,7 @@ function afficher(vs, sortie) {
   "use strict";
   // ecrit par l'app (index.html, seancesPage) dans le stockage du site, a chaque affichage de la Seance du jour
   const CLE = "cp-seances-page";
-  const TYPES = ["top set", "back-off", "secondaire", "echauffement", "montee fixe", ""];
+  const TYPES = ["top set", "back-off", "deload", "secondaire", "echauffement", "montee fixe", ""];
   const VARIANTES = ["", "hautes", "bloquées", "stato", "pausées", "tempo"];   // lot R3
 
   function lireResume(texte) {
