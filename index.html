@@ -88,6 +88,8 @@ h1.logo img{display:block;width:auto;height:52px}
 .fpend>details>summary em{font-style:normal;font-weight:400;color:var(--muted)}
 .fpend>details[open]>summary{margin-bottom:6px}
 /* lot 65 (Q16) : vues de Données en rangée défilante */
+.perbar{margin-top:6px}.perlab{margin:4px 0 2px;font-size:15px}   /* lot 99 */
+.perx{font:inherit;font-size:17px;line-height:1;border:1px solid var(--rule);background:none;color:inherit;border-radius:50%;width:30px;height:30px;margin-left:6px;vertical-align:middle}
 .dtabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;margin:0 -2px;scrollbar-width:thin}
 .dtabs .pill{flex:0 0 auto;padding:10px 12px;font-family:var(--txt)}
 /* lot 67 : phrase-titre d'un graphique, qui dit la conclusion */
@@ -906,6 +908,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <button type="button" class="pill" data-dvg="bilan">Bilan</button>
       <button type="button" class="pill" data-dvg="pesees">Pesées</button>
     </div>
+    <div id="dperbar" class="perbar"></div>   <!-- lot 99 : période commune -->
     <div class="row" style="display:none"><div class="field w"><label for="dview">Afficher</label>
       <select id="dview">
         <option value="series">Séries — chercher et comparer</option>
@@ -1030,7 +1033,6 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="field sm"><label for="dreps">Reps</label><select id="dreps"></select></div>
       <div class="field md"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="dvid">avec vidéo</label></div>
     </div>
-    <div id="dper" class="per" data-per="d"></div>
     <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="dexp">Exporter ce qui est affiché (CSV)</button></div>
     </details>
     <div id="dsum"></div>
@@ -1039,7 +1041,6 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 
   <div class="card" data-dv="pesees" data-chk="dpes">
     <h2>Pesées <em id="pescount">tous les PdC connus</em><button type="button" class="chi" data-chinfo="dpes" aria-label="Explications" aria-pressed="false">i</button></h2>
-    <div id="pper" class="per" data-per="p"></div>
     <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="pexp">Exporter ce qui est affiché (CSV)</button></div>
     <details class="chd" data-chd="pesadd"><summary>＋ Ajouter une pesée hors séance</summary>   <!-- lot 98 -->
       <div class="row">
@@ -1142,7 +1143,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v102';   /* lot 74 */
+var APPV='v103';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -3645,9 +3646,9 @@ function pesPlot(rs){
 function renderPesees(){
   var o=$('peslist'); if(!o)return;
   var q=dq(), all=pesRows(), rs=all.filter(function(r){ return perOk(q,'p',r.b,r.d); }), c=function(v){ return v!=null?F(v):'—'; };
-  $('pper').innerHTML=perHTML(q,'p');
+  perRender();   /* lot 99 */
   $('pescount').textContent=rs.length+' date'+(rs.length>1?'s':'')+' sur '+all.length;
-  o.innerHTML=fltNote(all.length-rs.length,'pesée','p')+(rs.length?pesPlot(rs)+'<div class="scroll"><table><thead><tr><th>date</th><th>bloc</th><th>tapé en séance</th><th>non habillé</th><th>hors séance</th><th>séries</th><th>vidéo</th><th>fin de séance</th></tr></thead><tbody>'+
+  o.innerHTML=(rs.length?pesPlot(rs)+'<div class="scroll"><table><thead><tr><th>date</th><th>bloc</th><th>tapé en séance</th><th>non habillé</th><th>hors séance</th><th>séries</th><th>vidéo</th><th>fin de séance</th></tr></thead><tbody>'+
     rs.map(function(r){ var f=r.f;
       return '<tr><td>'+frDate(r.d)+'</td><td>'+(r.b?r.b:'hors bloc')+'</td><td>'+c(r.j)+'</td><td>'+nuCell(r)+'</td><td>'+plCell(r)+'</td><td>'+c(r.s)+(r.ns>1?' <small>('+r.ns+')</small>':'')+'</td><td>'+c(r.v)+'</td><td>'+
         (f?F(f.kg)+(f.hab?' habillé':' non habillé')+' <small>'+esc(pesSeance(f))+'</small>':'—')+'</td></tr>'; }).join('')+
@@ -8710,38 +8711,62 @@ function perBlocks(){
   return bl;
 }
 function blockOfDate(d){ return blockOfEntry({date:d}); }
+/* lot 99 (P1-P4) : une seule période pour Séances et Pesées, jamais enregistrée : chaque ouverture repart du bloc en cours.
+   Les anciennes pastilles et dates enregistrées (q.blks, q.d1, q.pblks, q.pd1...) ne servent plus. */
+var DPER={m:'cur'};
 function perKeys(p){ return p==='d'?{b:'blks',f:'d1',t:'d2'}:{b:'pblks',f:'pd1',t:'pd2'}; }
+function isoMinus(days,months){ var d=new Date(todayISO()+'T12:00:00'); if(months)d.setMonth(d.getMonth()-months); if(days)d.setDate(d.getDate()-days); return d.toISOString().slice(0,10); }
 function perOk(q,p,b,d){
-  var k=perKeys(p), bs=q[k.b]||[];
-  if(bs.length&&bs.indexOf(b)<0)return false;
-  if(q[k.f]&&(!d||d<q[k.f]))return false;
-  if(q[k.t]&&(!d||d>q[k.t]))return false;
+  var m=DPER.m, cb=+S.blockId||1;
+  if(m==='cur')return b===cb;
+  if(m==='prev')return b===cb-1;
+  if(m==='blk')return b===+DPER.b;
+  if(m==='4w')return !!d&&d>isoMinus(28);
+  if(m==='3m')return !!d&&d>isoMinus(0,3);
+  if(m==='dates'){ if(DPER.f&&(!d||d<DPER.f))return false; if(DPER.t&&(!d||d>DPER.t))return false; }
   return true;
 }
-function perHTML(q,p){
-  var k=perKeys(p), bs=q[k.b]||[], cb=+S.blockId||1;
-  return '<div class="pillrow" role="group" aria-label="Blocs"><button class="pill" data-perb="" aria-pressed="'+(!bs.length)+'">tous</button>'+
-    perBlocks().map(function(b){ return '<button class="pill" data-perb="'+b+'" aria-pressed="'+(bs.indexOf(b)>=0)+'">'+(b?'Bloc '+b+(b===cb?' (en cours)':''):'hors bloc')+'</button>'; }).join('')+'</div>'+
-    '<div class="row" style="margin-top:6px"><div class="field md"><label for="'+p+'per1">Du</label><input type="date" id="'+p+'per1" data-perd="f" value="'+esc(q[k.f]||'')+'"></div>'+
-    '<div class="field md"><label for="'+p+'per2">Au</label><input type="date" id="'+p+'per2" data-perd="t" value="'+esc(q[k.t]||'')+'"></div>'+
-    ((q[k.f]||q[k.t])?'<div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" data-perd="x">Toutes les dates</button></div>':'')+'</div>';
+function perName(){
+  var cb=+S.blockId||1, m=DPER.m, b=+DPER.b;
+  return m==='cur'?'Bloc '+cb+' (en cours)':m==='prev'?'Bloc '+(cb-1):m==='blk'?(b?'Bloc '+b+(b===cb?' (en cours)':''):'Hors bloc'):
+    m==='4w'?'4 dernières semaines':m==='3m'?'3 derniers mois':m==='dates'?'Dates choisies':'Tout';
 }
-['dper','pper'].forEach(function(id){
-  var box=$(id), p=box.dataset.per;
-  box.addEventListener('click',function(ev){
-    var t=ev.target.closest?ev.target.closest('[data-perb],[data-perd="x"]'):null; if(!t)return;
-    var q=dq(), k=perKeys(p);
-    if(t.dataset.perd==='x'){ q[k.f]=''; q[k.t]=''; }
-    else if(t.dataset.perb===''){ q[k.b]=[]; }
-    else { var b=+t.dataset.perb, a=q[k.b], i=a.indexOf(b); if(i>=0)a.splice(i,1); else a.push(b); }
-    save(); renderData();
-  });
+function perDs(iso){ var a=String(iso).split('-'); return (+a[2])+'/'+(+a[1])+(a[0]!==todayISO().slice(0,4)?'/'+a[0].slice(2):''); }
+function perSpan(){
+  if(DPER.m==='dates')return DPER.f||DPER.t?(DPER.f?'du '+perDs(DPER.f):'')+(DPER.t?(DPER.f?' ':'')+'au '+perDs(DPER.t):''):'choisissez les dates';
+  var ds=[];
+  (S.log||[]).forEach(function(e){ var d=String(e.date||'').slice(0,10); if(d&&perOk(null,'d',blockOfEntry(e),d))ds.push(d); });
+  pesRows().forEach(function(r){ if(perOk(null,'p',r.b,r.d))ds.push(r.d); });
+  ds.sort(); return ds.length?perDs(ds[0])+' → '+perDs(ds[ds.length-1]):'rien d\'enregistré';
+}
+function perHTML(){
+  var cb=+S.blockId||1, m=DPER.m, bl=perBlocks(),
+    o=[['cur','Bloc en cours ('+cb+')']].concat(cb>1?[['prev','Bloc précédent ('+(cb-1)+')']]:[])
+      .concat([['4w','4 dernières semaines'],['3m','3 derniers mois'],['all','Tout']]).concat(bl.length>1?[['blk','Un bloc précis…']]:[]).concat([['dates','Dates…']]);
+  return '<p class="perlab"><b>'+esc(perName())+'</b> · '+esc(perSpan())+
+    (m!=='cur'?'<button type="button" class="perx" data-perx aria-label="Revenir au bloc en cours">×</button>':'')+'</p>'+
+    '<div class="row"><div class="field md"><label for="dperm">Période</label><select id="dperm">'+
+      o.map(function(x){ return '<option value="'+x[0]+'"'+(x[0]===m?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select></div>'+
+    (m==='blk'?'<div class="field sm"><label for="dperb">Bloc</label><select id="dperb">'+
+      bl.map(function(b){ return '<option value="'+b+'"'+(b===+DPER.b?' selected':'')+'>'+(b?'Bloc '+b:'hors bloc')+'</option>'; }).join('')+'</select></div>':'')+
+    (m==='dates'?'<div class="field md"><label for="dper1">Du</label><input type="date" id="dper1" value="'+esc(DPER.f||'')+'"></div>'+
+      '<div class="field md"><label for="dper2">Au</label><input type="date" id="dper2" value="'+esc(DPER.t||'')+'"></div>':'')+'</div>';
+}
+function perRender(){
+  var box=$('dperbar'), g=dGroup(dq().view); if(!box)return;
+  box.hidden=!(g==='seances'||g==='pesees'); if(!box.hidden)box.innerHTML=perHTML();
+}
+(function(){ var box=$('dperbar'); if(!box||!box.addEventListener)return;
+  box.addEventListener('click',function(ev){ if(ev.target&&ev.target.closest&&ev.target.closest('[data-perx]')){ DPER={m:'cur'}; renderData(); } });
   box.addEventListener('change',function(ev){
-    var t=ev.target; if(!t.dataset||!t.dataset.perd)return;
-    var q=dq(), k=perKeys(p), v=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:'';
-    q[t.dataset.perd==='f'?k.f:k.t]=v; save(); renderData();
+    var t=ev.target, bl;
+    if(t.id==='dperm'){ DPER={m:t.value}; if(t.value==='blk'){ bl=perBlocks(); DPER.b=bl.length>1?bl[1]:bl[0]; } }
+    else if(t.id==='dperb')DPER.b=+t.value;
+    else if(t.id==='dper1'||t.id==='dper2')DPER[t.id==='dper1'?'f':'t']=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:'';
+    else return;
+    renderData();
   });
-});
+})();
 function opts(sel,vals,cur,lab0,fmt){
   sel.innerHTML='<option value="">'+lab0+'</option>'+vals.map(function(v){
     return '<option value="'+v+'"'+(String(v)===String(cur)?' selected':'')+'>'+(fmt?fmt(v):v)+'</option>';}).join('');
@@ -8758,11 +8783,11 @@ function renderDataView(){
   Array.prototype.forEach.call(document.querySelectorAll('#p-data [data-dv]'),function(c){
     c.style.display=DGRP[g].indexOf(c.dataset.dv)>=0?'':'none';
   });
-  var nf=(q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0)+((q.blks||[]).length?1:0);
-  if($('dfiltsum'))$('dfiltsum').innerHTML='Filtres'+(nf?' <b>· '+nf+' actif'+(nf>1?'s':'')+'</b>':' : mouvement, type, lest, reps, période');
+  var nf=(q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0);   /* lot 99 : la période n'est plus un filtre */
+  if($('dfiltsum'))$('dfiltsum').innerHTML='Filtres'+(nf?' <b>· '+nf+' actif'+(nf>1?'s':'')+'</b>':' : mouvement, type, lest, reps');
   opts($('dlift'),S.lifts.map(function(_,i){return i;}),q.li,'tous',function(i){return esc(S.lifts[i].name);});
   opts($('rlift'),S.lifts.map(function(_,i){return i;}),q.rli,'tous',function(i){return esc(S.lifts[i].name);});
-  $('dper').innerHTML=perHTML(q,'d');   /* lot 60 (Q5) */
+  perRender();   /* lot 99 : période commune, en haut */
   $('drole').value=q.role;
   var lo={}, rp={};
   dataFilter('load').forEach(function(e){ if(e.load!=null)lo[+e.load]=1; });
@@ -9027,12 +9052,12 @@ function renderData(){
 
   /* historique */
   RKEV=rkEvMap();   /* lot 48 : 🎉 */
-  var FL=dataFilter();
+  var FL=dataFilter(), NP=(S.log||[]).filter(function(e){ return perOk(null,'d',blockOfEntry(e),String(e.date||'').slice(0,10)); }).length;   /* lot 99 */
   $('logcount').textContent=FL.length+' / '+S.log.length;
   $('dsum').innerHTML=S.log.length?dataSummary(FL):'';
-  if(!FL.length){$('loglist').innerHTML=S.log.length?fltNote(S.log.length,'série','d'):'<p class="note">Vide.</p>';}
+  if(!FL.length){$('loglist').innerHTML=!S.log.length?'<p class="note">Vide.</p>':NP?fltNote(NP,'série','d'):'<p class="note">Aucune série sur cette période.</p>';}
   else{
-    $('loglist').innerHTML=fltNote(S.log.length-FL.length,'série','d')+FL.slice().sort(byDateDesc).map(function(e){   /* R12 */   /* lot 91 : filtres visibles */
+    $('loglist').innerHTML=fltNote(NP-FL.length,'série','d')+FL.slice().sort(byDateDesc).map(function(e){   /* R12 */   /* lot 91 : filtres visibles */
       if(e.state==='skip')return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
         '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:e.day==='DL'?' · Deload':'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
