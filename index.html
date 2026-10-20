@@ -363,6 +363,20 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 .logrow:last-child{border-bottom:0}
 /* lot 77 : une ligne par série, le reste au toucher */
 .logrow{cursor:pointer}
+/* lot 100 : une ligne par séance, ses séries au toucher */
+.sesblk{font:600 12px/1.3 var(--txt);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 2px}
+.ses{border-bottom:1px solid var(--rule)}
+.seshd{display:grid;gap:2px;padding:8px 0;cursor:pointer;font-size:14px}
+.sesl1{display:flex;gap:6px;align-items:baseline}.sesn{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+.sesl2{font-size:13px}
+.ses:not(.sesopen) .sesbody{display:none}
+.sesbody{padding:0 0 6px 10px;border-left:2px solid var(--rule);margin-left:2px}
+.ses .logrow,:root[data-dir] .ses .logrow{grid-template-columns:1fr auto}.ses .logrow .d{display:none}
+#dchips:empty{display:none}
+/* lot 101 : une ligne par jour dans Pesées */
+.pesd{display:grid;gap:2px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.pesm{margin-left:auto;white-space:nowrap}
+.pesx{font-size:12px;color:var(--muted)}
 .logrow:not(.lgopen) .lgmore{display:none}
 /* lot 80 : à compléter, saisie douteuse */
 .lrn{font:500 11.5px/1.2 var(--txt);color:var(--muted);white-space:nowrap}   /* lot 81 */
@@ -1020,6 +1034,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     <h2>Séries <em id="logcount"></em></h2>
     <div class="row"><div class="field w"><label for="dsearch">Rechercher</label><input id="dsearch" type="search" placeholder="ex. dips 45x5" autocomplete="off"></div></div>   <!-- lot 97 -->
     <div id="dsearchout"></div>
+    <div id="dchips" class="pillrow"></div>   <!-- lot 100 : filtres actifs -->
     <details class="chd" data-chd="dfilt"><summary id="dfiltsum">Filtres</summary>
     <div class="row">
       <div class="field md"><label for="dlift">Mouvement</label><select id="dlift"></select></div>
@@ -1041,7 +1056,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 
   <div class="card" data-dv="pesees" data-chk="dpes">
     <h2>Pesées <em id="pescount">tous les PdC connus</em><button type="button" class="chi" data-chinfo="dpes" aria-label="Explications" aria-pressed="false">i</button></h2>
-    <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="pexp">Exporter ce qui est affiché (CSV)</button></div>
+    <div id="peslist"></div>   <!-- lot 101 : la courbe en haut -->
     <details class="chd" data-chd="pesadd"><summary>＋ Ajouter une pesée hors séance</summary>   <!-- lot 98 -->
       <div class="row">
         <div class="field md"><label for="pldate">Jour</label><input id="pldate" type="date"></div>
@@ -1052,8 +1067,8 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="btnrow"><button class="act mini" id="pladd">Ajouter</button></div>
       <p class="note" id="plnote">Seulement notée : elle ne change ni le PdC courant ni les calculs.</p>
     </details>
-    <div id="peslist"></div>
-    <p class="note chex">Sources : le PdC du jour tapé en séance, celui enregistré avec chaque série, celui des analyses vidéo importées, et le PdC de fin de séance.
+    <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="pexp">Exporter ce qui est affiché (CSV)</button></div>
+    <p class="note chex">Une ligne par jour : en gros, le PdC tapé en séance (à défaut, celui des séries ou de la vidéo) ; en petit dessous, les autres pesées du jour. Les séries et la vidéo n'y figurent que si elles diffèrent du PdC tapé.
     Les trois premiers sont des pesées : l'outil en fait la moyenne du jour pour ses calculs, et la plus récente devient le PdC courant. Le PdC de fin de séance, le PdC non habillé et les pesées hors séance sont seulement notés.</p>
   </div>
 
@@ -1143,7 +1158,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v103';   /* lot 74 */
+var APPV='v105';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -3406,6 +3421,8 @@ function unfoldTo(el){
 }
 function goLog(key){
   var q=dq(); q.view='series'; q.li=''; q.blk=''; q.role=''; q.load=''; q.reps=''; q.vid=false;
+  var en=(S.log||[]).filter(function(x){ return x.key===key; })[0];   /* lot 100 : sa séance ouverte, et la période qui la contient */
+  if(en){ var d0=String(en.date||'').slice(0,10); if(!perOk(null,'d',blockOfEntry(en),d0))DPER={m:'all'}; SESOPEN[d0]=1; }
   goTab('data');
   var el=null;
   Array.prototype.forEach.call(document.querySelectorAll('#loglist [data-lk]'),function(r){
@@ -3611,9 +3628,12 @@ function pesTrend(all){
     if(t==null)t=x.bw; else t+=(1-Math.pow(0.9,Math.max(0,(d-p)/864e5)))*(x.bw-t);
     p=d; return {d:x.d,bw:x.bw,t:t}; });
 }
+/* lot 101 (W1, W2) : le poids principal du jour = celui tapé en séance ; à défaut, celui des séries, puis de la vidéo */
+function pesMain(r){ return r.j!=null?r.j:(r.s!=null?r.s:r.v); }
 function pesPlot(rs){
   var keep={}; rs.forEach(function(r){ keep[r.d]=1; });
-  var pts=pesTrend(bwKnown()).filter(function(x){ return keep[x.d]; });
+  var pts=pesTrend(pesRows().filter(function(r){ return pesMain(r)!=null; }).reverse().map(function(r){ return {d:r.d,bw:pesMain(r)}; }))
+    .filter(function(x){ return keep[x.d]; });
   if(pts.length<2)return '';
   var W=340,H=200,mx=40,mr=12,mt=22,mb=24, DJ=864e5;
   var T=function(p){return new Date(p.d+'T12:00:00').getTime();};
@@ -3637,28 +3657,39 @@ function pesPlot(rs){
   s+='<path data-pestrend d="'+pts.map(function(p,j){ return (j?'L':'M')+X(T(p)).toFixed(1)+' '+Y(p.t).toFixed(1); }).join(' ')+'" fill="none" stroke="var(--a2)" stroke-width="2.2" stroke-linejoin="round"/>';
   var a=pts[0], b=pts[pts.length-1], dt=b.t-a.t;
   s+='<text x="'+(W-mr)+'" y="'+(Y(b.t)-7).toFixed(1)+'" font-size="10.5" font-weight="700" fill="var(--a2)" text-anchor="end">tendance '+F(Math.round(b.t*10)/10)+'</text>';
-  s+=tx(4,13,'PdC (kg) : points = pesées du jour, trait = tendance');
+  s+=tx(4,13,'PdC (kg) : points = poids du jour, trait = tendance');
   return '<p class="ctitle" data-pestitle>PdC : tendance <b>'+F(Math.round(b.t*10)/10)+' kg</b> le '+frDate(b.d)+', '+
     (Math.abs(dt)<0.05?'stable':(dt>0?'+':'−')+F(Math.round(Math.abs(dt)*10)/10)+' kg')+' depuis le '+frDate(a.d)+'</p>'+s+'</svg>'+
     '<p class="note">La tendance amortit les écarts d’un jour (pesée habillée, avant ou après manger) : chaque pesée ne la déplace que de 10 % '+
-    'de son écart par jour écoulé. Une pesée par jour pesé (moyenne de ce qui a été noté ce jour-là).</p>';
+    'de son écart par jour écoulé. Un point par jour : le PdC tapé en séance.</p>';
 }
 function renderPesees(){
   var o=$('peslist'); if(!o)return;
-  var q=dq(), all=pesRows(), rs=all.filter(function(r){ return perOk(q,'p',r.b,r.d); }), c=function(v){ return v!=null?F(v):'—'; };
+  var q=dq(), all=pesRows(), rs=all.filter(function(r){ return perOk(q,'p',r.b,r.d); });
   perRender();   /* lot 99 */
   $('pescount').textContent=rs.length+' date'+(rs.length>1?'s':'')+' sur '+all.length;
-  o.innerHTML=(rs.length?pesPlot(rs)+'<div class="scroll"><table><thead><tr><th>date</th><th>bloc</th><th>tapé en séance</th><th>non habillé</th><th>hors séance</th><th>séries</th><th>vidéo</th><th>fin de séance</th></tr></thead><tbody>'+
-    rs.map(function(r){ var f=r.f;
-      return '<tr><td>'+frDate(r.d)+'</td><td>'+(r.b?r.b:'hors bloc')+'</td><td>'+c(r.j)+'</td><td>'+nuCell(r)+'</td><td>'+plCell(r)+'</td><td>'+c(r.s)+(r.ns>1?' <small>('+r.ns+')</small>':'')+'</td><td>'+c(r.v)+'</td><td>'+
-        (f?F(f.kg)+(f.hab?' habillé':' non habillé')+' <small>'+esc(pesSeance(f))+'</small>':'—')+'</td></tr>'; }).join('')+
-    '</tbody></table></div><p class="note">Séries : moyenne des PdC notés avec les séries du jour (leur nombre entre parenthèses quand il y en a plusieurs).</p>'
+  o.innerHTML=(rs.length?pesPlot(rs)+pesDays(rs)
     :'<p class="note">'+(all.length?'Aucune pesée sur cette période.':'Aucun PdC connu pour l\'instant. Touchez la ligne PdC de Séance du jour pour le saisir.')+'</p>');
+}
+/* lot 101 (W1) : une ligne par jour, le poids principal en gros, les autres pesées en petit dessous ; un titre à chaque bloc */
+function pesDays(rs){
+  var lastB=null, cb=+S.blockId||1, ec=function(a,b){ return a!=null&&b!=null&&Math.abs(a-b)>=0.05; };
+  return '<div class="pesdays">'+rs.map(function(r){
+    var h='', m=pesMain(r), o=[];
+    if(r.b!==lastB){ h='<h3 class="sesblk">'+(r.b?'Bloc '+r.b+(r.b===cb?' (en cours)':''):'Hors bloc')+'</h3>'; lastB=r.b; }
+    if(r.n)o.push('non habillé '+nuCell(r));
+    if(r.l&&r.l.length)r.l.forEach(function(x){ o.push('<span style="white-space:nowrap">hors séance '+esc(plTxt(x))+' <button class="linkbtn" data-plrm="'+x.id+'" aria-label="Supprimer cette pesée">×</button></span>'); });
+    if(r.f)o.push('fin de séance '+F(r.f.kg)+(r.f.hab?' habillé':' non habillé')+(pesSeance(r.f)?' ('+esc(pesSeance(r.f))+')':''));
+    if(r.j!=null&&ec(r.s,m))o.push('séries '+F(r.s)+(r.ns>1?' ('+r.ns+')':''));
+    if(r.v!=null&&ec(r.v,m))o.push('vidéo '+F(r.v));
+    return h+'<div class="pesd" data-pesd="'+esc(r.d)+'"><span class="sesl1"><b>'+sesDay(r.d)+'</b>'+
+      '<span class="pesm">'+(m!=null?'<b>'+F(m)+' kg</b>'+(r.j==null?' <small>('+(r.s!=null?'séries':'vidéo')+')</small>':''):'<span class="muted">pas de PdC tapé</span>')+'</span></span>'+
+      (o.length?'<span class="pesx">'+o.join(' · ')+'</span>':'')+'</div>';
+  }).join('')+'</div>';
 }
 /* lot 93 : PdC non habillé ; l'écart avec le PdC tapé le même jour = les vêtements */
 /* lot 98 : pesées hors séance, chacune supprimable */
 function plTxt(x){ return F(x.kg)+(x.h?' à '+x.h:'')+(x.hab?' habillé':' non habillé'); }
-function plCell(r){ return r.l&&r.l.length?r.l.map(function(x){ return '<span style="white-space:nowrap">'+F(x.kg)+' <small>'+(x.h||'')+(x.hab?' hab.':' non hab.')+'</small> <button class="linkbtn" data-plrm="'+x.id+'" aria-label="Supprimer">×</button></span>'; }).join('<br>'):'—'; }
 document.addEventListener('click',function(ev){
   var t=ev.target; if(!t||!t.closest)return;
   if(t.closest('#pladd')){ var kg=num($('plkg').value,null), d=$('pldate').value||todayISO(), h=$('plh').value||'';
@@ -8784,6 +8815,7 @@ function renderDataView(){
     c.style.display=DGRP[g].indexOf(c.dataset.dv)>=0?'':'none';
   });
   var nf=(q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0);   /* lot 99 : la période n'est plus un filtre */
+  if($('dchips'))$('dchips').innerHTML=chipsHTML(q);   /* lot 100 */
   if($('dfiltsum'))$('dfiltsum').innerHTML='Filtres'+(nf?' <b>· '+nf+' actif'+(nf>1?'s':'')+'</b>':' : mouvement, type, lest, reps');
   opts($('dlift'),S.lifts.map(function(_,i){return i;}),q.li,'tous',function(i){return esc(S.lifts[i].name);});
   opts($('rlift'),S.lifts.map(function(_,i){return i;}),q.rli,'tous',function(i){return esc(S.lifts[i].name);});
@@ -9057,7 +9089,10 @@ function renderData(){
   $('dsum').innerHTML=S.log.length?dataSummary(FL):'';
   if(!FL.length){$('loglist').innerHTML=!S.log.length?'<p class="note">Vide.</p>':NP?fltNote(NP,'série','d'):'<p class="note">Aucune série sur cette période.</p>';}
   else{
-    $('loglist').innerHTML=fltNote(NP-FL.length,'série','d')+FL.slice().sort(byDateDesc).map(function(e){   /* R12 */   /* lot 91 : filtres visibles */
+    $('loglist').innerHTML=fltNote(NP-FL.length,'série','d')+sesHTML(FL,dfltN()>0);   /* lot 100 : groupées par séance ; ouvertes si un filtre est actif */
+  }
+}
+function logRowHTML(e){   /* lot 100 : une série, dans sa séance */
       if(e.state==='skip')return '<div class="logrow" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
         '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b> sauté'+
         '<br><i>'+(e.tpl||'')+(e.week?' · S'+e.week+' '+e.day:e.day==='DL'?' · Deload':'')+(e.presLoad!=null?' · prescrit '+loadLab(S.lifts[e.li],e.presLoad)+' '+S.sep+' '+e.presReps:'')+'</i>'+
@@ -9085,10 +9120,56 @@ function renderData(){
         (e.note?'<br><i>'+esc(e.note)+'</i>':'')+snHTML(e)+   /* lot 46 (R10) */
         dcomHTML(e)+(lk.length?'<br>'+lk.join(' \u00a0 '):'')+'</span></span>'+
         '<button class="act ghost mini" data-rm="'+esc(e.key)+'">×</button></div>';
-    }).join('');
-  }
 }
+var SESOPEN={};   /* lot 100 : séances ouvertes (non enregistré) */
+function dfltN(){ var q=dq(); return (q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0); }
+function sesDay(d){ var x=new Date(d+'T12:00:00'); return isNaN(x.getTime())?esc(d):x.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')+' '+perDs(d); }
+function sesBest(es){
+  var by={}, ord=[];
+  es.forEach(function(e){ if(e.state==='skip'||!S.lifts[e.li])return; if(!by[e.li]){ by[e.li]=[]; ord.push(e.li); } by[e.li].push(e); });
+  var main=ord.filter(function(li){ return by[li].some(function(e){ return roleGroup(e)!=='sec'; }); });
+  return (main.length?main:ord).map(function(li){ var L=S.lifts[li], bst=null;
+    by[li].forEach(function(e){ var r=lastReps(e); if(r==null)return;
+      if(!bst||(+e.load||0)>(+bst.load||0)||((+e.load||0)===(+bst.load||0)&&r>lastReps(bst)))bst=e; });
+    return '<span style="white-space:nowrap"><b class="n'+col(li)+'">'+esc(L.name)+'</b>'+(bst?' '+loadLab(L,bst.load)+' '+S.sep+' '+lastReps(bst)+uM(L):'')+'</span>'; }).join(' · ');
+}
+function sesHTML(FL,open){
+  var g={}, ord=[], lastB=null, cb=+S.blockId||1;
+  FL.slice().sort(byDateDesc).forEach(function(e){ var d=String(e.date||'').slice(0,10)||'?'; if(!g[d]){ g[d]=[]; ord.push(d); } g[d].push(e); });
+  return ord.map(function(d){
+    var es=g[d], bk=blockOfEntry(es[0]), h='';
+    if(bk!==lastB){ h='<h3 class="sesblk">'+(bk?'Bloc '+bk+(bk===cb?' (en cours)':''):'Hors bloc')+'</h3>'; lastB=bk; }
+    var pe=es.filter(function(e){ return e.tpl&&e.state!=='skip'; })[0]||es[0],
+      jp=pe.day==='DL'?'Deload':pe.tpl?((pe.week?'S'+pe.week+' ':'')+(pe.day||'')).trim():'hors programme', ns=0;
+    es.forEach(function(e){ if(e.state!=='skip')ns+=(e.sets||[]).length; });
+    var vid=es.some(function(e){ return veloOfKey(e.key).length; }),
+      on=open||SESOPEN[d]||es.some(function(e){ return LGOPEN[e.key]||DCOM===e.key; });
+    return h+'<div class="ses'+(on?' sesopen':'')+'" data-sesd="'+esc(d)+'"><div class="seshd" data-ses="'+esc(d)+'">'+
+      '<span class="sesl1"><b>'+sesDay(d)+'</b>'+(jp?' · '+esc(jp):'')+'<span class="sesn">'+ns+' série'+(ns>1?'s':'')+(vid?' 🎥':'')+
+      ' <span class="lgchev" aria-hidden="true">'+(on?'▾':'▸')+'</span></span></span><span class="sesl2">'+sesBest(es)+'</span></div>'+
+      '<div class="sesbody">'+es.map(logRowHTML).join('')+'</div></div>';
+  }).join('');
+}
+function chipsHTML(q){
+  var RL={top:'top set',back:'back-off',amrap:'série maximale',sec:'secondaires, variantes',pr:'hors programme'}, c=[];
+  if(q.li!==''&&S.lifts[+q.li])c.push(['li',S.lifts[+q.li].name]);
+  if(q.role!=='')c.push(['role',RL[q.role]||q.role]);
+  if(q.load!=='')c.push(['load',+q.load?F(+q.load)+' kg':'PdC']);
+  if(q.reps!=='')c.push(['reps',q.reps+' reps']);
+  if(q.vid)c.push(['vid','avec vidéo']);
+  return c.map(function(x){ return '<button type="button" class="pill" data-chipx="'+x[0]+'" aria-label="Retirer ce filtre">'+esc(x[1])+' ×</button>'; }).join('')+
+    (c.length?'<button type="button" class="linkbtn" data-chipx="*">Tout effacer</button>':'');
+}
+document.addEventListener('click',function(ev){
+  var b=ev.target&&ev.target.closest?ev.target.closest('[data-chipx]'):null; if(!b)return;
+  var q=dq(), k=b.dataset.chipx;
+  (k==='*'?['li','role','load','reps','vid']:[k]).forEach(function(f){ q[f]=f==='vid'?false:''; });
+  save(); renderData(); applyFolds();
+});
 $('loglist').addEventListener('click',function(e){
+  var sh=e.target.closest('[data-ses]');   /* lot 100 : ouvrir / fermer la séance */
+  if(sh){ var w=sh.parentNode, d=w.dataset.sesd, on=!w.classList.contains('sesopen'); if(on)SESOPEN[d]=1; else delete SESOPEN[d];
+    w.classList.toggle('sesopen',on); var cv=sh.querySelector('.lgchev'); if(cv)cv.textContent=on?'▾':'▸'; return; }
   var fb=e.target.closest('[data-dfm]'); if(fb){ dfmToggle(fb.dataset.dfm,+fb.dataset.dst); return; }   /* lot 48 (R12) */
   var b=e.target.closest('[data-rm]'); if(!b){ dataRowClick(e); return; }   /* lot 46 (R10) */
   S.log.forEach(function(x){ if(x.key===b.dataset.rm)keepJuge(x.key); });   /* B20 : par clé, unique ; l'id peut être périmé */
