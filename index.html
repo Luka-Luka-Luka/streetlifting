@@ -7,11 +7,16 @@
 <title>Charges &amp; programmes</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<!-- Chargement non bloquant : hors ligne ou en mauvais reseau, la page s'affiche
-     immediatement avec les polices systeme au lieu d'attendre l'expiration du delai. -->
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap"></noscript>
+<!-- lot 105 : IBM Plex, seule police, rangée dans l'outil (fonts/, licence OFL) : rien n'est demandé à Google, elle s'affiche hors ligne -->
+<link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-sans-latin-400-normal.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-sans-condensed-latin-700-normal.woff2" crossorigin>
+<style>
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-condensed-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-condensed-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Condensed';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/ibm-plex-sans-condensed-latin-700-normal.woff2) format('woff2')}
+</style>
 <style>
 /* Lot 57 B : deux palettes (S.pal, bouton 🎨 de l'en-tête), chacune en clair et en sombre (S.theme).
    Palette 1 « Ardoise renforcée » : l'identité d'avant, contrastes poussés. Palette 2 « Piste de nuit » : cyan et vert
@@ -23,8 +28,8 @@
   --a1:#B50D27; --a2:#1550A0; --a3:#1F6B39; --a4:#7A4E00; --a5:#5E2F96; --a6:#00666B; --a7:#9C2469; --a8:#4A4F56;
   --ok:#1F6B39; --warn:#805000; --bad:#9A1B26; --onok:#FFFFFF;
   --r:3px;
-  --num:'Barlow Condensed','Arial Narrow','Helvetica Neue Condensed',system-ui,sans-serif;
-  --txt:Archivo,system-ui,-apple-system,sans-serif;
+  --num:'IBM Plex Sans Condensed','IBM Plex Sans','Arial Narrow',system-ui,sans-serif;   /* lot 105 : Plex, seule police */
+  --txt:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
 }
 [data-theme="dark"]{
   --bg:#0D0F12; --surface:#181C21; --ink:#F2F4F7; --muted:#AAB3BE;
@@ -637,11 +642,6 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 /* chiffres en gras (repris de B) */
 :root[data-dir] #p-today .line .pr,:root[data-dir] .big{font-weight:700}
 /* polices à l'essai (⚙ › Police) ; les non condensées gardent le programme sur une ligne */
-:root[data-font="plex"]{--txt:'IBM Plex Sans',system-ui,sans-serif;--num:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif}
-:root[data-font="inter"]{--txt:Inter,system-ui,sans-serif;--num:Inter,system-ui,sans-serif}
-:root[data-font="atk"]{--txt:'Atkinson Hyperlegible',system-ui,sans-serif;--num:'Atkinson Hyperlegible',system-ui,sans-serif}
-:root[data-font="sys"]{--txt:system-ui,Roboto,sans-serif;--num:system-ui,Roboto,sans-serif}
-:root[data-font="inter"] #p-prog .line .pr,:root[data-font="atk"] #p-prog .line .pr,:root[data-font="sys"] #p-prog .line .pr{font-size:15px}
 .appmenu .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}.appmenu .chk{margin-top:6px}
 :root[data-dir] input[type=checkbox],:root[data-dir] input[type=radio]{min-height:0;padding:0}
 .appmenu .row .field{flex:1 1 9em;min-width:0}.appmenu .row select{width:100%}
@@ -692,7 +692,6 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     <button type="button" class="act ghost" id="theme" title="Thème" aria-label="Thème">☀️</button>
     <div class="row">   <!-- lot 85 : refonte -->
       <div class="field sm"><label for="uidir">Style</label><select id="uidir"><option value="A">nouveau, grand</option><option value="M">nouveau, moyen</option><option value="">v87, petit</option></select></div>
-      <div class="field md"><label for="uifont">Police (à l'essai)</label><select id="uifont"><option value="">Archivo + Barlow (d'avant)</option><option value="plex">IBM Plex Sans</option><option value="sys">Police du téléphone</option></select></div>
       <div class="field sm"><label for="sep">Séparateur</label>
         <select id="sep"><option value="×" selected>×</option><option value="*">*</option></select></div>
     </div>
@@ -1183,7 +1182,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v108';   /* lot 74 */
+var APPV='v109';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -3484,24 +3483,21 @@ function applyTheme(){
   if(mt&&window.getComputedStyle){ var bg=getComputedStyle(document.documentElement).getPropertyValue('--bg'); if(bg)mt.setAttribute('content',String(bg).trim()); }
   uiApply();   /* lot 85 */
 }
-/* lot 85 : style, police à l'essai, PdC d'en-tête, vibration (⚙) */
-var UIFONTS={plex:'IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700'};   /* lot 88 : Inter et Atkinson retirées */
+/* lot 85 : style, PdC d'en-tête, vibration (⚙). Lot 105 : plus de menu Police, IBM Plex pour tous ; un S.font déjà enregistré est ignoré */
 function uiApply(){
-  var de=document.documentElement, d=S.dir==null?'A':S.dir, f=UIFONTS[S.font]||S.font==='sys'?S.font:'';
+  var de=document.documentElement, d=S.dir==null?'A':S.dir;
   try{
     if(d)de.setAttribute('data-dir',d); else if(de.removeAttribute)de.removeAttribute('data-dir');
-    if(f)de.setAttribute('data-font',f); else if(de.removeAttribute)de.removeAttribute('data-font');
-    if(UIFONTS[f]&&document.head&&!document.getElementById('font-'+f)){ var l=document.createElement('link'); l.id='font-'+f; l.rel='stylesheet';
-      l.href='https://fonts.googleapis.com/css2?family='+UIFONTS[f]+'&display=swap'; document.head.appendChild(l); }
+    if(de.removeAttribute)de.removeAttribute('data-font');
   }catch(_){}
   var m=$('bwmen'); if(m&&m.style)m.style.display=S.hdrBw===false?'none':'';
-  if($('uidir'))$('uidir').value=d; if($('uifont'))$('uifont').value=f;
+  if($('uidir'))$('uidir').value=d;
   if($('uibw'))$('uibw').checked=S.hdrBw!==false; if($('uivib'))$('uivib').checked=S.vib!==false;
 }
 function uiVib(){ if(S.vib===false)return; try{ if(navigator.vibrate)navigator.vibrate(12); }catch(_){} }   /* S4 : Hoober p. 398, 413 ; 10-15 ms */
-['uidir','uifont','uibw','uivib'].forEach(function(id){ var el=$(id); if(!el)return;
+['uidir','uibw','uivib'].forEach(function(id){ var el=$(id); if(!el)return;
   el.addEventListener('change',function(){
-    if(id==='uidir')S.dir=this.value; else if(id==='uifont')S.font=this.value;
+    if(id==='uidir')S.dir=this.value;
     else if(id==='uibw')S.hdrBw=!!this.checked; else S.vib=!!this.checked;
     save(); uiApply(); if(id==='uivib'&&this.checked)uiVib();
   });
