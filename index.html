@@ -377,6 +377,12 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 .pesd{display:grid;gap:2px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}
 .pesm{margin-left:auto;white-space:nowrap}
 .pesx{font-size:12px;color:var(--muted)}
+/* lot 102 : une ligne par carte pour dire ce qu'elle montre ; le résumé de Données ; la comparaison des blocs */
+.cdesc{margin:2px 0 8px;font-size:13px;color:var(--muted)}
+.card.folded .cdesc{display:none}
+.hbest{display:grid;gap:3px;margin:6px 0 10px;font-size:14px}
+.hgo{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.bcmp td,.bcmp th{white-space:nowrap}
 .logrow:not(.lgopen) .lgmore{display:none}
 /* lot 80 : à compléter, saisie douteuse */
 .lrn{font:500 11.5px/1.2 var(--txt);color:var(--muted);white-space:nowrap}   /* lot 81 */
@@ -650,6 +656,7 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 :root[data-dir] .panel.pn7{box-shadow:inset 4px 0 0 var(--a8),inset 0 0 0 1px var(--rule)}
 /* lot 87 : cinq vues de Données sur une ligne à 360 px */
 #dtabs .pill[data-dvg],:root[data-dir] #dtabs .pill[data-dvg]{flex:1 1 0;min-width:0;padding-left:2px;padding-right:2px}
+#dtabs .pill[data-dvg],:root[data-dir] #dtabs .pill[data-dvg]{font-size:12px;letter-spacing:-.01em}   /* lot 102 : six vues sur une ligne */
 /* lot 88 : taille moyenne du nouveau style (entre v87 et le grand) */
 :root[data-dir="M"]{--t-xs:12px;--t-s:12.5px;--t-m:14px;--t-l:15.5px;--t-xl:19px;--t-xxl:25px;--s4:14px;--s5:20px}
 /* lot 89 */
@@ -916,6 +923,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
   <div class="card" id="cardview">
     <h2>Données <em>une chose à la fois</em></h2>
     <div class="dtabs" id="dtabs" role="group" aria-label="Afficher">   <!-- lot 65 (Q16) -->
+      <button type="button" class="pill" data-dvg="accueil">Résumé</button>   <!-- lot 102 (G1) -->
       <button type="button" class="pill" data-dvg="seances">Séances</button>
       <button type="button" class="pill" data-dvg="vitesse">Vitesse</button>
       <button type="button" class="pill" data-dvg="progres">Progrès</button>
@@ -938,8 +946,15 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       </select></div></div>
   </div>
 
+  <div class="card" data-dv="accueil">   <!-- lot 102 (G1) : le résumé de la période, puis les accès aux listes -->
+    <h2>Résumé <em>de la période choisie</em></h2>
+    <p class="cdesc">Ce que vous avez fait sur la période : les séances, la meilleure série de chaque mouvement, la dernière pesée.</p>
+    <div id="dhome"></div>
+  </div>
+
   <div id="p-velo" data-dv="vitesse">   <!-- lot 87 : l'onglet Vitesse rejoint Données -->
     <div class="vhead">
+      <p class="cdesc" style="margin-top:0">Vos séries filmées de la période : la vitesse de chaque rep dit ce qu'il restait en réserve.</p>
       <div class="vtabs">
         <button class="pill" data-vs="seance">Séance</button>
         <button class="pill" data-vs="profil">Profil</button>
@@ -955,16 +970,19 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 
   <div class="card" data-dv="suivi">
     <h2>Suivi du bloc <em>prescrit contre réalisé</em></h2>
+    <p class="cdesc">Bloc en cours : la part des séries faites comme prévu. Sous 80 %, le programme n'a pas vraiment été suivi.</p>
     <div id="conform"></div>
   </div>
 
   <div class="card" data-dv="bilan">
     <h2>Bilan des blocs <em>ce qui est mesurable</em></h2>
+    <p class="cdesc">Les blocs comparés entre eux : la force a-t-elle monté d'un bloc à l'autre ? Tous les blocs, quelle que soit la période.</p>
     <div id="bilan"></div>
   </div>
 
   <div class="card" data-dv="records" data-chk="drec">
     <h2>Records <em>par reps, 1RM estimé, formats, forme</em><button type="button" class="chi" data-chinfo="drec" aria-label="Explications" aria-pressed="false">i</button></h2>
+    <p class="cdesc">Vos meilleures séries de tous les temps, par nombre de reps : ce qu'il faut battre. Tout l'historique, quelle que soit la période.</p>
     <div class="row">
       <div class="field md"><label for="rlift">Mouvement</label><select id="rlift"></select></div>
       <div class="field md"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="rtop">par reps : top sets et maxima seulement</label></div>
@@ -982,6 +1000,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 
   <div class="card" data-dv="prog" data-chk="dprog">
     <h2>Progression <em>e1RM des top sets, fatigue des back-offs</em><button type="button" class="chi" data-chinfo="dprog" aria-label="Explications" aria-pressed="false">i</button></h2>
+    <p class="cdesc">Votre 1RM estimé à chaque top set de la période : s'il monte, vous êtes plus fort, même si la charge n'a pas bougé.</p>
     <div id="prog"></div>
     <p class="note chex"><b>e1RM</b> : 1RM estimé de chaque top set par le modèle de l'outil (reps faites + réserve notée), en charge
     système (PdC + lest). C'est lui qui dit si la force a monté : une charge qui monte pendant que la réserve baisse peut
@@ -993,14 +1012,16 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     d'environ 1 rep, ce qui grossit la baisse (≈ 2,5 % par rep). Séances de deload exclues, comme l'historique versé hors bloc (sans réserve notée, il ne donne pas d'e1RM).</p>
   </div>
 
-  <div class="card" data-dv="courbe">
+  <div class="card" data-dv="courbe" data-fdef="1">
     <h2>Coût d'une répétition <em>vos séries contre le réglage</em></h2>
+    <p class="cdesc">Réglage avancé : vérifie que le calcul des charges colle à vos séries. Rien à regarder d'une séance à l'autre.</p>
     <div id="fit"></div>
     <div class="btnrow"><button class="act ghost" id="applyfit">Appliquer les coefficients ajustés</button></div>
   </div>
 
-  <div class="card" data-dv="saisie" data-chk="dsai">
+  <div class="card" data-dv="saisie" data-chk="dsai" data-fdef="1">
     <h2>Performance hors programme<button type="button" class="chi" data-chinfo="dsai" aria-label="Explications" aria-pressed="false">i</button></h2>
+    <p class="cdesc">Pour noter un max improvisé ou une ancienne performance, hors de Séance du jour.</p>
     <div class="row">
       <div class="field md"><label for="ldate">Date</label><input id="ldate" type="date"></div>
       <div class="field md"><label for="llift">Mouvement</label><select id="llift"></select></div>
@@ -1025,13 +1046,15 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     l'onglet Séance du jour. <b>Réserve inconnue</b> exclut la série de l'ajustement de la courbe : mieux vaut ça qu'un chiffre inventé.</p>
   </div>
 
-  <div class="card" id="cardweekvol" data-dv="suivi">
+  <div class="card" id="cardweekvol" data-dv="suivi" data-fdef="1">
     <h2>Volume par semaine <em>bloc en cours</em></h2>
+    <p class="cdesc">Le nombre de séries de chaque semaine du bloc en cours.</p>
     <div id="weekvol"></div>
   </div>
 
   <div class="card" data-dv="series">
     <h2>Séries <em id="logcount"></em></h2>
+    <p class="cdesc">Vos séances de la période, une par ligne : touchez-en une pour voir ses séries.</p>
     <div class="row"><div class="field w"><label for="dsearch">Rechercher</label><input id="dsearch" type="search" placeholder="ex. dips 45x5" autocomplete="off"></div></div>   <!-- lot 97 -->
     <div id="dsearchout"></div>
     <div id="dchips" class="pillrow"></div>   <!-- lot 100 : filtres actifs -->
@@ -1056,6 +1079,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 
   <div class="card" data-dv="pesees" data-chk="dpes">
     <h2>Pesées <em id="pescount">tous les PdC connus</em><button type="button" class="chi" data-chinfo="dpes" aria-label="Explications" aria-pressed="false">i</button></h2>
+    <p class="cdesc">Votre poids de corps jour après jour, et sa tendance : c'est lui qui entre dans le calcul des charges.</p>
     <div id="peslist"></div>   <!-- lot 101 : la courbe en haut -->
     <details class="chd" data-chd="pesadd"><summary>＋ Ajouter une pesée hors séance</summary>   <!-- lot 98 -->
       <div class="row">
@@ -1158,7 +1182,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v105';   /* lot 74 */
+var APPV='v106';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -2549,6 +2573,7 @@ function vDayInfo(d){
 function vFiltre(ds){
   var U=vui(), fb=String(U.fb||''), ft=U.ft||'';
   return ds.filter(function(d){ var i=vDayInfo(d);
+    if(!perOk(null,'d',i.b,d))return false;   /* lot 102 : la période de Données */
     if(fb!==''&&String(i.b)!==fb)return false;
     if(ft==='p'&&!i.p)return false;
     if(ft==='s'&&i.p)return false;
@@ -3212,6 +3237,7 @@ function foldify(sel,isHead,pfx){
     while(h.nextSibling)body.appendChild(h.nextSibling);
     card.appendChild(body);
     h.setAttribute('data-fold',key);
+    if(card.getAttribute('data-fdef')){ S.foldDef=S.foldDef||{}; if(!S.foldDef[key]){ S.foldDef[key]=1; S.fold=S.fold||{}; S.fold[key]=1; } }   /* lot 102 : replié la première fois */
     h.insertAdjacentHTML('afterbegin',chev(key));
     card.setAttribute('data-fx','1');
   });
@@ -8364,10 +8390,35 @@ function bilanNext(bid){
   });
   return out.length?'<p class="note" data-bilannext>Le bloc suivant : '+out.join(' ; ')+'.</p>':'';
 }
+/* lot 102 (B1) : une ligne par bloc et par mouvement principal : meilleure série, 1RM estimé (le meilleur des séries à réserve
+   connue), écart avec le bloc précédent. Deloads, séries ratées ou douteuses exclus. */
+function blocCmp(){
+  var bl=perBlocks().filter(function(b){return b>0;}).sort(function(a,b){return a-b;}), h='';
+  S.lifts.forEach(function(L,li){
+    if(!L.main||isM(L))return;
+    var prev=null, rows=bl.map(function(b){
+      var es=(S.log||[]).filter(function(e){ return e.li===li&&blockOfEntry(e)===b&&e.state!=='skip'&&e.state!=='miss'&&e.state!=='fail'&&!e.doubt&&
+        e.role!=='deload'&&!/^d\|/.test(String(e.key||''))&&lastReps(e)!=null; });
+      if(!es.length)return null;
+      var bst=null, rm=null;
+      es.forEach(function(e){ var r=lastReps(e), bw=bwOf(e);
+        if(!bst||(+e.load||0)>(+bst.load||0)||((+e.load||0)===(+bst.load||0)&&r>lastReps(bst)))bst=e;
+        if(e.rir!=null){ var le=e1rm(L,+e.load||0,r,+e.rir,bw)-eff(L,bw), sy=L.useBw?bw+le:le; if(rm==null||sy>rm)rm=sy; } });
+      if(rm!=null)rm=Math.round(rm*10)/10;   /* l'écart se lit sur les chiffres affichés */
+      var d=rm!=null&&prev!=null?rm-prev:null; if(rm!=null)prev=rm;
+      return '<tr><td>B'+b+(b===(+S.blockId||1)?' <small>en cours</small>':'')+'</td><td>'+loadLab(L,bst.load)+' '+S.sep+' '+lastReps(bst)+uM(L)+'</td><td>'+
+        (rm!=null?'<b>'+F(Math.round(rm*10)/10)+'</b>':'—')+'</td><td>'+(d!=null?(Math.abs(d)<0.05?'=':(d>0?'+':'−')+F(Math.round(Math.abs(d)*10)/10)):'—')+'</td></tr>';
+    }).filter(Boolean);
+    if(rows.length)h+='<h3 class="rkh">'+esc(L.name)+'</h3><div class="scroll"><table class="bcmp" data-bcmp><thead><tr><th>bloc</th><th>meilleure</th><th>1RM est.</th><th>écart</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+  });
+  return h?'<p class="ctitle" style="margin-top:0">Les blocs comparés</p>'+h+
+    '<p class="note">Meilleure : la série la plus lourde du bloc. 1RM est. : le 1RM estimé, le meilleur de vos séries à réserve notée, en PdC + lest pour les mouvements au poids du corps. Écart : avec le bloc précédent. Le détail de chaque bloc suit.</p>'+
+    '<div style="border-top:1px solid var(--rule);margin:12px 0 8px"></div>':'';
+}
 function renderBilan(){
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
-  var h='<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
+  var h=blocCmp()+'<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
     (S.start?'depuis le '+frDate(S.start):'aucune date de d\u00e9but')+' \u00b7 '+nd+'/'+sess.length+' s\u00e9ances marqu\u00e9es faites'+formLine()+'.</p>'+
     statsHTML(blockStats(S.start||null,null))+bilanPente(+S.blockId||1)+painBilan(+S.blockId||1,nd)+bxHTML(bilanX(+S.blockId||1))+mdBtn(+S.blockId||1);   /* lot 55 */   /* lot 54 */
   if(S.blocks.length){
@@ -8785,7 +8836,7 @@ function perHTML(){
 }
 function perRender(){
   var box=$('dperbar'), g=dGroup(dq().view); if(!box)return;
-  box.hidden=!(g==='seances'||g==='pesees'); if(!box.hidden)box.innerHTML=perHTML();
+  box.hidden=g==='bilan'; if(!box.hidden)box.innerHTML=perHTML();   /* lot 102 : Résumé, Progrès et Vitesse suivent aussi la période */
 }
 (function(){ var box=$('dperbar'); if(!box||!box.addEventListener)return;
   box.addEventListener('click',function(ev){ if(ev.target&&ev.target.closest&&ev.target.closest('[data-perx]')){ DPER={m:'cur'}; renderData(); } });
@@ -8804,8 +8855,8 @@ function opts(sel,vals,cur,lab0,fmt){
   if(cur!==''&&vals.map(String).indexOf(String(cur))<0)sel.value='';
 }
 /* lot 77 (D1) : quatre vues ; chacune regroupe des cartes d'avant, rien n'est retiré */
-var DGRP={seances:['series','saisie'],vitesse:['vitesse'],progres:['prog','records','courbe'],bilan:['bilan','suivi'],pesees:['pesees']};   /* lot 87 : Vitesse */
-var DGV={seances:'series',vitesse:'vitesse',progres:'prog',bilan:'bilan',pesees:'pesees'};
+var DGRP={accueil:['accueil'],seances:['series','saisie'],vitesse:['vitesse'],progres:['prog','records','courbe'],bilan:['bilan','suivi'],pesees:['pesees']};   /* lot 87 : Vitesse ; lot 102 : Résumé */
+var DGV={accueil:'accueil',seances:'series',vitesse:'vitesse',progres:'prog',bilan:'bilan',pesees:'pesees'};
 function dGroup(v){ for(var g in DGRP)if(DGRP[g].indexOf(v)>=0)return g; return 'seances'; }
 function renderDataView(){
   var q=dq(), g=dGroup(q.view);
@@ -8844,6 +8895,10 @@ function dataSummary(list){
   return '<p class="note">'+list.length+' série'+(list.length>1?'s':'')+'. Choisissez un lest ou un nombre de reps pour les comparer dans un tableau.</p>';
 }
 $('dview').addEventListener('change',function(){ dq().view=this.value; save(); renderData(); });
+$('dhome').addEventListener('click',function(e){   /* lot 102 : les accès du Résumé */
+  var b=e.target.closest?e.target.closest('[data-dvg]'):null; if(!b)return;
+  dq().view=DGV[b.dataset.dvg]; save(); renderData(); applyFolds(); chInfo(); window.scrollTo(0,0);
+});
 $('dtabs').addEventListener('click',function(e){   /* lot 65 (Q16) */
   var b=e.target.closest?e.target.closest('[data-dvg]'):null; if(!b)return;   /* lot 77 */
   dq().view=DGV[b.dataset.dvg]; save(); renderData(); applyFolds(); chInfo();
@@ -9018,7 +9073,7 @@ function renderProg(){
   var h='';
   S.lifts.forEach(function(L,li){
     if(!L.main||isM(L))return;
-    var rows=progRows(li); if(!rows.length)return;
+    var rows=progRows(li).filter(function(r){ return perOk(null,'d',r.blk,r.date); }); if(!rows.length)return;   /* lot 102 : la période */
     h+='<h3 class="rkh">'+esc(L.name)+'</h3>';
     var j1=progJ1(rows);   /* lot 68 (Q30) */
     if(j1)h+='<p class="note" data-progj1><b style="color:var(--warn)">! Repère : J1 en baisse</b> deux fois de suite, '+progSg(j1.a.drep)+' puis '+progSg(j1.b.drep)+
@@ -9041,10 +9096,10 @@ function renderProg(){
           '<td>'+(b?progSet(L,b,progLastRir(b))+(r.fp!=null?'<br><b>−'+F(Math.round(r.fp*10)/10)+' %</b>':''):'')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   });
-  box.innerHTML=h||'<p class="note"><b>Aucun top set enregistré sur un mouvement principal.</b> La progression apparaît dès le premier top set noté dans Séance du jour.</p>';
+  box.innerHTML=h||'<p class="note"><b>Aucun top set sur un mouvement principal pendant cette période.</b> Changez la période en haut, ou notez un top set dans Séance du jour.</p>';
 }
 function renderData(){
-  renderDataView();
+  renderDataView(); renderHome();   /* lot 102 */
   if(dq().view==='vitesse')renderVelo();   /* lot 87 */
   if(!BRSWAP&&(dq().view==='bilan'||dq().view==='tout'))renderBilan();   /* lot 72 : le Bilan suit les séries */
   renderWeekVol(); renderBackup(); renderRecords(); renderPesees(); renderProg();   /* lot 62 */   /* lot 48 : 1RM dans Records */   /* lot 44 (R9) */
@@ -9124,14 +9179,31 @@ function logRowHTML(e){   /* lot 100 : une série, dans sa séance */
 var SESOPEN={};   /* lot 100 : séances ouvertes (non enregistré) */
 function dfltN(){ var q=dq(); return (q.li!==''?1:0)+(q.role!==''?1:0)+(q.load!==''?1:0)+(q.reps!==''?1:0)+(q.vid?1:0); }
 function sesDay(d){ var x=new Date(d+'T12:00:00'); return isNaN(x.getTime())?esc(d):x.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')+' '+perDs(d); }
-function sesBest(es){
+function sesBest(es){ return sesBestL(es).join(' · '); }
+function sesBestL(es){   /* lot 102 : une entrée par mouvement, pour le Résumé */
   var by={}, ord=[];
   es.forEach(function(e){ if(e.state==='skip'||!S.lifts[e.li])return; if(!by[e.li]){ by[e.li]=[]; ord.push(e.li); } by[e.li].push(e); });
   var main=ord.filter(function(li){ return by[li].some(function(e){ return roleGroup(e)!=='sec'; }); });
   return (main.length?main:ord).map(function(li){ var L=S.lifts[li], bst=null;
     by[li].forEach(function(e){ var r=lastReps(e); if(r==null)return;
       if(!bst||(+e.load||0)>(+bst.load||0)||((+e.load||0)===(+bst.load||0)&&r>lastReps(bst)))bst=e; });
-    return '<span style="white-space:nowrap"><b class="n'+col(li)+'">'+esc(L.name)+'</b>'+(bst?' '+loadLab(L,bst.load)+' '+S.sep+' '+lastReps(bst)+uM(L):'')+'</span>'; }).join(' · ');
+    return '<span style="white-space:nowrap"><b class="n'+col(li)+'">'+esc(L.name)+'</b>'+(bst?' '+loadLab(L,bst.load)+' '+S.sep+' '+lastReps(bst)+uM(L):'')+'</span>'; });
+}
+/* lot 102 (G1) : Résumé de la période ; les accès aux listes */
+function renderHome(){
+  var o=$('dhome'); if(!o)return;
+  var es=(S.log||[]).filter(function(e){ var d=String(e.date||'').slice(0,10); return d&&e.state!=='skip'&&perOk(null,'d',blockOfEntry(e),d); }),
+    ds={}, ns=0, nv=0;
+  es.forEach(function(e){ ds[String(e.date).slice(0,10)]=1; ns+=(e.sets||[]).length; });
+  var nd=Object.keys(ds).length, bl=sesBestL(es), pr=pesRows().filter(function(r){ return pesMain(r)!=null; })[0];
+  (vDates()).forEach(function(d){ if(perOk(null,'d',vDayInfo(d).b,d))nv++; });
+  var np=pesRows().filter(function(r){ return perOk(null,'p',r.b,r.d); }).length;
+  o.innerHTML=(nd?'<p class="ctitle" data-hcount><b>'+nd+' séance'+(nd>1?'s':'')+'</b>, '+ns+' série'+(ns>1?'s':'')+'</p>'+
+      (bl.length?'<p class="note" style="margin:6px 0 0">Meilleure série de chaque mouvement :</p><div class="hbest" data-hbest>'+bl.join('')+'</div>':'')
+    :'<p class="note"><b>Aucune séance sur cette période.</b> Changez la période en haut.</p>')+
+    '<p class="note" data-hpes>Dernière pesée : '+(pr?'<b>'+F(pesMain(pr))+' kg</b>, '+sesDay(pr.d):'aucune pour l\'instant')+'.</p>'+
+    '<div class="hgo">'+[['seances','Séances',nd],['progres','Progrès',''],['vitesse','Vitesse',nv],['bilan','Bilan des blocs',''],['pesees','Pesées',np]].map(function(x){
+      return '<button type="button" class="pill" data-dvg="'+x[0]+'">'+x[1]+(x[2]!==''?' ('+x[2]+')':'')+' ›</button>'; }).join('')+'</div>';
 }
 function sesHTML(FL,open){
   var g={}, ord=[], lastB=null, cb=+S.blockId||1;
@@ -10346,6 +10418,7 @@ try{localStorage.removeItem('cp-state-backup');}catch(e){}
 load();
 if(S.bkEvery==null)S.bkEvery=7;          /* rappel de sauvegarde : chaque semaine par defaut */
 if(!S.firstUse)S.firstUse=todayISO();
+dq().view='accueil';   /* lot 102 (G1) : Données s'ouvre sur le Résumé */
 renderAll(); applyNavMin(); renderBackup();
 (function(){   /* lot 77 : Ajouter sous Séries, Progression avant Records, Bilan avant Bloc en cours */
   var c=$('p-data'), dv=function(k){ return c.querySelector(':scope > .card[data-dv="'+k+'"]'); };
