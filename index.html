@@ -677,6 +677,14 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 nav,:root[data-dir] nav{background:var(--soft);border-top:0;box-shadow:0 -1px 0 color-mix(in srgb,var(--ink) 22%,transparent)}
 nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"]{background:var(--surface)}
 #chnout{margin:8px 0 0}
+/* lot 109 (P1) : personnes */
+#profbar{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+#profbar>button{background:var(--surface);color:var(--ink);border:1px solid var(--rule,var(--muted));border-radius:999px;padding:6px 14px;font:600 14px/1.2 var(--txt);cursor:pointer;min-height:36px}
+#profpick{display:flex;flex-wrap:wrap;gap:6px}
+.profrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--soft)}
+.profrow .pn{flex:1 1 140px;min-width:0}
+.profrow .pn small{display:block;color:var(--muted);font-weight:400}
+.profdel{flex:1 1 100%;background:var(--soft);border-left:4px solid var(--bad);border-radius:8px;padding:8px 10px}
 #chnout b{font-size:1.25em}
 </style>
 </head>
@@ -693,6 +701,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     <button class="iconbtn hlab" id="foldall" title="Tout replier" aria-label="Tout replier">▾ Replier</button>
     <button type="button" class="iconbtn sq" id="appmen" title="Palette et thème" aria-label="Palette et thème" aria-expanded="false">⚙</button>
   </div>
+  <div id="profbar" hidden></div>   <!-- lot 109 (P1) : personne courante, dès 2 personnes -->
   <div class="appmenu" id="appmenu" hidden>   <!-- lot 78 (P4) : réglages de l'app, sortis de Réglages du bloc -->
     <p class="note">Réglages de l'app</p>
     <button type="button" class="act ghost" id="pal" title="Palette" aria-label="Palette">🎨</button>
@@ -1110,6 +1119,16 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     Les trois premiers sont des pesées : l'outil en fait la moyenne du jour pour ses calculs, et la plus récente devient le PdC courant. Le PdC de fin de séance, le PdC non habillé et les pesées hors séance sont seulement notés.</p>
   </div>
 
+  <div class="card" id="cardprof">   <!-- lot 109 (P1) -->
+    <h2>Personnes <em id="profsum"></em></h2>
+    <div id="proflist"></div>
+    <div class="row" style="margin-top:8px">
+      <div class="field md"><label for="profnew">Ajouter une personne</label><input id="profnew" type="text" placeholder="Prénom" autocomplete="off"></div>
+      <div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" id="profadd">Ajouter</button></div>
+    </div>
+    <p class="note" id="profnote">Chaque personne a ses propres mouvements, programme, séances et sauvegardes. Les analyses vidéo arrivent seulement chez Luka.</p>
+  </div>
+
   <div class="card" id="cardsauve">
     <h2>Sauvegarde <em id="bksum"></em></h2>
     <div class="btnrow">
@@ -1197,7 +1216,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v112';   /* lot 74 */
+var APPV='v113';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1252,11 +1271,28 @@ document.addEventListener('input',function(ev){
   if(bad&&!(m&&m.classList.contains('nmsg')))t.insertAdjacentHTML('afterend','<div class="nmsg">Nombre attendu, par exemple 27,5</div>');
   if(!bad&&m&&m.classList.contains('nmsg'))m.remove();
 });
+/* lot 109 (P1) : plusieurs personnes dans le même navigateur. Registre localStorage['cp-profiles'] = {cur, list:[{id,name}]}.
+   SK(base) donne la clé de la personne courante : pour 'luka', exactement l'ancienne (aucune migration) ; sinon base+':'+id.
+   cp-inbox (page vidéo) n'est pas par personne : il n'est lu que chez Luka. Changer de personne = enregistrer puis recharger. */
+var PKEYS=['cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page'];
+var PROF=(function(){
+  var r=null; try{ r=JSON.parse(localStorage.getItem('cp-profiles')||'null'); }catch(e){}
+  if(!r||!Array.isArray(r.list)||!r.list.some(function(p){return p&&p.id==='luka';})){
+    r={cur:'luka',list:[{id:'luka',name:'Luka'}].concat((r&&Array.isArray(r.list)?r.list:[]).filter(function(p){return p&&p.id&&p.id!=='luka';}))};
+    try{ localStorage.setItem('cp-profiles',JSON.stringify(r)); }catch(e){}
+  }
+  if(!r.list.some(function(p){return p.id===r.cur;}))r.cur='luka';
+  return r;
+})();
+function SKof(id,base){ return id==='luka'?base:base+':'+id; }
+function SK(base){ return SKof(PROF.cur,base); }
+function profCur(){ return PROF.list.filter(function(p){return p.id===PROF.cur;})[0]; }
+function profStore(){ try{ localStorage.setItem('cp-profiles',JSON.stringify(PROF)); return true; }catch(e){ alert("Le registre des personnes n'a pas pu être enregistré : stockage plein ou désactivé."); return false; } }
 var SAVEFAIL=false;
 function save(){
   if(BRSWAP)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon */
   REFSTAMP++; REFC={};
-  try{ localStorage.setItem('cp-state',JSON.stringify(S)); SAVEFAIL=false; }
+  try{ localStorage.setItem(SK('cp-state'),JSON.stringify(S)); SAVEFAIL=false; }
   catch(e){
     /* quota depasse ou stockage refuse : sans cet avertissement, tout continue de
        fonctionner a l'ecran et rien n'est conserve au rechargement. */
@@ -1270,7 +1306,7 @@ function save(){
 }
 function load(){
   try{
-    var raw=localStorage.getItem('cp-state'); if(!raw)return;
+    var raw=localStorage.getItem(SK('cp-state')); if(!raw)return;
     var d=JSON.parse(raw);
     if(!d||!d.lifts||!d.lifts.length)return;
     /* migrations : jusqu'ici la version etait ecrasee sans etre lue, donc le numero
@@ -4755,7 +4791,7 @@ function tplGroups(){
    R14 : seuls les main lifts sont dans le brouillon, sauf case « inclure les secondaires » ; un mouvement hors du
    brouillon est « Ne pas programmer » le temps du calcul. Comparer seulement (Q-45a c) : rien n'ecrit le brouillon
    dans le vrai programme. */
-var BRKEY='cp-prog-brouillon', BR=null, BRSWAP=0, ASGT='assign', ASGSKIP={};
+var BRKEY=SK('cp-prog-brouillon'), BR=null, BRSWAP=0, ASGT='assign', ASGSKIP={};
 var BRJOURNAL=['fz','adj','fl','rbOps'];   /* lot R2 : choix des règles du programme Robin */
 function brCopy(o){return o==null?o:JSON.parse(JSON.stringify(o));}
 function brPut(o,k,v){ if(v===undefined)delete o[k]; else o[k]=v; }
@@ -5594,7 +5630,7 @@ function seancesPage(){
       pdc:pdc!=null?pdc:(date===todayISO()&&S.tbw!=null?+S.tbw:+S.bw),fait:fait,series:series});
   });});
   var r={v:1,app:APPV,ecrit:todayISO(),mouvement:'tractions',seances:out};
-  try{ localStorage.setItem('cp-seances-page',JSON.stringify(r)); }catch(e){}
+  try{ localStorage.setItem(SK('cp-seances-page'),JSON.stringify(r)); }catch(e){}
   return r;
 }
 function dayDate(w,lab){
@@ -6220,9 +6256,9 @@ function panelHTML(key){
    (cp-drafts) : ce n'est pas une donnee d'entrainement, et ca ne va pas dans l'export.
    Une ligne qui a un brouillon porte un crayon. En revenant sur Seance du jour, le
    panneau qui etait ouvert se rouvre de lui-meme. */
-var DRAFTS={}; try{ DRAFTS=JSON.parse(localStorage.getItem('cp-drafts')||'{}')||{}; }catch(e){ DRAFTS={}; }
+var DRAFTS={}; try{ DRAFTS=JSON.parse(localStorage.getItem(SK('cp-drafts'))||'{}')||{}; }catch(e){ DRAFTS={}; }
 var DRT=null, LASTOPEN=null;
-function draftWrite(){ clearTimeout(DRT); DRT=null; try{localStorage.setItem('cp-drafts',JSON.stringify(DRAFTS));}catch(e){} }
+function draftWrite(){ clearTimeout(DRT); DRT=null; try{localStorage.setItem(SK('cp-drafts'),JSON.stringify(DRAFTS));}catch(e){} }
 function draftPersist(now){ clearTimeout(DRT); if(now){ draftWrite(); return; } DRT=setTimeout(draftWrite,250); }   /* B6 */
 function draftRead(p){
   var o={}, el;
@@ -6675,8 +6711,66 @@ $('bkban').addEventListener('click',function(e){
 $('bkevery').addEventListener('change',function(){ S.bkEvery=+this.value; save(); renderBackup(); });
 /* B11 : annuler un import. La copie est prise juste avant l'ecrasement (voir l'import),
    elle est effacee au demarrage suivant et apres restauration. */
-function bkCopy(){ try{ return localStorage.getItem('cp-state-backup'); }catch(e){ return null; } }
-function bkDrop(){ try{ localStorage.removeItem('cp-state-backup'); }catch(e){} }
+/* lot 109 (P1) : Personnes. Supprimer se confirme dans la page (PROFDEL), avec l'export proposé juste avant. */
+var PROFDEL=null, PROFREN=null, PROFPICK=false;
+function profSlug(n){ return String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'personne'; }
+function profFile(id){ id=id||PROF.cur; if(id==='luka')return 'charges-'; var p=PROF.list.filter(function(x){return x.id===id;})[0]; return 'sauvegarde-'+profSlug(p&&p.name)+'-'; }
+function profSize(id){ var n=0; PKEYS.forEach(function(k){ try{ var v=localStorage.getItem(SKof(id,k)); if(v)n+=v.length; }catch(e){} }); return n; }
+function profKo(n){ return n<1024?'moins de 1 Ko':F(Math.round(n/1024))+' Ko'; }
+function profEsc(t){ return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function profGo(id){
+  if(id===PROF.cur)return;
+  save(); if(typeof draftWrite==='function')draftWrite();
+  PROF.cur=id; if(!profStore())return; location.reload();
+}
+function renderProf(){
+  var many=PROF.list.length>1, c=profCur(), bar=$('profbar');
+  if(bar){ bar.hidden=!many;
+    bar.innerHTML=many?'<button type="button" data-profpick="1" aria-expanded="'+PROFPICK+'">👤 '+profEsc(c.name)+' ▾</button>'+
+      (PROFPICK?'<div id="profpick">'+PROF.list.filter(function(p){return p.id!==PROF.cur;}).map(function(p){
+        return '<button type="button" class="act ghost mini" data-profgo="'+p.id+'">'+profEsc(p.name)+'</button>'; }).join('')+'</div>':''):''; }
+  if(!$('proflist'))return;
+  $('profsum').textContent=many?PROF.list.length+' personnes · en cours : '+c.name:'';
+  $('proflist').innerHTML=PROF.list.map(function(p){
+    var me=p.id===PROF.cur, h='<div class="profrow">';
+    if(PROFREN===p.id)h+='<input id="profren" type="text" value="'+profEsc(p.name)+'" style="flex:1 1 140px"><button class="act mini" data-profrenok="'+p.id+'">OK</button><button class="act ghost mini" data-profrenx="1">Annuler</button>';
+    else h+='<div class="pn"><b>'+profEsc(p.name)+'</b>'+(me?' · en cours':'')+'<small>'+profKo(profSize(p.id))+' dans ce téléphone</small></div>'+
+      (me?'':'<button class="act ghost mini" data-profgo="'+p.id+'">Choisir</button>')+
+      '<button class="act ghost mini" data-profren="'+p.id+'">Renommer</button>'+
+      (p.id==='luka'?'':'<button class="act ghost mini" data-profdel="'+p.id+'">Supprimer</button>');
+    if(PROFDEL===p.id)h+='<div class="profdel"><b>Supprimer '+profEsc(p.name)+' et toutes ses données ?</b> Rien ne peut être annulé ensuite. Exportez d\'abord sa sauvegarde.'+
+      '<div class="btnrow" style="margin-top:6px"><button class="act ghost mini" data-profexp="'+p.id+'">Exporter sa sauvegarde</button>'+
+      '<button class="act mini" data-profdelok="'+p.id+'">Supprimer définitivement</button><button class="act ghost mini" data-profdelx="1">Annuler</button></div></div>';
+    return h+'</div>';
+  }).join('');
+}
+document.addEventListener('click',function(ev){
+  var t=ev.target; if(!t||!t.closest)return; var b;
+  if(t.closest('[data-profpick]')){ PROFPICK=!PROFPICK; renderProf(); return; }
+  if((b=t.closest('[data-profgo]'))){ profGo(b.dataset.profgo); return; }
+  if((b=t.closest('[data-profren]'))){ PROFREN=b.dataset.profren; PROFDEL=null; renderProf(); var i=$('profren'); if(i&&i.focus)i.focus(); return; }
+  if(t.closest('[data-profrenx]')){ PROFREN=null; renderProf(); return; }
+  if((b=t.closest('[data-profrenok]'))){ var nm=String($('profren').value||'').trim().slice(0,30);
+    if(nm){ PROF.list.forEach(function(p){ if(p.id===b.dataset.profrenok)p.name=nm; }); profStore(); } PROFREN=null; renderProf(); return; }
+  if((b=t.closest('[data-profdel]'))){ PROFDEL=b.dataset.profdel; PROFREN=null; renderProf(); return; }
+  if(t.closest('[data-profdelx]')){ PROFDEL=null; renderProf(); return; }
+  if((b=t.closest('[data-profexp]'))){ var raw=null; try{ raw=localStorage.getItem(SKof(b.dataset.profexp,'cp-state')); }catch(e){}
+    if(raw)dl(profFile(b.dataset.profexp)+todayISO()+'.json',JSON.stringify(JSON.parse(raw),null,2),'application/json'); else msgBar('Rien à exporter : aucune donnée enregistrée pour cette personne.'); return; }
+  if((b=t.closest('[data-profdelok]'))){ var id=b.dataset.profdelok; if(id==='luka')return;
+    var name=(PROF.list.filter(function(p){return p.id===id;})[0]||{}).name;
+    PKEYS.forEach(function(k){ try{ localStorage.removeItem(SKof(id,k)); }catch(e){} });
+    PROF.list=PROF.list.filter(function(p){return p.id!==id;}); PROFDEL=null;
+    if(PROF.cur===id){ PROF.cur='luka'; profStore(); location.reload(); return; }
+    profStore(); renderProf(); msgBar(name+' supprimé·e.'); return; }
+});
+$('profadd').addEventListener('click',function(){
+  var nm=String($('profnew').value||'').trim().slice(0,30); if(!nm){ $('profnew').focus(); return; }
+  if(PROF.list.some(function(p){return p.name.toLowerCase()===nm.toLowerCase();})){ msgBar('Ce prénom existe déjà.'); return; }
+  PROF.list.push({id:'p'+Date.now().toString(36),name:nm}); if(!profStore())return;
+  $('profnew').value=''; renderProf(); msgBar(nm+' ajouté·e : touchez « Choisir » pour passer sur ses données.');
+});
+function bkCopy(){ try{ return localStorage.getItem(SK('cp-state-backup')); }catch(e){ return null; } }
+function bkDrop(){ try{ localStorage.removeItem(SK('cp-state-backup')); }catch(e){} }
 $('undoimport').addEventListener('click',function(){
   var bk=bkCopy(); if(!bk){ alert("Il n'y a rien \u00e0 annuler : la copie d'avant import n'existe plus."); renderBackup(); return; }
   var cur=(S.log||[]).length, old=0, ol=0;
@@ -6685,7 +6779,7 @@ $('undoimport').addEventListener('click',function(){
     'Actuellement : '+cur+' s\u00e9rie'+(cur>1?'s':'')+' et '+(S.lifts||[]).length+' mouvements.\n'+
     'Avant l\'import : '+old+' s\u00e9rie'+(old>1?'s':'')+' et '+ol+' mouvements.\n\n'+
     'Ce qui a \u00e9t\u00e9 import\u00e9 sera perdu.'))return;
-  try{ localStorage.setItem('cp-state',bk); }catch(e){ alert("La restauration a \u00e9chou\u00e9 : le stockage du navigateur est plein ou d\u00e9sactiv\u00e9."); return; }
+  try{ localStorage.setItem(SK('cp-state'),bk); }catch(e){ alert("La restauration a \u00e9chou\u00e9 : le stockage du navigateur est plein ou d\u00e9sactiv\u00e9."); return; }
   bkDrop(); load(); renderAll(); renderBackup();
 });
 
@@ -9680,6 +9774,7 @@ function vRecord(v){
 }
 /* lot 90 (V4) : séances envoyées par la page vidéo (même site) : localStorage['cp-inbox'], tableau de textes JSON */
 function inboxPull(){
+  if(PROF.cur!=='luka')return;   /* lot 109 (P1) : les analyses vidéo sont celles de Luka */
   var a; try{ a=JSON.parse(localStorage.getItem('cp-inbox')||'[]'); }catch(e){ a=[]; }
   if(!Array.isArray(a)||!a.length)return;
   try{ localStorage.removeItem('cp-inbox'); }catch(e){}
@@ -10396,7 +10491,7 @@ function dl(name,txt,mime){
 }
 $('exportj').addEventListener('click',function(){
   S.lastExport=todayISO(); delete S.bkSnooze; save();
-  dl('charges-'+todayISO()+'.json',JSON.stringify(S,null,2),'application/json');
+  dl(profFile()+todayISO()+'.json',JSON.stringify(S,null,2),'application/json');
   renderBackup();
 });
 function seriesCSV(list){   /* lot 60 (Q5) : commun a la sauvegarde CSV et a l'export de ce qui est affiche ; colonne bloc en plus */
@@ -10423,13 +10518,13 @@ $('importfile').addEventListener('change',function(){
       /* l'import complet ECRASE tout : on compte ce qui part et ce qui arrive,
          et on sauvegarde l'etat courant avant, sinon un mauvais fichier efface tout. */
       var cur=(S.log||[]).length, inc=(d.log||[]).length;
-      if(!confirm('Remplacer TOUT le contenu actuel ?\n\n'+
+      if(!confirm('Remplacer TOUT le contenu actuel'+(PROF.list.length>1?' de '+profCur().name:'')+' ?\n\n'+
         'Actuellement : '+cur+' s\u00e9rie'+(cur>1?'s':'')+' et '+(S.lifts||[]).length+' mouvements.\n'+
         'Dans le fichier : '+inc+' s\u00e9rie'+(inc>1?'s':'')+' et '+d.lifts.length+' mouvements.\n\n'+
         'Une copie de l\'\u00e9tat actuel est gard\u00e9e : le bouton \u00ab\u00a0Annuler l\'import\u00a0\u00bb la remet en place, '+
         'tant que vous ne rechargez pas la page.'))return;
-      try{localStorage.setItem('cp-state-backup',JSON.stringify(S));}catch(e2){}
-      localStorage.setItem('cp-state',JSON.stringify(d)); load(); renderAll(); renderBackup();
+      try{localStorage.setItem(SK('cp-state-backup'),JSON.stringify(S));}catch(e2){}
+      localStorage.setItem(SK('cp-state'),JSON.stringify(d)); load(); renderAll(); renderBackup();
     }catch(e){alert("Ce fichier n'est pas une sauvegarde de cet outil.");}
   };
   r.readAsText(f);
@@ -10473,7 +10568,7 @@ $('mergefile').addEventListener('change',function(){
       });
       save(); renderAll();
       var nl=Object.keys(noms);
-      alert(add+' s\u00e9rie'+(add>1?'s':'')+' ajout\u00e9e'+(add>1?'s':'')+
+      alert((PROF.list.length>1?profCur().name+' : ':'')+add+' s\u00e9rie'+(add>1?'s':'')+' ajout\u00e9e'+(add>1?'s':'')+
         (skip?', '+skip+' d\u00e9j\u00e0 pr\u00e9sente'+(skip>1?'s':''):'')+
         (unk?', '+unk+' sur un mouvement absent d\'ici'+(nl.length?' ('+nl.slice(0,4).join(', ')+(nl.length>4?'\u2026':'')+')':''):'')+
         (bad?', '+bad+' ignor\u00e9e'+(bad>1?'s':'')+' (format)':'')+'.'+
@@ -10519,12 +10614,12 @@ $('rirexpm').addEventListener('change',function(){ S.rirExpShow=this.value==='1'
 $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderToday();});
 /* B11 : une copie d'avant import laissee par une session precedente n'a plus de sens
    (l'etat courant a pu changer depuis) : on l'efface avant de charger. */
-try{localStorage.removeItem('cp-state-backup');}catch(e){}
+try{localStorage.removeItem(SK('cp-state-backup'));}catch(e){}
 load();
 if(S.bkEvery==null)S.bkEvery=7;          /* rappel de sauvegarde : chaque semaine par defaut */
 if(!S.firstUse)S.firstUse=todayISO();
 dq().view='accueil';   /* lot 102 (G1) : Données s'ouvre sur le Résumé */
-renderAll(); applyNavMin(); renderBackup();
+renderAll(); applyNavMin(); renderBackup(); renderProf();
 /* lot 106 : demander un stockage persistant. Sans lui, le navigateur peut effacer localStorage
    quand l'espace manque. La reponse est rendue dans Reglages > Sauvegarde. */
 (function(){ var st=navigator.storage; if(!st||!st.persist)return;
