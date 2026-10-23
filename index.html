@@ -1130,6 +1130,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="field md"><label for="profnew">Ajouter une personne</label><input id="profnew" type="text" placeholder="Prénom" autocomplete="off"></div>
       <div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" id="profadd">Ajouter</button></div>
     </div>
+    <div id="profmodel"></div>   <!-- lot 111 (P3) -->
     <p class="note" id="profnote">Chaque personne a ses propres mouvements, programme, séances et sauvegardes. Les analyses vidéo arrivent seulement chez Luka.</p>
   </div>
 
@@ -1220,7 +1221,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v114';   /* lot 74 */
+var APPV='v115';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1947,8 +1948,8 @@ function chev(k){return '<span class="fchev">'+(fold(k)?'\u25b8':'\u25be')+'</sp
    \u00e9gale, l'ordre du journal (ordre de saisie) est conserv\u00e9. */
 function byDateAsc(a,b){var x=String(a.date||''), y=String(b.date||''); return x<y?-1:(x>y?1:0);}
 function byDateDesc(a,b){return -byDateAsc(a,b);}
-function loadLab(L,v){return (L&&Math.abs(+v||0)<0.01)?'PdC':F(v);}
-function loadKg(L,v){return (L&&Math.abs(+v||0)<0.01)?'PdC':F(v)+' kg';}
+function loadLab(L,v){return (L&&Math.abs(+v||0)<0.01)?(L.zeroLab||'PdC'):F(v);}   /* lot 111 : L.zeroLab = « ? » tant que la charge de départ n'est pas trouvée */
+function loadKg(L,v){return (L&&Math.abs(+v||0)<0.01)?(L.zeroLab||'PdC'):F(v)+' kg';}
 function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ================= ajustements =================
@@ -6729,6 +6730,41 @@ function profGo(id){
   save(); if(typeof draftWrite==='function')draftWrite();
   PROF.cur=id; if(!profStore())return; location.reload();
 }
+/* lot 111 (P3) : modèle de départ de Sylwia (choix de Luka du 23/10, jours de la fiche des profils). Que des accessoires :
+   double progression, +0,5 kg par haltère ; sac de sable à charge fixe ; bloc d'apprentissage de 2 semaines à 2 séries.
+   Les exercices « à essayer » qui ne sont pas au programme sont créés en « Ne pas programmer ». */
+function accLift(name,o){
+  var P=newProg(o.inc!=null?o.inc:0.5); P.tpl=o.off?'off':'acc'; P.accDays=o.d||['J1']; P.accDay=P.accDays[0];
+  P.accSets=o.n||2; P.accLo=o.lo; P.accHi=o.hi; P.accLoad=o.ld||0; P.accMode=o.m||'double'; if(o.st)P.accStep=o.st;
+  var L={name:name,main:false,useBw:false,step:o.step||0.5,k:0.025,refMode:'fixe',ref:{load:0,reps:1,rir:0,bw:null,date:null},prog:P};
+  if(o.u){ L.unit=o.u; L.noRef=true; }
+  if(!o.ld&&!o.bwx)L.zeroLab='?';
+  return L;
+}
+function sylwiaModel(){
+  return [
+    accLift('Squat chaise, haltère poitrine',{d:['J1'],lo:8,hi:12}),
+    accLift('Rowing un bras',{d:['J1','J2'],lo:10,hi:15}),
+    accLift('Développé au sol',{d:['J1'],lo:8,hi:12}),
+    accLift('Porter sac de sable',{d:['J1'],u:'m',lo:30,hi:60,st:5,ld:25,inc:0,step:1}),
+    accLift('RDL haltères',{d:['J2'],lo:8,hi:12}),
+    accLift('Développé assise',{d:['J2'],lo:8,hi:12}),
+    accLift('Chaise contre le mur',{d:['J2'],u:'s',lo:20,hi:60,st:5,bwx:1}),
+    accLift('Box squat sac de sable',{off:1,lo:8,hi:12,m:'maintien',inc:0,step:1}),
+    accLift('Fentes bulgares',{off:1,lo:8,hi:12}),
+    accLift('Pont fessier',{off:1,lo:10,hi:15}),
+    accLift('Développé debout',{off:1,lo:8,hi:12}),
+    accLift('Rowing à la barre',{off:1,lo:8,hi:12,step:0.5}),
+    accLift('Planche latérale',{off:1,u:'s',lo:15,hi:45,st:5,bwx:1}),
+    accLift('Dead bug',{off:1,lo:6,hi:12,m:'maintien',inc:0,bwx:1})
+  ];
+}
+function applySylwia(){
+  if(PROF.cur==='luka'||(S.log||[]).length)return;
+  S.lifts=sylwiaModel(); S.active=0; S.nwk=2; S.done={}; S.tsel=null;
+  S.blockNote='Apprentissage (2 semaines) : 2 séries, environ 3 reps en réserve, la technique d\'abord. Bloc suivant : 3 séries.';
+  save(); location.reload();
+}
 function renderProf(){
   var many=PROF.list.length>1, c=profCur(), bar=$('profbar');
   if(bar){ bar.hidden=!many;
@@ -6736,6 +6772,8 @@ function renderProf(){
       (PROFPICK?'<div id="profpick">'+PROF.list.filter(function(p){return p.id!==PROF.cur;}).map(function(p){
         return '<button type="button" class="act ghost mini" data-profgo="'+p.id+'">'+profEsc(p.name)+'</button>'; }).join('')+'</div>':''):''; }
   if(!$('proflist'))return;
+  if($('profmodel'))$('profmodel').innerHTML=(PROF.cur!=='luka'&&!(S.log||[]).length)?'<div class="btnrow" style="margin-top:8px"><button class="act ghost mini" data-profmodel="1">Remplacer ses mouvements par le modèle Sylwia</button></div>'+
+    '<p class="note">Seulement tant qu\'aucune série n\'est enregistrée chez cette personne. 7 exercices au programme (J1, J2), 7 autres prêts en « Ne pas programmer ».</p>':'';   /* lot 111 */
   $('profsum').textContent=many?PROF.list.length+' personnes · en cours : '+c.name:'';
   $('proflist').innerHTML=PROF.list.map(function(p){
     var me=p.id===PROF.cur, h='<div class="profrow">';
@@ -6752,6 +6790,7 @@ function renderProf(){
 }
 document.addEventListener('click',function(ev){
   var t=ev.target; if(!t||!t.closest)return; var b;
+  if(t.closest('[data-profmodel]')){ applySylwia(); return; }
   if(t.closest('[data-profpick]')){ PROFPICK=!PROFPICK; renderProf(); return; }
   if((b=t.closest('[data-profgo]'))){ profGo(b.dataset.profgo); return; }
   if((b=t.closest('[data-profren]'))){ PROFREN=b.dataset.profren; PROFDEL=null; renderProf(); var i=$('profren'); if(i&&i.focus)i.focus(); return; }
