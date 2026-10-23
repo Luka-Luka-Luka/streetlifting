@@ -681,8 +681,13 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 :root[data-simple] [data-dvg="vitesse"],:root[data-simple] #p-velo,:root[data-simple] #p-data [data-dv="prog"],:root[data-simple] #p-data [data-dv="courbe"],
 :root[data-simple] #nav button[data-p="charges"],:root[data-simple] .rk1rm,:root[data-simple] #cardrappel{display:none!important}
 /* lot 109 (P1) : personnes */
-#profbar{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
-#profbar>button{background:var(--surface);color:var(--ink);border:1px solid var(--rule,var(--muted));border-radius:999px;padding:6px 14px;font:600 14px/1.2 var(--txt);cursor:pointer;min-height:36px}
+#profbar{margin:0 0 4px;font:400 12px/1.3 var(--txt);color:var(--muted)}   /* lot 112 : discret ; le choix est dans ⚙ */
+#profbar b{font-weight:600;color:var(--muted)}
+#appprof,#appbk{flex:1 1 100%;width:100%}
+#appprof .btnrow,#appbk .btnrow{margin-top:4px}
+/* lot 112 : flèches de séance lisibles en plein jour (fond plein, fort contraste) */
+#tprev,#tnext,:root[data-dir] #tprev,:root[data-dir] #tnext{background:var(--ink);color:var(--surface);border:0;font-size:30px;font-weight:700;min-width:52px;min-height:52px}
+#tprev:disabled,#tnext:disabled{opacity:.25}
 #profpick{display:flex;flex-wrap:wrap;gap:6px}
 .profrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--soft)}
 .profrow .pn{flex:1 1 140px;min-width:0}
@@ -716,6 +721,8 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     </div>
     <label class="chk"><input type="checkbox" id="uibw" checked>PdC en haut de l'écran</label>
     <label class="chk"><input type="checkbox" id="uivib" checked>Vibration quand une série est enregistrée</label>
+    <div id="appprof"></div>   <!-- lot 112 : personne en cours et changement -->
+    <div id="appbk"></div>   <!-- lot 112 : jours depuis la dernière sauvegarde -->
     <label class="chk"><input type="checkbox" id="uisimple">Affichage simplifié (sans Charges, Vitesse, e1RM, courbe ni gabarits Zlat, Helms et Programmes)</label>   <!-- lot 110 (P2) -->
   </div>
 </header>
@@ -1221,7 +1228,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v115';   /* lot 74 */
+var APPV='v116';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -6704,12 +6711,13 @@ function renderBackup(){
      (la banniere ci-dessous les remplace quand le rappel est du). L'app ne sait que la date de l'export :
      elle ne peut pas savoir si le fichier a quitte le telephone. */
   var dline=S.lastExport?(since===0?'Sauvegarde exportée aujourd\'hui':'Sauvegarde exportée il y a '+since+' j'):'Aucune sauvegarde exportée';
-  if(!due){ ban.innerHTML='<div class="bkday'+(!S.lastExport||(n>0&&since>=n)?' late':'')+'">💾 '+dline+
-    '<button class="act ghost mini" data-bk="now">Sauvegarder</button></div>'; return; }
+  if($('appbk'))$('appbk').innerHTML='<p class="note" style="margin:8px 0 0">💾 '+dline+'</p><div class="btnrow"><button class="act ghost mini" data-bkapp="1">Sauvegarder</button></div>';   /* lot 112 : dans ⚙, plus en Séance */
+  if(!due){ ban.innerHTML=''; return; }
   ban.innerHTML=due?'<div class="bkban"><b>Sauvegarde à faire</b> — '+(S.lastExport?'la dernière date du '+frDate(S.lastExport)+' ('+since+' jours)':'aucune sauvegarde depuis '+since+' jours')+
     '. Vos données ne sont que dans ce téléphone : envoyez le fichier ailleurs (Drive, mail, ordinateur).<div class="btnrow"><button class="act" data-bk="now">Sauvegarder maintenant</button>'+
     '<button class="act ghost" data-bk="later">Demain</button></div></div>':'';
 }
+document.addEventListener('click',function(e){ if(e.target&&e.target.closest&&e.target.closest('[data-bkapp]'))$('exportj').click(); });   /* lot 112 */
 $('bkban').addEventListener('click',function(e){
   var b=e.target.closest('[data-bk]'); if(!b)return;
   if(b.dataset.bk==='now')$('exportj').click();
@@ -6767,10 +6775,9 @@ function applySylwia(){
 }
 function renderProf(){
   var many=PROF.list.length>1, c=profCur(), bar=$('profbar');
-  if(bar){ bar.hidden=!many;
-    bar.innerHTML=many?'<button type="button" data-profpick="1" aria-expanded="'+PROFPICK+'">👤 '+profEsc(c.name)+' ▾</button>'+
-      (PROFPICK?'<div id="profpick">'+PROF.list.filter(function(p){return p.id!==PROF.cur;}).map(function(p){
-        return '<button type="button" class="act ghost mini" data-profgo="'+p.id+'">'+profEsc(p.name)+'</button>'; }).join('')+'</div>':''):''; }
+  if(bar){ bar.hidden=!many; bar.innerHTML=many?'👤 <b>'+profEsc(c.name)+'</b>':''; }   /* lot 112 : un rappel discret ; changer de personne se fait dans ⚙ */
+  if($('appprof'))$('appprof').innerHTML=many?'<p class="note" style="margin:8px 0 0">Personne : <b>'+profEsc(c.name)+'</b></p><div class="btnrow">'+
+    PROF.list.filter(function(p){return p.id!==PROF.cur;}).map(function(p){ return '<button type="button" class="act ghost mini" data-profgo="'+p.id+'">Passer à '+profEsc(p.name)+'</button>'; }).join('')+'</div>':'';
   if(!$('proflist'))return;
   if($('profmodel'))$('profmodel').innerHTML=(PROF.cur!=='luka'&&!(S.log||[]).length)?'<div class="btnrow" style="margin-top:8px"><button class="act ghost mini" data-profmodel="1">Remplacer ses mouvements par le modèle Sylwia</button></div>'+
     '<p class="note">Seulement tant qu\'aucune série n\'est enregistrée chez cette personne. 7 exercices au programme (J1, J2), 7 autres prêts en « Ne pas programmer ».</p>':'';   /* lot 111 */
@@ -6908,6 +6915,7 @@ function dtagName(t){ var o=DTAGS.filter(function(q){return q[0]===t;})[0]; retu
 /* lot 70 (Q31) : gêne aux articulations, par séance, avec le lieu et le mouvement après lequel elle est venue.
    S.pain['bloc|semaine|jour'] = {coude: indice du mouvement, ou -1 si on ne sait pas}. Aucune charge n'en dépend. */
 var PLOCS=[['coude','coude'],['epaule','épaule'],['poignet','poignet'],['autre','autre']];
+if(PROF.cur!=='luka'){ DTAGS.push(['regles','règles']); PLOCS.splice(3,0,['genou','genou']); }   /* lot 112 : pour Sylwia et les autres personnes */
 function plocName(k){ var o=PLOCS.filter(function(q){return q[0]===k;})[0]; return o?o[1]:k; }
 function painKey(k){ return (+S.blockId||1)+'|'+k; }
 function painOf(k){ return (S.pain&&S.pain[painKey(k)])||{}; }
