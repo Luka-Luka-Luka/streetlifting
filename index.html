@@ -409,10 +409,9 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 #assign details.asec[open]>summary .asecsum{display:none}
 #assign .asecb{padding-bottom:6px}
 #assign .asecb>.row:first-child{margin-top:0!important}
-#assign details.asgoff{border-top:1px solid var(--rule);padding-top:4px}
-#assign details.asgoff>summary{cursor:pointer;padding:10px 0;font:600 14px/1.3 var(--txt);min-height:44px;box-sizing:border-box}
-#assign details.asgoff>summary .note{display:block;font-weight:400;margin:2px 0 0}
-#assign details.asgoff .asgsum,#assign details.asgoff .asgmod{display:none}
+#assign .asgin{margin:0 0 12px}
+#assign .asgin>div.note{margin:0 0 6px;font-weight:600}
+#assign .asgin .daypick{display:flex;flex-wrap:wrap;gap:6px}
 #assign .wmrow{flex-wrap:nowrap;gap:6px}
 #assign .wmrow .nm{flex:0 0 1.1em;color:var(--muted)}
 #assign .wmrow .wedit{flex-wrap:nowrap;gap:3px}
@@ -1255,7 +1254,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v118';   /* lot 74 */
+var APPV='v120';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -5864,14 +5863,23 @@ function asgVolets(){
       if(!body.length)d.parentNode.removeChild(d);
     });
   });
-  if(offs.length){
-    var d=document.createElement('details'); d.className='asgoff'; d.setAttribute('data-asec','off'); if(ASEC.off)d.open=true;
-    d.innerHTML='<summary>Pas dans ce bloc ('+offs.length+') <span class="note">'+offs.map(function(c){ var t=c.querySelector('.tagname'); return esc(t?t.firstChild&&t.firstChild.textContent||'':''); }).join(', ')+'</span></summary>';
-    offs.forEach(function(c){ d.appendChild(c); });
-    a.appendChild(d);
-  }
+  /* lot 115 : cases « Dans ce bloc » en tête ; un mouvement décoché n'a plus de carte ; « Ne pas programmer » sort du menu */
+  offs.forEach(function(c){ c.parentNode.removeChild(c); });
+  Array.prototype.forEach.call(a.querySelectorAll('select[data-f=tpl] option[value=off]'),function(o){ var g=o.parentNode; o.parentNode.removeChild(o); if(g.tagName==='OPTGROUP'&&!g.children.length)g.parentNode.removeChild(g); });
+  a.insertAdjacentHTML('afterbegin','<div class="asgin"><div class="note">Dans ce bloc</div><div class="daypick">'+
+    S.lifts.map(function(L,i){ if(ASGSKIP[i])return ''; var on=L.prog.tpl!=='off'&&!!tplOf(L.prog.tpl);
+      return '<label class="dchip'+(on?' on':'')+'"><input type="checkbox" data-inb="'+i+'"'+(on?' checked':'')+'>'+esc(L.name)+'</label>'; }).join('')+
+    '</div><p class="note" style="margin:4px 0 0">Décoché, un mouvement sort du programme ; ses réglages sont gardés pour le jour où vous le recochez. Le journal n\u2019est pas touché.</p></div>');
   chInfo();
 }
+document.addEventListener('change',function(ev){   /* lot 115 : cocher / décocher « Dans ce bloc » */
+  var t=ev.target; if(!t||!t.getAttribute||t.getAttribute('data-inb')==null)return;
+  var L=S.lifts[+t.getAttribute('data-inb')]; if(!L||!L.prog)return; var P=L.prog;
+  if(t.checked){ var w=P.tplWas&&tplOf(P.tplWas)&&((!isU(L)&&!L.noRef)||P.tplWas==='acc')?P.tplWas:'acc'; P.tpl=w; delete P.tplWas;
+    S.fold=S.fold||{}; S.lifts.forEach(function(M){ S.fold['a:'+M.name]=1; }); delete S.fold['a:'+L.name]; }
+  else { if(P.tpl!=='off')P.tplWas=P.tpl; P.tpl='off'; }
+  save(); renderAssign(); refreshPlans();
+});
 document.addEventListener('toggle',function(ev){ var d=ev.target; if(!d||!d.getAttribute)return; var k=d.getAttribute('data-asec'); if(k){ if(d.open)ASEC[k]=1; else delete ASEC[k]; } },true);
 function asgSum(){
   var a=$('assign'); if(!a||!a.querySelectorAll)return; var T=brTops();
