@@ -396,6 +396,33 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 .line.dbt .nm::after{content:" · douteuse";font:600 11.5px/1 var(--txt);color:var(--warn)}
 .logrow .lgchev{color:var(--muted);font-size:12px;margin-left:4px}
 #dtabs .pill[data-dvg]{flex:1 0 auto}
+/* lot 114 : Réglages du bloc en volets, explications derrière « i », hors bloc en bas, objectif sur 3 lignes */
+.liftcard:not(.chinfo) .aex{display:none!important}
+#assign .liftcard .row .chi{align-self:center;flex:0 0 auto;margin-left:0}
+#assign details.asec{border-top:1px solid var(--rule);margin-top:8px}
+#assign details.asec>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:9px 0;min-height:44px;box-sizing:border-box;justify-content:center}
+#assign details.asec>summary::-webkit-details-marker{display:none}
+#assign .asect{font:600 14px/1.3 var(--txt)}
+#assign .asect::before{content:"\25b8";display:inline-block;width:1.1em;color:var(--muted)}
+#assign details.asec[open]>summary .asect::before{content:"\25be"}
+#assign .asecsum{font:400 12.5px/1.35 var(--txt);color:var(--muted);padding-left:1.25em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#assign details.asec[open]>summary .asecsum{display:none}
+#assign .asecb{padding-bottom:6px}
+#assign .asecb>.row:first-child{margin-top:0!important}
+#assign details.asgoff{border-top:1px solid var(--rule);padding-top:4px}
+#assign details.asgoff>summary{cursor:pointer;padding:10px 0;font:600 14px/1.3 var(--txt);min-height:44px;box-sizing:border-box}
+#assign details.asgoff>summary .note{display:block;font-weight:400;margin:2px 0 0}
+#assign details.asgoff .asgsum,#assign details.asgoff .asgmod{display:none}
+#assign .wmrow{flex-wrap:nowrap;gap:6px}
+#assign .wmrow .nm{flex:0 0 1.1em;color:var(--muted)}
+#assign .wmrow .wedit{flex-wrap:nowrap;gap:3px}
+#assign .wmrow .wedit{white-space:nowrap;font-size:13px}
+#assign .wmrow .wedit input.wn{width:2.7em;padding:3px;font-size:14px}
+#assign .wmrow .wedit select{max-width:6.3em;padding:3px 2px;font-size:13.5px}
+#assign .wmrow .wedit .mini{padding:0 7px;min-width:0}
+#assign .liftcard .row:has(> .chi) > .field{flex:1 1 0;min-width:0}
+@media (max-width:370px){ #assign .wmrow .wedit{flex-wrap:wrap} }
+#bgoal:not(:focus){max-height:5.4em;overflow:hidden}
 /* lot 78 : Programme en deux vues, menu ⚙ */
 .pseg{display:flex;gap:6px;margin:0 0 10px}
 .pseg .pill{flex:1 1 0;padding:11px 8px;font-family:var(--txt)}
@@ -1228,7 +1255,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v116';   /* lot 74 */
+var APPV='v118';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1354,6 +1381,7 @@ function load(){
     if(!S.m85){ if(S.sep==='*')S.sep='×'; S.m85=1; }   /* lot 85 : × par défaut (réponses refonte du 16/10) */
     if(!S.m83){ var lb83=(S.blocks||[])[(S.blocks||[]).length-1]; if(lb83&&!lb83.fq){ if(!S.cui||typeof S.cui!=='object')S.cui={}; if(!S.cui.open)S.cui.open={}; S.cui.open['fq'+lb83.id]=1; } S.m83=1; }   /* lot 83 : questionnaire du dernier bloc clos ouvert */
     if(!S.m81){ (S.blocks||[]).forEach(function(b){ if(+b.id===1&&b.learn==null)b.learn=1; }); S.m81=1; }   /* lot 81 (A9) : le bloc 1 */
+    if(!S.m114){ if(!S.fold)S.fold={}; (S.lifts||[]).forEach(function(L){ S.fold['a:'+L.name]=1; }); S.m114=1; }   /* lot 114 (P1) : cartes repliées une fois */
     if(!S.m78){ if(!S.fold)S.fold={}; (S.lifts||[]).forEach(function(L){ S.fold['a:'+L.name]=1; }); S.m78=1; }   /* lot 78 (P2) : mouvements repliés sur leur résumé */
     if(!S.m77){ if(!S.fold)S.fold={}; S.fold['c:cardsauve']=1; S.m77=1; }   /* lot 77 : Sauvegarde repliée au premier passage */
     if(!S.veloJuge)S.veloJuge={};
@@ -2583,7 +2611,7 @@ function warmEditor(L,i,P){
   var ks=warmKinds(L);
   var rows=P.warmL.map(function(w,q){
     var a=' data-i="'+i+'" data-f="wm" data-q="'+q+'"';
-    return '<div class="line wrow wmrow"><span class="nm">Montée '+(q+1)+'</span><span class="wedit">'+
+    return '<div class="line wrow wmrow"><span class="nm" title="Montée '+(q+1)+'">'+(q+1)+'</span><span class="wedit">'+   /* lot 114 (P4) */
       '<select'+a+' data-k="bw" aria-label="PdC ou lest"><option value="1"'+(w.bw?' selected':'')+'>'+(L.useBw?'PdC':'barre seule')+'</option>'+
         '<option value="0"'+(w.bw||w.kg!=null?'':' selected')+'>% du lest</option><option value="2"'+(!w.bw&&w.kg!=null?' selected':'')+'>lest fixe</option></select>'+   /* lot 59 */
       (w.bw?'':w.kg!=null?' <input class="numin wn"'+a+' data-k="kg" inputmode="decimal" value="'+F(+w.kg)+'" aria-label="lest fixe"> kg'
@@ -2594,7 +2622,7 @@ function warmEditor(L,i,P){
       (w.kind==='autre'?' <input type="text" class="wtxt"'+a+' data-k="txt" value="'+esc(w.txt||'')+'" placeholder="précisez" aria-label="type, précisez">':'')+
       ' <button type="button" class="act ghost mini"'+a+' data-wm="del" aria-label="retirer">×</button></span></div>';
   }).join('');
-  return '<div class="row" style="margin-top:8px"><div class="field w" style="flex:1 1 100%"><label>Échauffement — modèle (lest en % du lest du top set)</label>'+
+  return '<div class="row" style="margin-top:8px"><div class="field w" style="flex:1 1 100%"><label>Modèle : montée, PdC ou lest (% du top set), reps, type</label>'+
     (rows||'<p class="note">Aucune montée.</p>')+
     '<div class="btnrow" style="margin-top:4px"><button type="button" class="act ghost mini" data-i="'+i+'" data-f="wm" data-wm="add">+ montée</button></div></div></div>'+
     (P.warmOld?'<p class="note">Partie de l\'ancien modèle non reconnue, gardée pour mémoire : <b>'+esc(P.warmOld)+'</b>.</p>':'')+
@@ -3329,7 +3357,10 @@ document.addEventListener('click',function(ev){
   var k=h.getAttribute('data-fold'); if(!k||k.indexOf(':')<0)return;
   if(!S.fold)S.fold={};
   if(S.fold[k])delete S.fold[k]; else S.fold[k]=1;
+  var op=k.indexOf('a:')===0&&!S.fold[k];   /* lot 114 (P1) : une seule carte de mouvement ouverte */
+  if(op)S.lifts.forEach(function(L){ if('a:'+L.name!==k)S.fold['a:'+L.name]=1; });
   save(); applyFolds();
+  if(op){ var r=h.getBoundingClientRect(); if(r.top<70||r.top>innerHeight*0.6)scrollBy(0,r.top-70); }
 });
 $('foldall').addEventListener('click',function(){
   var hs=document.querySelectorAll('[data-fold]'), open=false;
@@ -4983,7 +5014,7 @@ function renderAssign(){
       var pl=accPlan(L,i), last=pl[pl.length-1];
       return '<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
         '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+esc(L.name)+'</div>'+
-        '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>'+
+        '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>'+ASM('acc')+   /* lot 114 */
         '<div class="row" style="margin-top:8px">'+
           '<div class="field w" style="flex:1 1 100%"><label>Jours</label><div class="daypick">'+
             ADAYS.map(function(d){var on=accDaysOf(P).indexOf(d)>=0;
@@ -5013,7 +5044,7 @@ function renderAssign(){
         (P.accHiWas?hardFlag('Fourchette de reps corrigée',   /* D8 */
           'La borne haute était à '+F(P.accHiWas)+' reps, ce qui ne peut venir que d\'une saisie. Elle est ramenée à '+
           (+P.accHi||10)+' : au-delà de 30 reps la double progression ne monte jamais en charge.'):'')+
-        goalField(L,i,P)+descField(L,i,P)+tipsFor(L,i,P,t)+   /* lot 46 (R5) */   /* lot 53 */
+        ASM('goal')+goalField(L,i,P)+descField(L,i,P)+ASM('out')+tipsFor(L,i,P,t)+   /* lot 46 (R5) */   /* lot 114 */   /* lot 53 */
         (S.verbo==='min'?'':'<details'+(S.verbo==='full'?' open':'')+'><summary class="note">Comment lire ce programme</summary>'+
           '<p class="note">'+t.note+' <b class="src">Source : '+t.src+'.</b></p>'+
           t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details>')+stopHTML(P.tpl)+'</div>';
@@ -5022,7 +5053,7 @@ function renderAssign(){
     var z=isZlat(P.tpl), ap=P.tpl==='advpeak';
     var h='<div class="liftcard c'+col(i)+'" style="padding-left:9px;margin-bottom:13px">'+
       '<div class="tagname n'+col(i)+'" style="margin-bottom:6px">'+L.name+tbLab(P,t)+'</div>'+
-      '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>';
+      '<div class="row"><div class="field w"><select data-i="'+i+'" data-f="tpl">'+groups+'</select></div></div>'+ASM('prog');   /* lot 114 : volets */
 
     /* variantes des séances secondaires */
     h+='<div class="row" style="margin-top:8px">'+
@@ -5049,6 +5080,7 @@ function renderAssign(){
     '</div>'+(z&&t.ranges?runRule(L,P,t):'')+(t.vline?vlineHTML(L,i,P):'');   /* lot 56 */
 
     /* charge de départ */
+    h+=ASM('start');   /* lot 114 */
     if(z){
       h+='<div class="row" style="margin-top:8px">'+
         '<div class="field md"><label>Charge de départ</label><select data-i="'+i+'" data-f="startMode">'+
@@ -5121,8 +5153,8 @@ function renderAssign(){
           return 'µ'+(m+1)+' '+F(rnd(tg,L.step))+' kg';
         }).join(' · ')+'. Le saut se décide <b>après</b> chaque single, selon sa facilité : c\'est le mécanisme central du programme, pas un réglage à figer.</p>';
     }
-    h+=warmEditor(L,i,P);   /* lot 47 (Q-47a) */
-    h+=goalField(L,i,P)+descField(L,i,P)+volFlag(i,L)+tipsFor(L,i,P,t);   /* lot 53 */   /* lot 46 (R5) */   /* D12 */
+    h+=ASM('warm')+warmEditor(L,i,P);   /* lot 47 (Q-47a) */   /* lot 114 */
+    h+=ASM('goal')+goalField(L,i,P)+descField(L,i,P)+ASM('out')+volFlag(i,L)+tipsFor(L,i,P,t);   /* lot 53 */   /* lot 46 (R5) */   /* D12 */
     if(S.verbo!=='min')h+='<details'+(S.verbo==='full'?' open':'')+'><summary class="note">Comment lire ce programme</summary>'+
       '<p class="note">'+t.note+' <b class="src">Source : '+t.src+'.</b></p>'+
       t.info.map(function(x){return '<p class="note">— '+x+'</p>';}).join('')+'</details>';
@@ -5131,7 +5163,7 @@ function renderAssign(){
   }).join('');
   if(ASGT==='assign'){var bgi=$('bgoal'); if(bgi&&document.activeElement!==bgi)bgi.value=S.blockGoal||''; bgoalFit(); joursFill();}   /* lot 53 ; lot R1 : conseils des jours */
   Array.prototype.forEach.call($(ASGT).querySelectorAll('[data-f=tpl]'),function(s){s.value=S.lifts[+s.dataset.i].prog.tpl;});
-  if(ASGT==='assign')asgSum();   /* lot 78 (P2) */
+  if(ASGT==='assign'){ asgSum(); asgVolets(); }   /* lot 78 (P2) ; lot 114 */
   applyFolds();
 }
 /* lot 45 : la saisie (asgSet) est separee de ses effets, pour servir aussi au panneau du brouillon. Elle rend
@@ -5773,6 +5805,74 @@ function asgSumTxt(i,T){
   if(o&&o.a!=null)s+=' · '+(o.b!=null&&Math.abs(o.b-o.a)>0.01?'S'+(o.w0+1)+' ':'')+loadKg(L,o.a)+(o.b!=null&&o.w1!==o.w0&&Math.abs(o.b-o.a)>0.01?' → S'+(o.w1+1)+' '+loadKg(L,o.b):'');
   return s;
 }
+/* Lot 114 (P2, P3, P5) : dans Réglages du bloc, chaque carte de mouvement se découpe en volets repliés (marqueurs
+   ASM posés par renderAssign), chacun avec une ligne de résumé ; les explications (p.note sans couleur d'alerte,
+   « Comment lire », règle d'arrêt) passent derrière le « i » de la carte (clé cui().info.asg) ; les alertes
+   (.flag, notes orange et leur bouton) restent visibles sous le volet. Mouvements hors bloc rangés en bas.
+   L'ouverture des volets vit dans ASEC (le temps de la session), pour survivre au redessin après chaque saisie. */
+var ASEC={}, ASECT={prog:'Progression',start:'Charge de départ',warm:'Échauffement',goal:'Objectif et exécution',acc:'Séances et progression'};
+function ASM(k){ return ASGT==='assign'?'<i class="asecm" data-s="'+k+'"></i>':''; }
+function asecWarn(n){ return n.nodeType===1&&(n.classList.contains('flag')||/--warn/.test(n.getAttribute('style')||'')); }
+function asecSum(k,box){
+  var g=function(r,f){ var e=r.querySelector('[data-f="'+f+'"],[data-k="'+f+'"]'); return e&&String(e.value).trim()!==''?String(e.value).trim():null; };
+  if(k==='warm')return Array.prototype.map.call(box.querySelectorAll('.wmrow'),function(r){
+    var b=g(r,'bw'), o=r.querySelector('[data-k=bw] option[value="1"]');
+    return (b==='1'?(o?o.textContent:'PdC'):g(r,'kg')!=null?g(r,'kg')+' kg':(g(r,'pct')||0)+' %')+'×'+(g(r,'reps')||'?');
+  }).join(' · ')||'aucune montée';
+  if(k==='goal'){ var t=[], gl=g(box,'gLoad'), gr=g(box,'gReps'), gm=g(box,'gRm'), d=g(box,'desc');
+    if(gl)t.push(F(+gl)+' kg'+(gr?' × '+gr:'')); if(gm)t.push('1RM '+F(+gm)+' kg'); if(d)t.push(d);
+    return t.length?t.map(esc).join(' · '):'rien de fixé'; }
+  var out=[];
+  Array.prototype.forEach.call(box.querySelectorAll('select,input'),function(e){
+    var v='';
+    if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; v=o?o.textContent:''; }
+    else if(e.type==='checkbox'){ if(e.dataset.f==='accDayT'&&e.checked)v=e.dataset.d; }
+    else if(e.type!=='radio')v=e.value;
+    v=String(v||'').trim(); if(v)out.push(esc(v));
+  });
+  return out.join(' · ')||'—';
+}
+function asgVolets(){
+  var a=$('assign'); if(!a||!a.querySelectorAll)return; var offs=[];
+  Array.prototype.forEach.call(a.querySelectorAll(':scope > .liftcard'),function(c){
+    var s=c.querySelector('[data-f=tpl]'); if(!s)return; var i=+s.dataset.i, L=S.lifts[i]; if(!L)return;
+    if(L.prog.tpl==='off'||!tplOf(L.prog.tpl)){ offs.push(c); return; }
+    var ms=c.querySelectorAll(':scope > .asecm'); if(!ms.length)return;
+    c.setAttribute('data-chk','asg');
+    var row=s.closest('.row'); if(row)row.insertAdjacentHTML('beforeend',chIB('asg'));
+    Array.prototype.forEach.call(ms,function(m){
+      var k=m.getAttribute('data-s'), nodes=[], n=m.nextSibling;
+      while(n&&!(n.nodeType===1&&n.classList.contains('asecm'))){ nodes.push(n); n=n.nextSibling; }
+      var keep=[], body=[], prevW=false, prevX=false;
+      nodes.forEach(function(x){
+        if(x.nodeType!==1){ return; }
+        var btn=x.classList.contains('btnrow');
+        if(asecWarn(x)||(btn&&prevW)){ keep.push(x); prevW=!btn; prevX=false; return; }
+        if((x.tagName==='P'&&x.classList.contains('note'))||(x.tagName==='DETAILS'&&!x.classList.contains('flag'))||(btn&&prevX)){ x.classList.add('aex'); prevX=!btn; }
+        else prevX=false;
+        prevW=false; body.push(x);
+      });
+      if(k==='out'){ m.parentNode.removeChild(m); return; }
+      var key=i+':'+k, d=document.createElement('details');
+      d.className='asec'; d.setAttribute('data-asec',key); if(ASEC[key])d.open=true;
+      var w=document.createElement('div'); w.className='asecb';
+      body.forEach(function(x){ w.appendChild(x); });
+      d.innerHTML='<summary><span class="asect">'+ASECT[k]+'</span><span class="asecsum">'+asecSum(k,w)+'</span></summary>';
+      d.appendChild(w);
+      m.parentNode.replaceChild(d,m);
+      var after=d; keep.forEach(function(x){ after.parentNode.insertBefore(x,after.nextSibling); after=x; });
+      if(!body.length)d.parentNode.removeChild(d);
+    });
+  });
+  if(offs.length){
+    var d=document.createElement('details'); d.className='asgoff'; d.setAttribute('data-asec','off'); if(ASEC.off)d.open=true;
+    d.innerHTML='<summary>Pas dans ce bloc ('+offs.length+') <span class="note">'+offs.map(function(c){ var t=c.querySelector('.tagname'); return esc(t?t.firstChild&&t.firstChild.textContent||'':''); }).join(', ')+'</span></summary>';
+    offs.forEach(function(c){ d.appendChild(c); });
+    a.appendChild(d);
+  }
+  chInfo();
+}
+document.addEventListener('toggle',function(ev){ var d=ev.target; if(!d||!d.getAttribute)return; var k=d.getAttribute('data-asec'); if(k){ if(d.open)ASEC[k]=1; else delete ASEC[k]; } },true);
 function asgSum(){
   var a=$('assign'); if(!a||!a.querySelectorAll)return; var T=brTops();
   Array.prototype.forEach.call(a.querySelectorAll(':scope > .liftcard'),function(c){
