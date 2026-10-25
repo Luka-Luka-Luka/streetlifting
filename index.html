@@ -892,7 +892,6 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="row">
         <div class="field sm" id="chnbwf"><label for="chnbw">PdC</label><input id="chnbw" class="numin" type="text" inputmode="decimal"></div>
         <div class="field sm"><label for="chnlo">Lest (kg)</label><input id="chnlo" class="numin" type="text" inputmode="decimal"></div>
-        <div class="field md"><label for="chnsrc">e1RM</label><select id="chnsrc"><option value="last">du dernier top set</option><option value="carte">base de la carte</option></select></div>   <!-- lot 117 -->
       </div>
       <p class="note" id="chnout"></p>
     </details>
@@ -1270,7 +1269,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v123';   /* lot 74 */
+var APPV='v124';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -4377,20 +4376,14 @@ function chReps(){
   var L=cur(), p=num($('chnbw').value,null), lo=num($('chnlo').value,null), o=$('chnout');
   $('chnbwf').hidden=!L.useBw; $('chnbw').placeholder=F(chBw());
   $('chnlo').placeholder=L.useBw?'négatif = assistance':'kg';
-  /* lot 117 : par défaut, e1RM du dernier top set réussi à réserve notée (progRows, même unité que CRM) */
-  var src=S.cNSrc==='carte'?'carte':'last', RM=CRM, lt=null; $('chnsrc').value=src;
-  if(src==='last'){ var rw=progRows(S.lifts.indexOf(L)).filter(function(r){return r.rm>0;}); lt=rw[rw.length-1]||null; if(lt)RM=lt.rm; }
-  var bs=lt?'<br><span class="note">e1RM du top set du '+frDate(lt.date)+' ('+esc(lt.day)+', '+loadKg(L,+lt.top.load||0)+' × '+lt.top.sets[lt.top.sets.length-1]+', '+F(lt.rir)+' en réserve).</span>':
-    src==='last'?'<br><span class="note">Aucun top set à réserve notée : base de la carte.</span>':'';
   if(lo===null){ o.innerHTML='Tapez un lest'+(L.useBw?' (et votre PdC si ce n’est pas '+F(chBw())+' kg)':'')+' : l’outil donne les reps jusqu’à l’échec.'; return; }
-  var P=L.useBw?((p!==null&&p>=30&&p<=250)?p:chBw()):0, sys=eff(L,P)+lo, n=sys>0?(RM/sys-1)/L.k+1:NaN;
-  if(!(n>=1)){ o.innerHTML='<b>Au-dessus du 1RM estimé</b> ('+F(rnd(RM-eff(L,P),0.25))+' kg de lest à ce PdC).'+bs; return; }
+  var P=L.useBw?((p!==null&&p>=30&&p<=250)?p:chBw()):0, sys=eff(L,P)+lo, n=sys>0?(CRM/sys-1)/L.k+1:NaN;
+  if(!(n>=1)){ o.innerHTML='<b>Au-dessus du 1RM estimé</b> ('+F(rnd(CRM-eff(L,P),0.25))+' kg de lest à ce PdC).'; return; }
   var f=Math.floor(n+1e-9), t=function(x){ return x>=1?x+' rep'+(x>1?'s':''):'—'; };
   o.innerHTML=f>30?'<b>Plus de 30 reps</b> jusqu’à l’échec : hors du domaine du modèle.':
     '<b>≈ '+t(f)+'</b> jusqu’à l’échec (± 1, modèle) · à 1 en réserve : '+t(f-1)+' · à 2 : '+t(f-2)+
-    (L.useBw?'<br>Charge totale '+F(rnd(P+lo,0.25))+' kg (PdC '+F(P)+' + '+F(lo)+').':'')+bs;
+    (L.useBw?'<br>Charge totale '+F(rnd(P+lo,0.25))+' kg (PdC '+F(P)+' + '+F(lo)+').':'');
 }
-$('chnsrc').addEventListener('change',function(){ S.cNSrc=this.value; save(); chReps(); });
 ['chnbw','chnlo'].forEach(function(id){ $(id).addEventListener('input',chReps); });
 function chInfo(){
   var c=cui();
