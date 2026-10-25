@@ -706,6 +706,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 /* lot 110 (P2) : affichage simplifié (S.simple, d'office hors Luka) */
 :root[data-simple] [data-dvg="vitesse"],:root[data-simple] #p-velo,:root[data-simple] #p-data [data-dv="prog"],:root[data-simple] #p-data [data-dv="courbe"],
 :root[data-simple] #nav button[data-p="charges"],:root[data-simple] .rk1rm,:root[data-simple] #cardrappel{display:none!important}
+:root[data-simple] nav{grid-template-columns:repeat(4,minmax(0,1fr))}   /* lot 116 : 4 onglets répartis sur toute la largeur */
 /* lot 109 (P1) : personnes */
 #profbar{margin:0 0 4px;font:400 12px/1.3 var(--txt);color:var(--muted)}   /* lot 112 : discret ; le choix est dans ⚙ */
 #profbar b{font-weight:600;color:var(--muted)}
@@ -1268,7 +1269,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v121';   /* lot 74 */
+var APPV='v122';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
