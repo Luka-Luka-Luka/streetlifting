@@ -9977,16 +9977,6 @@ function veloImport(d){
   S.velo.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
   return null;
 }
-/* Serie precedente comparable : meme mouvement, charge systeme a 1,25 kg pres.
-   A defaut de charge systeme (PdC absent), on compare a lest egal. */
-function veloRef(v){
-  var l=(S.velo||[]).filter(function(x){
-    if(x.id===v.id||x.mouvement!==v.mouvement||String(x.date)>=String(v.date))return false;
-    return (x.charge_systeme_kg!=null&&v.charge_systeme_kg!=null)
-      ? Math.abs(x.charge_systeme_kg-v.charge_systeme_kg)<=1.25 : x.lest_kg===v.lest_kg;
-  });
-  return l.length?l[l.length-1]:null;
-}
 /* ---------- etalon de validite des reps ----------
    Principe : c'est Luka qui juge quelques reps (touche / pas touche / franche), et le
    seuil en centimetres se deduit de ses jugements. Aucune connaissance a priori de la
@@ -10623,10 +10613,22 @@ function vScrCmp(){
       '<button class="pill" data-vcmode="choix" aria-pressed="'+(U.cmode==='choix')+'">Séries choisies</button></div>'+
     (U.cmode==='choix'?vScrChoix():vScrComparer());
 }
+/* lot 120 bis (audit Vitesse 26/10) : la référence de « Comparer avec… » : même mouvement, même variante, même type de
+   série, charge système à 1,25 kg près (lest égal sans PdC), la plus récente avant celle-ci (le même jour : ordre n).
+   Remplace veloRef (v26), qui ne regardait ni variante ni type et n'avait plus d'autre appelant. */
+function vcRef(v){
+  var l=(S.velo||[]).filter(function(x){
+    if(x.id===v.id||x.mouvement!==v.mouvement||String(x.variante||'')!==String(v.variante||'')||typeLab(x)!==typeLab(v))return false;
+    if(!(String(x.date)<String(v.date)||(x.date===v.date&&vSortN(x,v)<0)))return false;
+    return (x.charge_systeme_kg!=null&&v.charge_systeme_kg!=null)?Math.abs(x.charge_systeme_kg-v.charge_systeme_kg)<=1.25+1e-6:+x.lest_kg===+v.lest_kg;
+  }).sort(function(a,b){ return String(a.date).localeCompare(String(b.date))||vSortN(a,b); });
+  return l.length?l[l.length-1]:null;
+}
 function vcLoadLab(v){ return +v.lest_kg?'+'+F(v.lest_kg)+' kg':'PdC'; }
-function vcDelta(d,k,good){   /* good : 1 si plus haut = mieux, −1 si plus bas = mieux */
+function vcDelta(d,k,good,mg){   /* good : 1 si plus haut = mieux, −1 si plus bas = mieux ; mg : marge de mesure, écart sans couleur en deçà */
   if(d==null)return '';
   var r=Math.round(d*k)/k; if(!r)return ' <small>= réf.</small>';
+  if(mg&&Math.abs(d)<mg)return ' <small>'+(r>0?'+':'−')+F(Math.abs(r))+'</small>';
   return ' <b class="'+((r>0)===(good>0)?'up':'dn')+'">'+(r>0?'+':'−')+F(Math.abs(r))+'</b>';
 }
 function vcStats(v,P){
@@ -10665,23 +10667,23 @@ function vScrChoix(){
     if(oldH)h+='<p class="note">Une série a l’ancienne mesure de hauteur : ses hauteurs ne se comparent pas aux autres.</p>';
     h+=sel.map(function(v,i){
       var o=st[i], ref=i===0, d=function(a,b){return ref||a==null||b==null?null:a-b;};
-      var lines='<dt>1re rep</dt><dd>'+(o.v1==null?'—':v2(o.v1)+' m/s')+vcDelta(d(o.v1,R.v1),100,1)+'</dd>'+
+      var lines='<dt>1re rep</dt><dd>'+(o.v1==null?'—':v2(o.v1)+' m/s')+vcDelta(d(o.v1,R.v1),100,1,0.07)+'</dd>'+
         '<dt>vs votre droite</dt><dd>'+(o.dw==null?'<small>'+(v.variante?'variante : pas de droite':!P?'pas encore de droite (Profil)':'—')+'</small>':
           (Math.abs(o.dw)<=0.07?'habituelle':(o.dw>0?'<b class="vsok">au-dessus</b>':'<b class="vswarn">en dessous</b>'))+
           ' <small>('+(Math.round(o.dw*100)?(o.dw>0?'+':'−')+v2(Math.abs(o.dw))+' m/s vs attendu':'= attendu')+')</small>')+'</dd>'+
-        '<dt>Dernière rep</dt><dd>'+(o.vl==null?'—':v2(o.vl)+' m/s')+(o.fin?' <small>(après une pause : non comparable)</small>':vcDelta(R.fin?null:d(o.vl,R.vl),100,1))+'</dd>'+
+        '<dt>Dernière rep</dt><dd>'+(o.vl==null?'—':v2(o.vl)+' m/s')+(o.fin?' <small>(après une pause : non comparable)</small>':vcDelta(R.fin?null:d(o.vl,R.vl),100,1,0.07))+'</dd>'+
         '<dt>Perte de vitesse</dt><dd>'+(o.pe==null?'—':F(Math.round(o.pe))+' %')+vcDelta(d(o.pe,R.pe),1,-1)+'</dd>'+
-        '<dt>Hauteur mini</dt><dd>'+(o.mn==null?'—':F(o.mn)+' cm')+(vRef(v)!==vRef(sel[0])?'':vcDelta(d(o.mn,R.mn),10,1))+'</dd>'+
+        '<dt>Hauteur mini</dt><dd>'+(o.mn==null?'—':F(o.mn)+' cm')+(vRef(v)!==vRef(sel[0])?'':vcDelta(d(o.mn,R.mn),10,1,VBANDE))+'</dd>'+
         '<dt>Reps valides</dt><dd>'+(o.nv==null?'—':o.nv+' / '+o.n)+'</dd>'+
         '<dt>Réserve notée</dt><dd>'+(o.rir==null?'—':F(o.rir))+'</dd>';
       return '<div class="vccard"><div class="vsvh"><b>'+frDate(v.date)+' · '+serieLab(v)+'</b><span class="tag">'+(ref?'référence':'vs réf.')+'</span></div>'+
-        '<p class="note" style="margin:2px 0 0">'+(o.cs!=null?'charge système '+F(o.cs)+' kg':'PdC absent')+(v.semaine?' · S'+v.semaine+' J'+v.seance:'')+
+        '<p class="note" style="margin:2px 0 0">'+(o.cs!=null?'charge système '+F(o.cs)+' kg':'PdC absent')+(v.semaine?' · S'+v.semaine+(v.seance!=null?' J'+v.seance:''):'')+
           ' · <button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></p>'+
         '<dl class="vsvl">'+lines+'</dl>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>';
     }).join('');
-    h+='<p class="note">Écarts avec la référence, la 1re série choisie. Couleur : vert = mieux, rouge = moins bien. '+
-      'Un écart de vitesse de moins de 0,07 m/s n’est pas mesurable (Weakley 2021). Barres à la même échelle.</p>';
-  }else h+='<p class="note" style="margin-top:8px"><b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La 1re cochée sert de référence.</p>';
+    h+='<p class="note">Écarts avec la référence, la 1re série choisie. Vert = mieux, rouge = moins bien. '+
+      'En gris : écart sous la marge de mesure (0,07 m/s pour la vitesse, Weakley 2021 ; '+F(VBANDE)+' cm pour la hauteur). Barres à la même échelle.</p>';
+  }else h+='<p class="note" style="margin-top:8px">'+(sel.length===1?'Aucune série d’avant au même lest, de même type et même variante : ':'')+'<b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La 1re cochée sert de référence.</p>';
   var list=all.filter(function(v){ return (!U.cload||vcLoadLab(v)===U.cload)&&(U.ctyp2==='tous'||typeLab(v)===U.ctyp2); });
   var full=U.csel.length>=VCMAX;
   var rows=list.map(function(v){
@@ -10711,7 +10713,7 @@ function vScrSerie(v){
       F(r.vitesse_point_dur_ms)+' m/s à '+F(r.hauteur_point_dur_cm)+' cm</td></tr>';}).join('');
   return '<div class="card"><button class="linkbtn" data-vback="1">‹ Retour</button>'+
     '<div class="vtitle">'+serieLab(v)+'</div>'+
-    '<p class="note" style="margin-top:2px">'+frDate(v.date)+' · '+esc(v.mouvement)+(v.semaine?' · S'+v.semaine+' J'+v.seance:'')+
+    '<p class="note" style="margin-top:2px">'+frDate(v.date)+' · '+esc(v.mouvement)+(v.semaine?' · S'+v.semaine+(v.seance!=null?' J'+v.seance:''):'')+
       (v.charge_systeme_kg?' · charge système '+F(v.charge_systeme_kg)+' kg':'')+'</p>'+
     '<div class="btnrow" style="margin:6px 0 8px"><button class="act ghost mini" data-vcmp="'+esc(v.id)+'">Comparer avec… ›</button></div>'+   /* lot 120 */
     '<div class="scroll"><table><thead><tr><th>Rep</th><th>Hauteur cm</th><th>Vitesse m/s</th><th>Votre jugement</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
@@ -10954,7 +10956,7 @@ $('p-velo').addEventListener('click',function(e){
   var cm=e.target.closest?e.target.closest('[data-vcmp],[data-vcmode]'):null;   /* lot 120 */
   if(cm){ var U0=vui();
     if(cm.dataset.vcmode)U0.cmode=cm.dataset.vcmode;
-    else{ var v0=vById(cm.dataset.vcmp); if(!v0)return; var r0=veloRef(v0);
+    else{ var v0=vById(cm.dataset.vcmp); if(!v0)return; var r0=vcRef(v0);
       U0.cmode='choix'; U0.cmv=v0.mouvement; U0.csel=r0?[r0.id,v0.id]:[v0.id]; U0.cload=''; U0.ctyp2='tous'; window.scrollTo(0,0); }
     U0.scr='comparer'; save(); renderVelo(); return; }
   var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
