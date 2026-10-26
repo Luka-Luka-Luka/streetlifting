@@ -167,7 +167,7 @@ button.act.mini{padding:5px 8px;font-size:12px}
 button:disabled{opacity:.35;pointer-events:none}
 .pill[data-sel]{box-shadow:0 0 0 2px var(--ink)}
 .pill.sub{color:var(--muted)}
-.tpo{display:block;font-size:12px;color:var(--muted);flex-basis:100%}.tpc{color:var(--muted);font-size:12px}.tped .tplab{display:block;font-size:12px;margin-bottom:4px}.tpf[hidden]{display:none}   /* lot 118 */
+.tpc{color:var(--muted);font-size:12px}.tped .tplab{display:block;font-size:12px;margin-bottom:4px}.tpf[hidden]{display:none}   /* lot 118 */
 .iconbtn.sq{flex:0 0 auto;width:34px;height:32px;padding:0;font-size:15px;line-height:1;
   display:inline-flex;align-items:center;justify-content:center}
 .iconbtn{font:600 12px/1 var(--txt);padding:7px 9px;border:1px solid var(--rule);background:var(--surface);
@@ -1270,7 +1270,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v125';   /* lot 74 */
+var APPV='v126';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -5689,9 +5689,8 @@ function renderPlan(into,weeks,pfx,scope){
         html+='<div class="line '+(st?'s-'+st:'')+(e80&&e80.doubt?' dbt':(aComp(e80)?' acp':''))+'" data-key="'+x.key+'">'+
           '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+pctHTML(x)+'</span>'+
-          (x.tempo?'<span class="tpo">⏱ '+tpTxt(S.lifts[x.li],x.tempo)+'</span>':'')+   /* lot 118 */   /* lot 58 : % du 1RM du moment */
           (pfx==='t'?'':infoHTML(x.info))+'</div>'+(pfx==='t'?'<div class="tdet" data-det="'+x.key+'">'+(x.info?'<p class="note tdin">'+x.info+'</p>':'')+
-          descLine(x,day)+lastPerfHTML(x)+recordHTML(x,day.label)+'</div>':'');   /* lot 46 (R5) ; lot R3 : le détail s'ouvre avec la ligne */
+          descLine(x,day)+(x.tempo?'<div class="lastp descp">⏱ Tempo : '+tpTxt(S.lifts[x.li],x.tempo)+'</div>':'')+lastPerfHTML(x)+recordHTML(x,day.label)+'</div>':'');   /* lot 118 bis : tempo dans le détail, au clic */   /* lot 46 (R5) ; lot R3 : le détail s'ouvre avec la ligne */
         txt+='  '+x.name+' '+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+(x.tempo?' tempo '+tpTxt(S.lifts[x.li],x.tempo):'')+' ('+x.info+')\n';
       });
       if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
