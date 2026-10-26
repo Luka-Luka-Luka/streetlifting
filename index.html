@@ -1283,7 +1283,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v128';   /* lot 74 */
+var APPV='v129';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -5785,21 +5785,21 @@ function seancesPage(){
   if(SIM)return null;
   var li=-1; S.lifts.forEach(function(L,i){ if(li<0&&(L.catId==='pullup'||/traction/i.test(L.name||'')))li=i; });
   var out=[];
-  if(li>=0)PLAN.forEach(function(wk){ if(wk.dl)return; wk.days.forEach(function(dd,di){   /* lot 59 */
-    var L=S.lifts[li], leger=jourLeger(L,dd.label);   /* J2 de Zlat / Helms : toutes les series en « secondaire » */
-    var ty=function(x){return leger?'secondaire':(PROLE[x.role]||(x.role==='work'?'back-off':null));};
+  if(li>=0)PLAN.forEach(function(wk){ wk.days.forEach(function(dd,di){   /* lot 59 ; lot 121 (audit Vitesse, 15) : le deload aussi */
+    var L=S.lifts[li], leger=!wk.dl&&jourLeger(L,dd.label);   /* J2 de Zlat / Helms : toutes les series en « secondaire » */
+    var ty=function(x){return wk.dl?'deload':leger?'secondaire':(PROLE[x.role]||(x.role==='work'?'back-off':null));};
     var xs=dd.lines.filter(function(x){return x.li===li&&ty(x);}); if(!xs.length)return;
     var series=[], fait=false, pdc=null, dfait='';
     xs.forEach(function(x){
       var e=entryOf(x.key), ok=!!(e&&e.state!=='skip'&&e.sets&&e.sets.length), n=ok?e.sets.length:Math.max(1,+x.sets||1);
       if(ok){ fait=true; if(pdc==null&&+e.bw>0)pdc=+e.bw; if(!dfait&&e.date)dfait=String(e.date).slice(0,10); }
       for(var k=0;k<n;k++)series.push({type:ty(x),lest:ok?(e.load==null?0:+e.load):(x.load==null?0:+x.load),
-        reps:ok?(e.sets[k]==null?null:+e.sets[k]):repHaut(x.reps),variante:varPage(L,x,leger)});
+        reps:ok?(e.sets[k]==null?null:+e.sets[k]):repHaut(x.reps),variante:varPage(L,x,leger)||(tpOut(ok&&e.tempo?e.tempo:x.tempo)?'tempo':'')});   /* lot 121 (16) : tempo imposé */
     });
     /* series de travail sans top set (Helms) : la premiere tient lieu de top set */
     if(!leger&&!series.some(function(s){return s.type==='top set';})&&series[0].type==='back-off')series[0].type='top set';
     var date=dfait||dayISO(wk.w,dd.label), j=['J1','J2','J3','J4'].indexOf(dd.label);
-    out.push({date:date,semaine:wk.w+1,seance:j>=0?j+1:di+1,label:dd.label,
+    out.push({date:date,semaine:wk.dl?null:wk.w+1,seance:wk.dl?null:(j>=0?j+1:di+1),label:wk.dl?'Deload':dd.label,
       type:series.some(function(s){return s.type==='top set';})?'principale':'secondaire',
       pdc:pdc!=null?pdc:(date===todayISO()&&S.tbw!=null?+S.tbw:+S.bw),fait:fait,series:series});
   });});
@@ -9972,6 +9972,10 @@ function veloImport(d){
   if(!d.reps||!d.reps.length)return ((d.alertes||[])[0]||'aucune rep dans le fichier');
   if(!d.date)return 'date absente du fichier';
   var t=veloTrim(d);
+  /* lot 121 (audit Vitesse, 1) : une analyse renvoyée ou réimportée garde son rattachement (choisi à la main, confirmé ou
+     « aucune ») ; un rattachement automatique n'est gardé que si le lest et le type n'ont pas changé, sinon il se refait. */
+  var old=(S.velo||[]).filter(function(x){return x.id===t.id;})[0];
+  if(old&&old.lien&&(!old.lien.auto||(+old.lest_kg===+t.lest_kg&&String(old.type_serie||'')===String(t.type_serie||''))))t.lien=old.lien;
   S.velo=(S.velo||[]).filter(function(x){return x.id!==t.id;});
   S.velo.push(t); bwFollow();   /* lot 40 */
   S.velo.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
@@ -10052,10 +10056,12 @@ function veloAuto(v){
     var ft=st===(e.tries||e.sets).length-1?finTot(e):null;   /* lot 57 bis : 4 + 1 filmés d'un bloc = 5 */
     c.push({e:e,s:st,m:(r===n||r===nOk||(ft&&ft===n)?2:0)+(role?1:0)});
   });});
+  var pris=function(x){ return (S.velo||[]).some(function(o){return o!==v&&o.lien&&o.lien.key===x.e.key&&o.lien.set===x.s;}); };
+  c=c.filter(function(x){ return !pris(x); });   /* lot 121 (audit Vitesse, 2) : une série déjà rattachée à une autre vidéo n'est plus candidate */
+  if(!c.length)return false;
   c.sort(function(a,b){return b.m-a.m;});
   if(c.length===1||(c[0].m>0&&c[1].m<c[0].m)){ setLien(v,{key:c[0].e.key,set:c[0].s,auto:1}); return true; }
   var tv=veloT(v); if(tv==null||!(c[0].m>0))return false;   /* lot 57 */
-  var pris=function(x){ return (S.velo||[]).some(function(o){return o!==v&&o.lien&&o.lien.key===x.e.key&&o.lien.set===x.s;}); };
   var tie=c.filter(function(x){return x.m===c[0].m&&!pris(x);}).map(function(x){ var a=x.e.at&&x.e.at[x.s]; return {x:x,d:a?(+a-tv):null}; });
   if(!tie.length||tie.some(function(y){return y.d==null;}))return false;
   tie=tie.filter(function(y){return y.d>=-60000&&y.d<=VTMAX;}).sort(function(a,b){return a.d-b.d;});
@@ -10120,7 +10126,7 @@ function vLienTxt(v){
   if(isFixe(v))return 'montée fixe : jamais rattachée';
   var e=lienEntry(v);
   if(!e)return '<b class="vswarn">non rattachée</b> <span class="muted">: '+vWhy(v)+' (détail › pour choisir)</span>'+
-    (isWarm(v)?'':' <button class="linkbtn" data-vrec="'+esc(v.id)+'">Enregistrer cette série</button>');   /* lot 90 (V5, V2) */
+    (isWarm(v)||vLibres(v).length?'':' <button class="linkbtn" data-vrec="'+esc(v.id)+'">Enregistrer cette série</button>');   /* lot 90 (V5, V2) ; lot 121 : pas si la série est déjà au journal */
   var n=(e.tries||e.sets).length;
   return roleLab(e.role,e.key)+(n>1?', série '+(v.lien.set+1)+' sur '+n:'')+
     (v.lien.ord?' · <span class="vswarn">par l’ordre, à vérifier</span> <button class="linkbtn" data-vok="'+esc(v.id)+'">c’est bon</button>':'');
@@ -10160,12 +10166,31 @@ function vWhy(v){
   if(!ec.length)return 'aucune série à '+(+v.lest_kg?F(v.lest_kg)+' kg':'PdC')+' enregistrée ce jour-là';
   var n=v.reps.length, nOk=vOk(v).length;
   if(!ec.some(function(e){ return (e.tries||e.sets).some(function(r){ return r===n||r===nOk; }); }))return 'aucune série de '+nOk+' reps à cette charge ce jour-là';
-  return 'plusieurs séries possibles';
+  /* lot 121 (audit Vitesse, 2) : la vraie raison, quand la série est au journal mais que rien ne tranche */
+  var lb=vLibres(v), ro=vRole(v);
+  if(!lb.length)return 'les séries de '+nOk+' reps à cette charge sont déjà rattachées à d’autres vidéos';
+  if(ro&&lb.every(function(x){ return x.e.role!==ro; }))return 'la vidéo est notée '+typeLab(v).toLowerCase()+', le journal a '+roleLab(lb[0].e.role,lb[0].e.key);
+  return 'plusieurs séries possibles, et les heures notées ne tranchent pas';
+}
+/* lot 121 : séries du journal qui pourraient être celles de la vidéo (même jour, mouvement, charge, reps), pas encore rattachées */
+function vLibres(v){
+  var n=v.reps.length, nOk=vOk(v).length, out=[];
+  S.log.forEach(function(e){
+    if(e.date!==v.date||!(v.li<0||e.li===v.li)||!e.sets||!e.sets.length)return;
+    if(v.lest_kg!=null&&e.load!=null&&Math.abs(+e.load-(+v.lest_kg))>VLOADTOL)return;
+    (e.tries||e.sets).forEach(function(r,st){
+      if(r!==n&&r!==nOk)return;
+      if((S.velo||[]).some(function(o){ return o!==v&&o.lien&&o.lien.key===e.key&&o.lien.set===st; }))return;
+      out.push({e:e,s:st});
+    });
+  });
+  return out;
 }
 /* lot 90 (V2) : la vidéo crée sa série. Séance de ce jour-là (d'après les séries déjà enregistrées, sinon la séance choisie),
    ligne prévue du même mouvement et du même type : vide → elle reçoit la série ; même charge → une série de plus ; sinon ajout ponctuel. */
 function vRecord(v){
   if(!v||v.lien)return 'déjà rattachée';
+  if(vLibres(v).length)return 'une série à cette charge est déjà au journal : choisissez-la dans le détail';   /* lot 121 */
   buildPlan();
   var L=S.lifts[v.li]; if(!L)return 'mouvement inconnu dans l\'outil';
   var lest=v.lest_kg==null?null:+v.lest_kg, n=vOk(v).length||v.reps.length, ro=vRole(v)||'back';
@@ -10191,7 +10216,7 @@ function vRecord(v){
     if(!S.extra[sk])S.extra[sk]=[];
     S.extra[sk].push({id:id,li:v.li,load:lest,reps:String(n),sets:1,src:x?x.key:null,info:'enregistrée depuis la vidéo'});
     buildPlan(); key='x|'+v.li+'|'+w+'|'+lab+'|'+id+BK();
-    var f=findLine(key); if(!f)return 'ajout impossible';
+    var f=findLine(key); if(!f){ S.extra[sk]=S.extra[sk].filter(function(q){ return q.id!==id; }); if(!S.extra[sk].length)delete S.extra[sk]; buildPlan(); return 'ajout impossible'; }   /* lot 121 : pas d'ajout fantôme */
     var e2={v:SCHEMA,id:key,key:key,date:v.date,li:v.li,lift:L.name,tpl:L.prog.tpl,week:w+1,day:lab,role:f.line.role,presLoad:lest,presReps:String(n),presSets:1,
       load:lest,sets:[n],rir:null,bw:v.poids_corps_kg!=null?+v.poids_corps_kg:S.bw,note:'',setNotes:[],state:null,vrec:1};
     if(f.line.tempo)e2.tempo=f.line.tempo;   /* lot 118 */
@@ -10502,8 +10527,9 @@ function scaleOf(list,mes){
   var lo=Math.min.apply(null,xs), hi=Math.max.apply(null,xs);
   return mes==='v'?{lo:0,hi:hi*1.12}:{lo:Math.min(0,Math.floor(lo)),hi:Math.ceil(hi+3)};   /* lot 66 (Q18) : barres depuis 0 */
 }
-function vMini(v){ var h=v.reps.map(function(r){return hOf(v,r);}).filter(function(x){return x!=null;}); return h.length?Math.min.apply(null,h):null; }
-function vLast(v){ var r=v.reps[v.reps.length-1]; return r?r.vitesse_moy_ms:null; }
+/* lot 121 (audit Vitesse, 5) : une tentative ratée n'est ni la dernière rep ni la hauteur mini (elle reste dans les barres, marquée ❌) */
+function vMini(v){ var h=v.reps.filter(function(r){return !r.tentative_ratee;}).map(function(r){return hOf(v,r);}).filter(function(x){return x!=null;}); return h.length?Math.min.apply(null,h):null; }
+function vLast(v){ return vLastOk(v); }
 function serieRow(v,sc,idx){
   var s=seuilOf(v), mn=vMini(v), vl=vLast(v), m=(s&&mn!=null)?mn-s.valide:null, al=(v.alertes||[]).length;
   return '<div class="vrow" data-vopen="'+esc(v.id)+'">'+
@@ -10760,7 +10786,7 @@ function vScrSeuil(){
 }
 /* ---------- lot 76 : Séance en mots, Profil charge-vitesse ---------- */
 function vsPts(mv){
-  return (S.velo||[]).filter(function(v){ return v.mouvement===mv&&!v.variante&&v.charge_systeme_kg!=null&&v.reps&&v.reps[0]&&v.reps[0].vitesse_moy_ms!=null; })
+  return (S.velo||[]).filter(function(v){ return v.mouvement===mv&&!v.variante&&!tpOutE(lienEntry(v))&&v.charge_systeme_kg!=null&&v.reps&&v.reps[0]&&v.reps[0].vitesse_moy_ms!=null; })   /* lot 121 : tempo imposé hors droite */
     .map(function(v){ return {x:+v.charge_systeme_kg,y:+v.reps[0].vitesse_moy_ms,v:v}; });
 }
 /* droite des moindres carrés ; prolongée jusqu'au 1RM seulement si elle est nette (r <= -0,8) et couvre au moins 25 kg */
@@ -10794,10 +10820,10 @@ function vsBars(v,hi){
      '<text x="'+(xr+3)+'" y="'+(+y2-1)+'" class="lb">1RM</text><text x="'+(xr+3)+'" y="'+(+y2+9)+'" class="lb">0,20</text>';
   R.forEach(function(r,i){
     var y=r.vitesse_moy_ms; if(y==null)return;
-    var x=x0+i*bw+bw*.16, w=bw*.68, yy=Y(Math.max(0,Math.min(hi,y))), last=i===n-1;
+    var x=x0+i*bw+bw*.16, w=bw*.68, yy=Y(Math.max(0,Math.min(hi,y))), last=r===vOk(v).slice(-1)[0];   /* lot 121 */
     o+='<rect x="'+x.toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(H-mb-yy).toFixed(1)+'" rx="2" fill="'+(last?'var(--a2)':'var(--a8)')+'" opacity="'+(last?1:.55)+'"/>'+
       '<text x="'+(x+w/2).toFixed(1)+'" y="'+(yy-3).toFixed(1)+'" text-anchor="middle">'+F(Math.round(y*100)/100)+'</text>'+
-      '<text x="'+(x+w/2).toFixed(1)+'" y="'+(H-3)+'" text-anchor="middle" class="lb">'+r.rep+'</text>';
+      '<text x="'+(x+w/2).toFixed(1)+'" y="'+(H-3)+'" text-anchor="middle" class="lb">'+(r.tentative_ratee?'❌':r.rep)+'</text>';
   });
   return o+'</svg>';
 }
@@ -10816,6 +10842,7 @@ function vsRow(v,P,hi){
       '<dt>Reps valides</dt><dd>'+(hasH?'<b'+(nv<n?' class="vsbad"':'')+'>'+(nv<n?'✗ ':'')+nv+' / '+n+'</b>'+(s&&!s.sure?' <span class="muted">(seuil provisoire)</span>':''):'—')+'</dd>'+
       '<dt>Dernière rep</dt><dd><b class="'+vd.c+'">'+vd.t+'</b>'+(vl!=null?' <span class="muted">('+F(vl)+' m/s)</span>':'')+'</dd>'+
       '<dt>Forme du jour</dt><dd>'+fo+'</dd>'+vsRow82(v)+   /* lot 82 */
+      ((v.alertes||[]).length?'<dt>Vidéo</dt><dd><b class="vswarn">⚠ '+v.alertes.length+' alerte'+(v.alertes.length>1?'s':'')+'</b> <span class="muted">: '+v.alertes.map(esc).join(' ; ')+'</span></dd>':'')+   /* lot 121 (audit Vitesse, 6) */
     '</dl>'+vsBars(v,hi)+'</div>';
 }
 /* lot 104 (T1, T2, P1) : repos en bas entre deux reps (pause_apres_s, toutes les séries filmées), comparé à la même série
@@ -10910,7 +10937,8 @@ function vsProfil(){
   if(ext)s+='<line x1="'+X(P.x9).toFixed(1)+'" y1="'+Y(P.a+P.b*P.x9).toFixed(1)+'" x2="'+X(x1).toFixed(1)+'" y2="'+y20+'" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="3 3"/>'+
     '<circle cx="'+X(x1).toFixed(1)+'" cy="'+y20+'" r="4.5" fill="none" stroke="var(--bad)" stroke-width="2"/>';
   pts.forEach(function(o){ if(o.v.date===U.date)return;
-    s+='<circle cx="'+X(o.x).toFixed(1)+'" cy="'+Y(o.y).toFixed(1)+'" r="3.4" fill="var(--a8)" opacity=".6"/>'; });
+    s+=(o.v.alertes||[]).length?'<circle cx="'+X(o.x).toFixed(1)+'" cy="'+Y(o.y).toFixed(1)+'" r="3.4" fill="none" stroke="var(--warn)" stroke-width="1.5"/>':   /* lot 121 : série à alerte, en creux */
+      '<circle cx="'+X(o.x).toFixed(1)+'" cy="'+Y(o.y).toFixed(1)+'" r="3.4" fill="var(--a8)" opacity=".6"/>'; });
   pts.forEach(function(o){ if(o.v.date!==U.date)return;
     s+='<circle cx="'+X(o.x).toFixed(1)+'" cy="'+Y(o.y).toFixed(1)+'" r="5" fill="var(--a2)" stroke="var(--surface)" stroke-width="1.5"/>'; });
   s+='</svg>';
@@ -10925,7 +10953,8 @@ function vsProfil(){
       'trop proches les unes des autres pour prolonger la droite jusqu’à 0,20 m/s'+(P.r>-0.8?' (r = '+F(Math.round(P.r*100)/100)+')':'')+'. '+
       'La prolonger quand même donnerait de '+fr(xa)+' à '+fr(xb)+' kg : trop large pour servir.'+
       (rr?' Par les reps (1RM de Séance du jour) : ≈ '+fr(rr)+' kg.':'')+'</p>';
-  h+=s+'<p class="note">En bleu : la séance du '+frDate(U.date)+'. '+P.n+' séries sans variante, r = '+F(Math.round(P.r*100)/100)+
+  var nal=pts.filter(function(o){return (o.v.alertes||[]).length;}).length;
+  h+=s+'<p class="note">En bleu : la séance du '+frDate(U.date)+'.'+(nal?' En creux orange : '+nal+' série'+(nal>1?'s':'')+' dont la vidéo a une alerte (détail de la série), comptée'+(nal>1?'s':'')+' quand même.':'')+' '+P.n+' séries sans variante, r = '+F(Math.round(P.r*100)/100)+
       ', écart type autour de la droite '+F(Math.round(P.sd*1000)/1000)+' m/s.</p>'+
     (ext?'':'<p class="note">Pour que la droite aille jusqu’au 1RM, filmez aussi des séries <b>plus légères</b> en tractions normales : les échauffements de la 1re séance du bloc (poids du corps, +10, +20, +30 kg). '+
       'Les tractions hautes et « haut et vite » sont des variantes : elles ne comptent pas.</p>')+

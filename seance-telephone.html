@@ -72,7 +72,7 @@ th:first-child,td:first-child{text-align:left}
 <body>
 <main>
 <header><h1>Analyse d'une séance</h1>
-<p class="sous">Outil · lot 40 · tout se calcule sur ce téléphone, sans réseau. Rien n'est envoyé.</p></header>
+<p class="sous">Outil · tout se calcule sur ce téléphone, sans réseau. « Envoyer vers l'outil » range les analyses dans l'app, sur ce même téléphone : rien ne part sur Internet.</p></header>
 
 <section class="carte"><h2>1. Les vidéos de la séance</h2>
 <input type="file" id="fichiers" multiple accept="video/mp4,video/*" aria-label="Vidéos de la séance">
@@ -4398,7 +4398,8 @@ $('dl').addEventListener('click', () => {
 $('send').addEventListener('click', () => {   // lot 90 (V4) : même site que l'outil, il lit cp-inbox
   if (!texteSeance) return;
   try { const a = JSON.parse(localStorage.getItem('cp-inbox') || '[]'); a.push(texteSeance); localStorage.setItem('cp-inbox', JSON.stringify(a));
-    $('sendmsg').textContent = "Envoyé. Ouvrez l'outil : les analyses y sont rangées (Données › Vitesse)."; }
+    $('send').disabled = true;   // lot 121 (audit Vitesse, 17) : un seul envoi par analyse
+    $('sendmsg').textContent = "Envoyé. Ouvrez l'outil : les analyses y sont rangées (Données › Vitesse). Pour renvoyer, refaites l'analyse."; }
   catch (e) { $('sendmsg').textContent = "Envoi impossible (" + e.message + ") : téléchargez le fichier et importez-le."; }
 });
 $('dls').addEventListener('click', () => {
@@ -4548,7 +4549,7 @@ function finir(entrees, saisie, echange) {
   if (fs) {
     if (blobSeance) URL.revokeObjectURL(blobSeance);
     const blob = new Blob([fs.texte], { type: 'application/json' });
-    blobSeance = URL.createObjectURL(blob); nomSeance = fs.nom; texteSeance = fs.texte; $('sendmsg').textContent = '';
+    blobSeance = URL.createObjectURL(blob); nomSeance = fs.nom; texteSeance = fs.texte; $('sendmsg').textContent = ''; $('send').disabled = false;
     $('fseance-nom').textContent = fs.nom + ' · ' + r.sortie.series.length + ' série' + (r.sortie.series.length > 1 ? 's' : '') + ' · ' + (blob.size / 1024).toFixed(1).replace('.', ',') + ' Ko';
     $('fseance').style.display = 'grid';
   }
@@ -4711,7 +4712,7 @@ function afficher(vs, sortie) {
     if (!r) return "Aucune séance de l'app sur ce téléphone : ouvrez l'app (même adresse) avant cette page, puis rechoisissez les vidéos. Saisie à la main en attendant.";
     if (!date) return "";
     if (!s) return "Aucune séance de tractions de l'app le " + frDate(date) + " (bloc en cours) : saisie à la main.";
-    let t = "Pré-rempli depuis l'app : semaine " + s.semaine + " · " + s.label + " du " + frDate(s.date) + " (" +
+    let t = "Pré-rempli depuis l'app : " + (s.semaine ? "semaine " + s.semaine + " · " : "") + s.label + " du " + frDate(s.date) + " (" +
       (s.fait ? "séance enregistrée dans l'app" : "séance prévue") + ", " + s.series.length + " série" + (s.series.length > 1 ? "s" : "") + ")";
     if (pr && pr.ecart > 0) t += " ; " + pr.ecart + " vidéo" + (pr.ecart > 1 ? "s" : "") + " de plus que de séries : à remplir à la main";
     if (pr && pr.ecart < 0) t += " ; " + (-pr.ecart) + " série" + (-pr.ecart > 1 ? "s" : "") + " sans vidéo, ignorée" + (-pr.ecart > 1 ? "s" : "");
