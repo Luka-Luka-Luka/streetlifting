@@ -509,6 +509,17 @@ svg.vsvb text.lb,svg.vsprof text.lb{fill:var(--muted)}
 .vsbig span{font:500 13px/1.3 var(--txt);color:var(--muted)}
 .vssub{font:400 13px/1.4 var(--txt);color:var(--muted)}
 .vlist{padding:6px 0;border-top:1px solid var(--rule)}
+/* lot 120 : comparer des séries choisies */
+.vcmode{margin:0 0 8px}
+.vcrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--rule);cursor:pointer;font:400 13.5px/1.35 var(--txt)}
+.vcrow:first-child{border-top:0}
+.vcrow input{flex:none;width:22px;height:22px;margin:0;accent-color:var(--ink)}
+.vcrow>span{flex:1 1 auto;min-width:0}
+.vcrow small{display:block;color:var(--muted);font-size:12px}
+.vcrow.off{opacity:.45;cursor:default}
+.vccard{padding:10px 0;border-top:1px solid var(--rule)}
+.vccard .vsvh .tag{font:600 11px/1 var(--txt);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.vsvl dd small{color:var(--muted);font-size:12px}
 svg.vplot text{font-family:var(--num);font-size:11px;fill:currentColor}
 svg.vplot .g{stroke:currentColor;opacity:.13}
 svg.vplot .ax{stroke:currentColor;opacity:.45}
@@ -1020,6 +1031,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="vtabs">
         <button class="pill" data-vs="seance">Séance</button>
         <button class="pill" data-vs="profil">Profil</button>
+        <button class="pill" data-vs="comparer">Comparer</button>   <!-- lot 120 -->
         <button class="pill" data-vs="seuil">Réglages</button>
       </div>
       <button class="act ghost mini" id="veloadd" hidden>Importer</button>
@@ -1271,7 +1283,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v127';   /* lot 74 */
+var APPV='v128';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -10446,7 +10458,7 @@ function serieLab(v){
   var le=lienEntry(v);   /* lot 57 bis */
   return typeLab(v)+' '+(+v.lest_kg?F(v.lest_kg):'PdC')+'×'+v.reps.length+(v.variante?' · '+esc(v.variante):'')+(le&&le.fin?' · '+finCourt(le):'');
 }
-function vui(){ if(!S.vui)S.vui={scr:'seance',date:'',mv:'',open:null,warm:false,cmv:'',cgrp:'',ctype:'',cmes:'h'}; return S.vui; }
+function vui(){ if(!S.vui)S.vui={scr:'seance',date:'',mv:'',open:null,warm:false,cmv:'',cgrp:'',ctype:'',cmes:'h'}; if(!S.vui.cmode)S.vui.cmode='egal'; if(!Array.isArray(S.vui.csel))S.vui.csel=[]; return S.vui; }
 function vById(id){ return (S.velo||[]).filter(function(x){return x.id===id;})[0]||null; }
 function hCol(h,s){
   if(h==null)return 'var(--muted)';
@@ -10599,6 +10611,92 @@ function vScrComparer(){
       ' Charge égale : même mouvement, même variante, charge système (PdC du jour + lest) à 1,25 kg près.'+
       (U.ctype==='tous'?' <b>Types mélangés</b> : un back-off fait après le top set n\'est pas une série fraîche.':'')+'</p></div>';
 }
+/* lot 120 : écran Comparer, deux façons (réponses de Luka 26/10, tout en recommandé).
+   À charge égale = vScrComparer (inchangé). Séries choisies = jusqu'à VCMAX séries cochées, n'importe lesquelles du
+   mouvement, dans l'ordre du choix : la 1re est la référence, les autres en écart avec elle. Charges différentes :
+   avertissement, et la 1re rep rapportée à la droite charge-vitesse du Profil (vsFit), qui seule se compare. */
+var VCMAX=3;
+function vScrCmp(){
+  var U=vui();
+  return '<div class="vseg vcmode">'+
+      '<button class="pill" data-vcmode="egal" aria-pressed="'+(U.cmode!=='choix')+'">À charge égale</button>'+
+      '<button class="pill" data-vcmode="choix" aria-pressed="'+(U.cmode==='choix')+'">Séries choisies</button></div>'+
+    (U.cmode==='choix'?vScrChoix():vScrComparer());
+}
+function vcLoadLab(v){ return +v.lest_kg?'+'+F(v.lest_kg)+' kg':'PdC'; }
+function vcDelta(d,k,good){   /* good : 1 si plus haut = mieux, −1 si plus bas = mieux */
+  if(d==null)return '';
+  var r=Math.round(d*k)/k; if(!r)return ' <small>= réf.</small>';
+  return ' <b class="'+((r>0)===(good>0)?'up':'dn')+'">'+(r>0?'+':'−')+F(Math.abs(r))+'</b>';
+}
+function vcStats(v,P){
+  var s=seuilOf(v), hs=v.reps.map(function(r){return hOf(v,r);}), hasH=hs.some(function(h){return h!=null;}), le=lienEntry(v);
+  var v1=v.reps[0]&&v.reps[0].vitesse_moy_ms!=null?+v.reps[0].vitesse_moy_ms:null, pe=vPerte(v);
+  var dw=(P&&!v.variante&&v1!=null&&v.charge_systeme_kg!=null)?v1-(P.a+P.b*(+v.charge_systeme_kg)):null;
+  return {v1:v1,vl:vLast(v),pe:pe&&pe.p!=null&&!(le&&le.fin)?pe.p:null,mn:vMini(v),fin:!!(le&&le.fin),
+    nv:hasH&&s?hs.filter(function(h){return h!=null&&h>=s.valide;}).length:null,n:v.reps.length,rir:vRir(v),dw:dw,cs:v.charge_systeme_kg!=null?+v.charge_systeme_kg:null};
+}
+function vScrChoix(){
+  var U=vui(), mvs=[];
+  (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
+  if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
+  if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
+  U.csel=U.csel.filter(function(id){ var v=vById(id); return v&&v.mouvement===U.cmv; });
+  var all=S.velo.filter(function(v){return v.mouvement===U.cmv;})
+    .sort(function(a,b){return String(b.date).localeCompare(String(a.date))||vSortN(b,a);});
+  var loads=[], types=[];
+  all.forEach(function(v){ var l=vcLoadLab(v), t=typeLab(v); if(loads.indexOf(l)<0)loads.push(l); if(types.indexOf(t)<0)types.push(t); });
+  loads.sort(function(a,b){ var x=function(s){return s==='PdC'?0:parseFloat(String(s).replace('+','').replace(',','.'));}; return x(a)-x(b); });
+  if(U.cload&&loads.indexOf(U.cload)<0)U.cload='';
+  if(U.ctyp2!=='tous'&&types.indexOf(U.ctyp2)<0)U.ctyp2='tous';
+  var sel=U.csel.map(vById), mes=U.cmes==='v'?'v':'h', P=vsFit(U.cmv);
+  var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
+  if(sel.length>=2){
+    var st=sel.map(function(v){return vcStats(v,P);}), R=st[0], sc=scaleOf(sel,mes);
+    var cs=st.map(function(o){return o.cs;}), diff=sel.some(function(v){return String(v.variante||'')!==String(sel[0].variante||'');})||
+      cs.some(function(c){return c==null||cs[0]==null||Math.abs(c-cs[0])>1.25+1e-6;}),
+      oldH=mes==='h'&&sel.some(function(v){return vRef(v)!==vRef(sel[0]);});
+    h+='<div class="row" style="margin-top:8px"><div class="field md"><label>Mesure des barres</label><div class="vseg">'+
+        '<button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Hauteur</button>'+
+        '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Vitesse</button></div></div></div>';
+    if(diff)h+='<div class="flag"><b>Charges différentes</b> ('+sel.map(function(v,i){return st[i].cs!=null?F(st[i].cs)+' kg':vcLoadLab(v);}).join(' · ')+
+      (sel.some(function(v){return v.variante;})?', ou variante différente':'')+') : plus la charge monte, plus la vitesse baisse. '+
+      'Les écarts bruts ne disent pas qui était le plus en forme ; la ligne <b>vs votre droite</b> le dit, elle compare chaque 1re rep à la vitesse attendue à sa charge.</div>';
+    if(oldH)h+='<p class="note">Une série a l’ancienne mesure de hauteur : ses hauteurs ne se comparent pas aux autres.</p>';
+    h+=sel.map(function(v,i){
+      var o=st[i], ref=i===0, d=function(a,b){return ref||a==null||b==null?null:a-b;};
+      var lines='<dt>1re rep</dt><dd>'+(o.v1==null?'—':v2(o.v1)+' m/s')+vcDelta(d(o.v1,R.v1),100,1)+'</dd>'+
+        '<dt>vs votre droite</dt><dd>'+(o.dw==null?'<small>'+(v.variante?'variante : pas de droite':!P?'pas encore de droite (Profil)':'—')+'</small>':
+          (Math.abs(o.dw)<=0.07?'habituelle':(o.dw>0?'<b class="vsok">au-dessus</b>':'<b class="vswarn">en dessous</b>'))+
+          ' <small>('+(Math.round(o.dw*100)?(o.dw>0?'+':'−')+v2(Math.abs(o.dw))+' m/s vs attendu':'= attendu')+')</small>')+'</dd>'+
+        '<dt>Dernière rep</dt><dd>'+(o.vl==null?'—':v2(o.vl)+' m/s')+(o.fin?' <small>(après une pause : non comparable)</small>':vcDelta(R.fin?null:d(o.vl,R.vl),100,1))+'</dd>'+
+        '<dt>Perte de vitesse</dt><dd>'+(o.pe==null?'—':F(Math.round(o.pe))+' %')+vcDelta(d(o.pe,R.pe),1,-1)+'</dd>'+
+        '<dt>Hauteur mini</dt><dd>'+(o.mn==null?'—':F(o.mn)+' cm')+(vRef(v)!==vRef(sel[0])?'':vcDelta(d(o.mn,R.mn),10,1))+'</dd>'+
+        '<dt>Reps valides</dt><dd>'+(o.nv==null?'—':o.nv+' / '+o.n)+'</dd>'+
+        '<dt>Réserve notée</dt><dd>'+(o.rir==null?'—':F(o.rir))+'</dd>';
+      return '<div class="vccard"><div class="vsvh"><b>'+frDate(v.date)+' · '+serieLab(v)+'</b><span class="tag">'+(ref?'référence':'vs réf.')+'</span></div>'+
+        '<p class="note" style="margin:2px 0 0">'+(o.cs!=null?'charge système '+F(o.cs)+' kg':'PdC absent')+(v.semaine?' · S'+v.semaine+' J'+v.seance:'')+
+          ' · <button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></p>'+
+        '<dl class="vsvl">'+lines+'</dl>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>';
+    }).join('');
+    h+='<p class="note">Écarts avec la référence, la 1re série choisie. Couleur : vert = mieux, rouge = moins bien. '+
+      'Un écart de vitesse de moins de 0,07 m/s n’est pas mesurable (Weakley 2021). Barres à la même échelle.</p>';
+  }else h+='<p class="note" style="margin-top:8px"><b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La 1re cochée sert de référence.</p>';
+  var list=all.filter(function(v){ return (!U.cload||vcLoadLab(v)===U.cload)&&(U.ctyp2==='tous'||typeLab(v)===U.ctyp2); });
+  var full=U.csel.length>=VCMAX;
+  var rows=list.map(function(v){
+    var on=U.csel.indexOf(v.id)>=0, k=on?U.csel.indexOf(v.id)+1:0, dis=!on&&full;
+    return '<label class="vcrow'+(dis?' off':'')+'"><input type="checkbox" data-vck="'+esc(v.id)+'"'+(on?' checked':'')+(dis?' disabled':'')+'>'+
+      '<span><b>'+frDate(v.date)+'</b> · '+serieLab(v)+(k?' <b>('+(k===1?'réf.':k)+')</b>':'')+
+      '<small>'+(v.charge_systeme_kg!=null?'charge système '+F(v.charge_systeme_kg)+' kg':'PdC absent')+(vLast(v)!=null?' · dern. rep '+v2(vLast(v))+' m/s':'')+'</small></span></label>';
+  }).join('');
+  var pick='<div class="row" style="margin-top:6px"><div class="field md"><label>Lest</label>'+vSel('cload',[''].concat(loads),U.cload,function(x){return x===''?'tous':esc(x);})+'</div>'+
+      '<div class="field md"><label>Type de série</label>'+vSel('ctyp2',types.concat(['tous']),U.ctyp2,function(t){return t==='tous'?'tous les types':t;})+'</div></div>'+
+    (full?'<p class="note">'+VCMAX+' séries cochées : décochez-en une pour en choisir une autre.</p>':'')+
+    (rows||'<p class="note">Aucune série pour ces filtres.</p>');
+  h+=sel.length>=2?'<details class="chd" data-chd="vcpick"><summary>Changer les séries <b>('+sel.length+' / '+VCMAX+')</b></summary>'+pick+'</details>':pick;
+  return h+'</div>';
+}
 function vScrSerie(v){
   var s=seuilOf(v), le=lienEntry(v);
   var rows=v.reps.map(function(r){
@@ -10615,6 +10713,7 @@ function vScrSerie(v){
     '<div class="vtitle">'+serieLab(v)+'</div>'+
     '<p class="note" style="margin-top:2px">'+frDate(v.date)+' · '+esc(v.mouvement)+(v.semaine?' · S'+v.semaine+' J'+v.seance:'')+
       (v.charge_systeme_kg?' · charge système '+F(v.charge_systeme_kg)+' kg':'')+'</p>'+
+    '<div class="btnrow" style="margin:6px 0 8px"><button class="act ghost mini" data-vcmp="'+esc(v.id)+'">Comparer avec… ›</button></div>'+   /* lot 120 */
     '<div class="scroll"><table><thead><tr><th>Rep</th><th>Hauteur cm</th><th>Vitesse m/s</th><th>Votre jugement</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<p class="note">Seuil '+(s?'<b>'+F(s.valide)+' cm</b> — '+s.src:'inconnu')+'. Hauteur '+refLab(v)+'.</p>'+
     ((v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'')+veloDur(v,le)+veloTempo(v,le)+   /* lot R3 ; lot 118 */
@@ -10787,7 +10886,7 @@ function vsProfil(){
   (S.velo||[]).forEach(function(v){ if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
   if(!mvs.length)return '<div class="card"><p class="note">Aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
-  var P=vsFit(U.cmv), pts=vsPts(U.cmv), cmp='<div class="btnrow" style="margin-top:10px"><button class="act ghost mini" data-vs="comparer">Comparer à charge égale ›</button></div>';
+  var P=vsFit(U.cmv), pts=vsPts(U.cmv), cmp='<div class="btnrow" style="margin-top:10px"><button class="act ghost mini" data-vcmode="egal">Comparer à charge égale ›</button></div>';
   var h='<div class="card" data-chk="vprofil"><div class="vtitle">Profil charge-vitesse'+chIB('vprofil')+'</div>'+
     (mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(!P)return h+'<p class="note">Il faut au moins 6 séries filmées sans variante, avec le PdC, pour tracer votre droite ('+pts.length+' pour l’instant).</p>'+cmp+'</div>';
@@ -10840,10 +10939,10 @@ function renderVelo(){
   if(U.scr==='serie'&&!vById(U.open))U.scr='seance';
   $('veloadd').hidden=U.scr!=='seuil';   /* lot 76 : Importer dans Réglages */
   Array.prototype.forEach.call(document.querySelectorAll('#p-velo [data-vs]'),function(b){
-    var on=b.dataset.vs===U.scr||(U.scr==='serie'&&b.dataset.vs===U.from)||(b.dataset.vs==='profil'&&(U.scr==='comparer'||(U.scr==='serie'&&U.from==='comparer')));
+    var on=b.dataset.vs===U.scr||(U.scr==='serie'&&b.dataset.vs===U.from)||(b.dataset.vs==='comparer'&&U.scr==='serie'&&U.from==='comparer');   /* lot 120 : la pastille Comparer */
     b.setAttribute('aria-pressed',String(on));
   });
-  $('velolist').innerHTML=U.scr==='comparer'?'<div class="btnrow" style="margin:0 0 8px"><button class="linkbtn" data-vs="profil">‹ Profil</button></div>'+vScrComparer():U.scr==='seuil'?vScrSeuil():
+  $('velolist').innerHTML=U.scr==='comparer'?vScrCmp():U.scr==='seuil'?vScrSeuil():
     U.scr==='profil'?vsProfil():U.scr==='serie'?vScrSerie(vById(U.open)):vsSeance();   /* lot 76 */
   chInfo();
 }
@@ -10852,6 +10951,12 @@ $('p-velo').addEventListener('click',function(e){
   if(ok){ var vv=vById(ok.dataset.vok); if(vv&&vv.lien){ delete vv.lien.ord; save(); renderVelo(); } return; }
   var rc=e.target.closest?e.target.closest('[data-vrec]'):null;   /* lot 90 (V2) */
   if(rc){ var vr=vById(rc.dataset.vrec), m=vRecord(vr); save(); renderVelo(); msgBar(m?'Pas enregistrée : '+m+'.':'Série enregistrée et rattachée.'); return; }
+  var cm=e.target.closest?e.target.closest('[data-vcmp],[data-vcmode]'):null;   /* lot 120 */
+  if(cm){ var U0=vui();
+    if(cm.dataset.vcmode)U0.cmode=cm.dataset.vcmode;
+    else{ var v0=vById(cm.dataset.vcmp); if(!v0)return; var r0=veloRef(v0);
+      U0.cmode='choix'; U0.cmv=v0.mouvement; U0.csel=r0?[r0.id,v0.id]:[v0.id]; U0.cload=''; U0.ctyp2='tous'; window.scrollTo(0,0); }
+    U0.scr='comparer'; save(); renderVelo(); return; }
   var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
   if(!b||e.target.closest('[data-juge],[data-velodel],select,a,[data-open]'))return;
   var U=vui();
@@ -10869,7 +10974,11 @@ $('p-velo').addEventListener('click',function(e){
   save(); renderVelo();
 });
 $('p-velo').addEventListener('change',function(e){
-  var t=e.target; if(!t.dataset||!t.dataset.vsel)return;
+  var t=e.target;
+  if(t.dataset&&t.dataset.vck!=null){ var U=vui(), id=t.dataset.vck;   /* lot 120 : séries choisies, dans l'ordre du choix */
+    U.csel=U.csel.filter(function(x){return x!==id;}); if(t.checked&&U.csel.length<VCMAX)U.csel.push(id);
+    save(); renderVelo(); return; }
+  if(!t.dataset||!t.dataset.vsel)return;
   vui()[t.dataset.vsel]=t.value; save(); renderVelo();
 });
 $('velolist').addEventListener('change',function(e){
