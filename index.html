@@ -1198,6 +1198,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
         <button class="act ghost mini" id="ghsave">Enregistrer</button>
         <button class="act ghost mini" id="ghnow">Envoyer maintenant</button>
         <button class="act ghost mini" id="ghforget">Oublier la clé</button>
+        <button class="act ghost mini" id="ghforce" hidden>Envoyer quand même</button>
       </div>
       <p class="note" id="ghst"></p>
     </div>
@@ -1270,7 +1271,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v126';   /* lot 74 */
+var APPV='v127';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1328,7 +1329,7 @@ document.addEventListener('input',function(ev){
 /* lot 109 (P1) : plusieurs personnes dans le même navigateur. Registre localStorage['cp-profiles'] = {cur, list:[{id,name}]}.
    SK(base) donne la clé de la personne courante : pour 'luka', exactement l'ancienne (aucune migration) ; sinon base+':'+id.
    cp-inbox (page vidéo) n'est pas par personne : il n'est lu que chez Luka. Changer de personne = enregistrer puis recharger. */
-var PKEYS=['cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page'];
+var PKEYS=['cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page','cp-state-illisible'];   /* lot 119 : + copie illisible */
 var PROF=(function(){
   var r=null; try{ r=JSON.parse(localStorage.getItem('cp-profiles')||'null'); }catch(e){}
   if(!r||!Array.isArray(r.list)||!r.list.some(function(p){return p&&p.id==='luka';})){
@@ -1344,8 +1345,27 @@ function simpleOn(){ return S&&S.simple!=null?!!S.simple:PROF.cur!=='luka'; }   
 function profCur(){ return PROF.list.filter(function(p){return p.id===PROF.cur;})[0]; }
 function profStore(){ try{ localStorage.setItem('cp-profiles',JSON.stringify(PROF)); return true; }catch(e){ alert("Le registre des personnes n'a pas pu être enregistré : stockage plein ou désactivé."); return false; } }
 var SAVEFAIL=false;
+/* lot 119 (audit du 26/10) : LOADBAD = données enregistrées illisibles au démarrage. L'outil s'ouvre vide mais n'écrit
+   plus rien (ni ici ni sur GitHub) tant qu'un import n'a pas réussi : avant, la première écriture remplaçait les données
+   illisibles par un outil vide. La copie brute est gardée dans SK('cp-state-illisible') et proposée au téléchargement.
+   STALE = une autre fenêtre de l'outil a enregistré : cette fenêtre-ci, périmée, se recharge au lieu d'écraser. */
+var LOADBAD=false, STALE=false;
+function loadBad(raw){
+  LOADBAD=true;
+  try{ if(!localStorage.getItem(SK('cp-state-illisible')))localStorage.setItem(SK('cp-state-illisible'),raw); }catch(e){}
+  setTimeout(function(){
+    if(confirm("Les données enregistrées dans ce téléphone n'ont pas pu être lues.\n\n"+
+      "L'outil s'ouvre vide, mais RIEN n'est effacé ni envoyé sur GitHub : il n'enregistre plus rien tant que vous n'avez pas importé une sauvegarde (Réglages › Sauvegarde › Importer).\n\n"+
+      "Télécharger maintenant une copie des données illisibles, pour pouvoir les réparer ?"))
+      dl(profFile()+'illisible-'+todayISO()+'.json',raw,'application/json');
+  },300);
+}
+function staleReload(){ alert("L'outil vient d'être modifié dans une autre fenêtre.\n\nCette fenêtre-ci n'est plus à jour : elle se recharge pour ne rien effacer. Si vous veniez de saisir quelque chose ici, refaites-le."); location.reload(); }
+window.addEventListener('storage',function(ev){ if(ev.key!==SK('cp-state')||LOADBAD)return; STALE=true; if(document.visibilityState==='visible')staleReload(); });
+document.addEventListener('visibilitychange',function(){ if(STALE&&document.visibilityState==='visible')location.reload(); });
 function save(){
-  if(BRSWAP)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon */
+  if(BRSWAP||LOADBAD)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon ; lot 119 : ni sur des données illisibles */
+  if(STALE){ staleReload(); return; }   /* lot 119 */
   REFSTAMP++; REFC={};
   try{ localStorage.setItem(SK('cp-state'),JSON.stringify(S)); SAVEFAIL=false; ghMark(); }   /* lot 113 */
   catch(e){
@@ -1361,9 +1381,11 @@ function save(){
 }
 function load(){
   try{
+    LOADBAD=false;   /* lot 119 */
     var raw=localStorage.getItem(SK('cp-state')); if(!raw)return;
-    var d=JSON.parse(raw);
-    if(!d||!d.lifts||!d.lifts.length)return;
+    var d=null; try{ d=JSON.parse(raw); }catch(e1){}
+    if(!d||typeof d!=='object'||((!d.lifts||!d.lifts.length)&&Array.isArray(d.log)&&d.log.length)){ loadBad(raw); return; }   /* lot 119 */
+    if(!d.lifts||!d.lifts.length)return;
     /* migrations : jusqu'ici la version etait ecrasee sans etre lue, donc le numero
        ne servait a rien. On la lit avant de l'ecrire. */
     var from=+d.v||1;
@@ -3477,18 +3499,19 @@ var HPANEL=false, NAVPOP=false;
 function curTab(){ var b=document.querySelector('#nav button[aria-selected="true"]'); return b&&b.dataset?b.dataset.p:'today'; }
 function histPanel(){ if(HPANEL)return; try{ history.pushState({cp:'panel',p:curTab()},''); HPANEL=true; }catch(e){} }
 function histTab(p){ try{ history.pushState({cp:'tab',p:p},''); HPANEL=false; }catch(e){} }
-function goTab(p){ if(!p||p===curTab())return; var b=document.querySelector('#nav button[data-p="'+p+'"]'); if(b){ NAVPOP=true; try{ b.click(); }finally{ NAVPOP=false; } } }
+/* lot 119 : renommée (goTabPop) : un second goTab, plus loin, la remplaçait, et chaque retour ajoutait une entrée d'historique */
+function goTabPop(p){ if(!p||p===curTab())return; var b=document.querySelector('#nav button[data-p="'+p+'"]'); if(b){ NAVPOP=true; try{ b.click(); }finally{ NAVPOP=false; } } }
 try{ history.replaceState({cp:'tab',p:'today'},''); }catch(e){}
 window.addEventListener('popstate',function(ev){
   var st=ev.state||{cp:'tab',p:'today'}, was=HPANEL;
-  if(st.cp==='panel'){ HPANEL=true; goTab(st.p); return; }
+  if(st.cp==='panel'){ HPANEL=true; goTabPop(st.p); return; }
   HPANEL=false;
   if(was){
-    if(OPENKEY){ LASTOPEN=null; closePanel(); goTab(st.p); return; }
+    if(OPENKEY){ LASTOPEN=null; closePanel(); goTabPop(st.p); return; }
     try{ history.back(); }catch(e){} return;   /* panneau déjà fermé : ce retour-ci ne changerait rien */
   }
   if(OPENKEY&&curTab()!==st.p){ LASTOPEN=null; closePanel(); }
-  goTab(st.p);
+  goTabPop(st.p);
 });
 document.addEventListener('click',function(ev){   /* lot 64 : « pourquoi ? » déplie l'aide juste après */
   var b=ev.target&&ev.target.closest?ev.target.closest('[data-why]'):null; if(!b)return;
@@ -3559,7 +3582,6 @@ function applyOrder(tab){
   var marks=items.map(function(el){var m=document.createComment('mv'); c.insertBefore(m,el); return m;});
   marks.forEach(function(m,i){ c.insertBefore(want[i],m); m.remove(); });
 }
-function curTab(){var b=document.querySelector('#nav [aria-selected=true]');return b?b.dataset.p:'today';}
 function drawBars(){
   document.querySelectorAll('.mvbar').forEach(function(b){b.remove();});
   document.querySelectorAll('.mv').forEach(function(e){e.classList.remove('mv');});
@@ -6917,7 +6939,7 @@ function renderBackup(){
      (la banniere ci-dessous les remplace quand le rappel est du). L'app ne sait que la date de l'export :
      elle ne peut pas savoir si le fichier a quitte le telephone. */
   var dline=LE?(since===0?'Sauvegarde faite aujourd\'hui':'Sauvegarde faite il y a '+since+' j'):'Aucune sauvegarde faite';
-  if(ghCfg()){ var gs=ghSt(); dline+=gs.err?' · GitHub : échec, '+gs.err:(gs.dirty?' · GitHub : envoi en attente':' · GitHub à jour'); }   /* lot 113 */
+  if(ghCfg()){ var gs=ghSt(); dline+=gs.block?' · GitHub : envoi bloqué (voir Sauvegarde)':gs.err?' · GitHub : échec, '+gs.err:(gs.dirty?' · GitHub : envoi en attente':' · GitHub à jour'); }   /* lot 113 */
   if($('appbk'))$('appbk').innerHTML='<p class="note" style="margin:8px 0 0">💾 '+dline+'</p><div class="btnrow"><button class="act ghost mini" data-bkapp="1">Sauvegarder</button></div>';   /* lot 112 : dans ⚙, plus en Séance */
   if(!due){ ban.innerHTML=''; return; }
   ban.innerHTML=due?'<div class="bkban"><b>Sauvegarde à faire</b> — '+(LE?'la dernière date du '+frDate(LE)+' ('+since+' jours)':'aucune sauvegarde depuis '+since+' jours')+
@@ -6938,13 +6960,14 @@ $('bkevery').addEventListener('change',function(){ S.bkEvery=+this.value; save()
    les 10 min. dirty survit à la fermeture : renvoi au démarrage et au retour du réseau.
    Fichier <id>.json (luka.json, sylwia….json) = JSON.stringify(S,null,2), identique à l'export.
    sha = verrou : si GitHub a une autre version (409/422), on relit le sha et on réécrit (l'historique garde l'autre). */
-var GHT=null, GHBUSY=false, GHGAP=600000;
+var GHT=null, GHBUSY=false, GHGAP=600000, GHGEN=0;   /* lot 119 : GHGEN compte les enregistrements, pour ne pas marquer « à jour » un changement fait pendant un envoi */
 function ghCfg(){ try{ var c=JSON.parse(localStorage.getItem('cp-gh')||'null'); return c&&c.repo&&c.tok?c:null; }catch(e){ return null; } }
 function ghSt(){ try{ return JSON.parse(localStorage.getItem(SK('cp-gh-st'))||'{}')||{}; }catch(e){ return {}; } }
 function ghSet(o){ var s=ghSt(); for(var k in o)s[k]=o[k]; try{ localStorage.setItem(SK('cp-gh-st'),JSON.stringify(s)); }catch(e){} return s; }
 function ghPath(){ return encodeURIComponent(PROF.cur)+'.json'; }
 function ghMark(){
   if(!ghCfg())return;
+  GHGEN++;   /* lot 119 */
   if(!ghSt().dirty)ghSet({dirty:true});
   ghPlan(60000);
 }
@@ -6964,12 +6987,33 @@ function ghSha(c){   /* sha du fichier sur GitHub, '' s'il n'existe pas encore *
   return ghApi(c,'GET').then(function(r){ if(r.status===404)return '';   /* fichier absent (ou dépôt absent : le PUT le dira) */
     if(!r.ok)throw {st:r.status}; return r.json().then(function(j){ return j.sha||''; }); });
 }
-function ghPush(manual){
-  var c=ghCfg(); if(!c||GHBUSY)return Promise.resolve();
+/* lot 119 (audit du 26/10) : avant chaque envoi, on lit le fichier sur GitHub. S'il n'est pas notre dernier envoi (autre sha :
+   autre appareil, navigateur neuf, téléphone effacé) et qu'il compte plus de séries que ce téléphone, rien n'est envoyé :
+   avant, coller la clé dans un navigateur vide remplaçait la sauvegarde par un outil vide. « Envoyer quand même » (force)
+   reste possible après confirmation. Un fichier illisible (n=null) ne bloque pas. */
+function ghN(o){ return o&&Array.isArray(o.log)?o.log.length:null; }
+function ghParse(b64){ try{ var s=atob(String(b64).replace(/\s/g,'')), u=new Uint8Array(s.length), i; for(i=0;i<s.length;i++)u[i]=s.charCodeAt(i); return JSON.parse(new TextDecoder().decode(u)); }catch(e){ return null; } }
+function ghRemote(c){   /* {sha, n} du fichier sur GitHub ; sha '' s'il n'existe pas */
+  return ghApi(c,'GET').then(function(r){
+    if(r.status===404)return {sha:'',n:0};
+    if(!r.ok)throw {st:r.status};
+    return r.json().then(function(j){
+      var sha=j.sha||'';
+      if(j.content&&j.encoding==='base64')return {sha:sha,n:ghN(ghParse(j.content))};
+      /* plus de 1 Mo : l'API ne joint pas le contenu, on le demande brut */
+      return fetch('https://api.github.com/repos/'+c.repo+'/contents/'+ghPath(),{cache:'no-store',
+        headers:{'Authorization':'Bearer '+c.tok,'Accept':'application/vnd.github.raw','X-GitHub-Api-Version':'2022-11-28'}})
+        .then(function(r2){ if(!r2.ok)throw {st:r2.status}; return r2.text(); })
+        .then(function(t){ var o=null; try{ o=JSON.parse(t); }catch(e){} return {sha:sha,n:ghN(o)}; });
+    });
+  });
+}
+function ghPush(manual,force){
+  var c=ghCfg(); if(!c||GHBUSY||LOADBAD||STALE)return Promise.resolve();   /* lot 119 */
   if(!manual&&!ghSt().dirty)return Promise.resolve();
   if(GHT){ clearTimeout(GHT); GHT=null; }
   GHBUSY=true; renderGh('Envoi en cours…');
-  var txt=JSON.stringify(S,null,2), p=profCur(), now=new Date();
+  var txt=JSON.stringify(S,null,2), p=profCur(), now=new Date(), gen=GHGEN, nLoc=(S.log||[]).length;   /* lot 119 */
   var msg='Sauvegarde '+(p?p.name:PROF.cur)+' du '+todayISO()+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' ('+APPV+')';
   var content=ghB64(txt);
   function put(sha,again){
@@ -6978,13 +7022,16 @@ function ghPush(manual){
       if((r.status===409||r.status===422)&&!again)return ghSha(c).then(function(s2){ return put(s2,true); });
       if(r.status===404&&sha&&!again)return put('',true);
       if(!r.ok)throw {st:r.status};
-      return r.json().then(function(j){ ghSet({sha:j.content&&j.content.sha||'',at:now.toISOString(),dirty:false,err:''}); });
+      return r.json().then(function(j){ ghSet({sha:j.content&&j.content.sha||'',at:now.toISOString(),dirty:GHGEN!==gen,err:'',block:null}); });   /* lot 119 */
     });
   }
   var st=ghSt();
-  return (st.sha?put(st.sha):ghSha(c).then(function(s){ return put(s); }))
+  return ghRemote(c).then(function(rm){   /* lot 119 */
+      if(!force&&rm.sha&&rm.sha!==st.sha&&rm.n!=null&&rm.n>nLoc){ ghSet({err:'',block:{n:rm.n,loc:nLoc}}); return; }
+      return put(rm.sha);
+    })
     .catch(function(e){ ghSet({err:e&&e.st?ghErr(e.st):'pas de réseau, nouvel essai plus tard'}); })
-    .then(function(){ GHBUSY=false; renderBackup(); if(ghSt().dirty&&!ghSt().err)ghPlan(60000); });
+    .then(function(){ GHBUSY=false; renderBackup(); var s=ghSt(); if(s.dirty&&!s.err&&!s.block)ghPlan(60000); });
 }
 function renderGh(busy){
   var c=ghCfg(), s=ghSt(), el=$('ghst'); if(!el)return;
@@ -6993,7 +7040,9 @@ function renderGh(busy){
   if($('ghnow'))$('ghnow').disabled=!c; if($('ghforget'))$('ghforget').disabled=!c;
   el.textContent=busy||(!c?'Pas encore réglée : rien n\'est envoyé.':
     (s.at?'Dernier envoi : '+frDate(s.at.slice(0,10))+' à '+new Date(s.at).toTimeString().slice(0,5)+'.':'Aucun envoi encore.')+
-    (s.err?' Échec du dernier essai : '+s.err+'.':s.dirty?' Changements en attente d\'envoi.':''));
+    (s.block?' Envoi bloqué : la sauvegarde sur GitHub compte '+s.block.n+' séries, ce téléphone '+s.block.loc+'. Pour ne pas écraser la copie la plus complète, rien n\'est envoyé. Si ce téléphone a raison (séries supprimées exprès), touchez « Envoyer quand même ».':
+     s.err?' Échec du dernier essai : '+s.err+'.':s.dirty?' Changements en attente d\'envoi.':''));   /* lot 119 */
+  if($('ghforce'))$('ghforce').hidden=!(c&&s.block);
 }
 $('ghsave').addEventListener('click',function(){
   var repo=($('ghrepo').value||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''), tok=($('ghtok').value||'').trim(), c=ghCfg();
@@ -7004,6 +7053,11 @@ $('ghsave').addEventListener('click',function(){
   $('ghtok').value=''; ghSet({sha:'',err:''}); ghPush(true);
 });
 $('ghnow').addEventListener('click',function(){ ghPush(true); });
+$('ghforce').addEventListener('click',function(){   /* lot 119 */
+  var b=ghSt().block; if(!b)return;
+  if(!confirm('Remplacer la sauvegarde GitHub ('+b.n+' séries) par celle de ce téléphone ('+(S.log||[]).length+' séries) ?\n\nL\'ancienne reste dans l\'historique du dépôt, mais l\'outil ne la reprendra plus.'))return;
+  ghPush(true,true);
+});
 $('ghforget').addEventListener('click',function(){
   if(!confirm('Oublier la clé sur ce téléphone ? Les envois automatiques s\'arrêtent. Les sauvegardes déjà sur GitHub restent.'))return;
   try{ localStorage.removeItem('cp-gh'); }catch(e){} if(GHT){ clearTimeout(GHT); GHT=null; } renderBackup();
@@ -10667,19 +10721,19 @@ function vsRow(v,P,hi){
    la dernière fois (même mouvement, même nombre de reps, charge système à 1 kg près) ; pause en haut, rep par rep, en
    variante bloquées ou pausées. Déjà mesurés par la page vidéo : rien n'est recalculé. */
 function vPz(v,k){ return (v.reps||[]).filter(function(r){ return !r.tentative_ratee&&r[k]!=null; }).map(function(r){ return +r[k]; }); }
-function vMoy(a){ return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:null; }
+function vMoyA(a){ return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:null; }   /* lot 119 : renommée, elle écrasait vMoy (lot 82) */
 function vF1(x){ return F(Math.round(x*10)/10); }
 function vRepos(v){
   var h='', b=vPz(v,'pause_apres_s');
   if(b.length){
-    var m=vMoy(b), n=(v.reps||[]).length, p=(S.velo||[]).filter(function(w){ return w!==v&&w.mouvement===v.mouvement&&String(w.variante||'')===String(v.variante||'')&&w.date<v.date&&(w.reps||[]).length===n&&
+    var m=vMoyA(b), n=(v.reps||[]).length, p=(S.velo||[]).filter(function(w){ return w!==v&&w.mouvement===v.mouvement&&String(w.variante||'')===String(v.variante||'')&&w.date<v.date&&(w.reps||[]).length===n&&
       w.charge_systeme_kg!=null&&v.charge_systeme_kg!=null&&Math.abs(w.charge_systeme_kg-v.charge_systeme_kg)<=1&&!isWarm(w)&&vPz(w,'pause_apres_s').length; })
-      .sort(function(a,c){ return a.date<c.date?1:a.date>c.date?-1:0; })[0], pm=p?Math.round(vMoy(vPz(p,'pause_apres_s'))*10)/10:null, d=pm!=null?Math.round(m*10)/10-pm:null;
+      .sort(function(a,c){ return a.date<c.date?1:a.date>c.date?-1:0; })[0], pm=p?Math.round(vMoyA(vPz(p,'pause_apres_s'))*10)/10:null, d=pm!=null?Math.round(m*10)/10-pm:null;
     h+='<dt>Repos entre reps</dt><dd>'+b.map(vF1).join(' · ')+' s <span class="muted">(moyenne '+vF1(m)+' s)</span>'+
       (p?'<br><span class="muted">Même série le '+frDate(p.date)+' : moyenne '+vF1(pm)+' s, </span>'+(Math.abs(d)<0.15?'pareil':(d<0?'<b class="vsok">plus court de '+vF1(-d)+' s</b>':'<b class="vswarn">plus long de '+vF1(d)+' s</b>')):'')+'</dd>';
   }
   if(v.variante==='bloquées'||v.variante==='pausées'){ var t=vPz(v,'pause_sommet_s');
-    h+='<dt>Pause en haut</dt><dd>'+(t.length?t.map(vF1).join(' · ')+' s <span class="muted">(moyenne '+vF1(vMoy(t))+' s)</span>':'<span class="muted">non mesurée (analyse importée avant la v59 : réimportez le fichier)</span>')+'</dd>'; }
+    h+='<dt>Pause en haut</dt><dd>'+(t.length?t.map(vF1).join(' · ')+' s <span class="muted">(moyenne '+vF1(vMoyA(t))+' s)</span>':'<span class="muted">non mesurée (analyse importée avant la v59 : réimportez le fichier)</span>')+'</dd>'; }
   return h;
 }
 /* lot 82 : perte de vitesse et distance à l'échec (A14), réserve notée en miroir (A1), série rattachée (A16) */
@@ -10932,10 +10986,10 @@ $('mergefile').addEventListener('change',function(){
         var li=(n!=null&&byName[nm(n)]!=null)?byName[nm(n)]:null;
         if(li==null){unk++; if(n)noms[String(n)]=1; return;}
         var id=String(e.id||e.key||(e.date+'~'+e.li+'~'+(e.load==null?'':e.load)+'~'+(e.sets||[]).join('/')));
-        var k='m|'+id;
-        if(have[k]){skip++;return;}
+        var k=/^m\|/.test(id)?id:'m|'+id;   /* lot 119 : une série déjà fusionnée garde sa clé */
+        if(have[k]||have[id]||(e.srcKey&&have[String(e.srcKey)])){skip++;return;}   /* lot 119 : déjà au journal sous sa clé d'origine */
         var c={}; for(var q in e)if(Object.prototype.hasOwnProperty.call(e,q))c[q]=e[q];
-        c.li=li; c.lift=S.lifts[li].name; c.id=k; c.key=k; c.srcKey=String(e.key||'');
+        c.li=li; c.lift=S.lifts[li].name; c.id=k; c.key=k; c.srcKey=String(e.srcKey||e.key||'');
         S.log.push(c); have[k]=1; add++;
       });
       save(); renderAll();
@@ -10988,6 +11042,26 @@ $('tday').addEventListener('change',function(){S.tsel=this.value;save();renderTo
    (l'etat courant a pu changer depuis) : on l'efface avant de charger. */
 try{localStorage.removeItem(SK('cp-state-backup'));}catch(e){}
 load();
+/* lot 119 (audit du 26/10) : copies fusionnées ('m|') d'une série déjà au journal sous sa clé d'origine (srcKey), même jour,
+   mouvement, charge et reps. Proposé une fois ; un export complet est téléchargé avant. */
+function dupScan(){
+  var by={}; (S.log||[]).forEach(function(e){ if(!/^m\|/.test(String(e.key)))by[String(e.key)]=e; });
+  return (S.log||[]).filter(function(e){ var o=/^m\|/.test(String(e.key))&&e.srcKey?by[String(e.srcKey)]:null;
+    return !!o&&o.date===e.date&&o.li===e.li&&+o.load===+e.load&&JSON.stringify(o.sets)===JSON.stringify(e.sets); });
+}
+setTimeout(function(){
+  if(LOADBAD||S.m119)return;
+  var dd=dupScan();
+  if(dd.length&&confirm(dd.length+' série'+(dd.length>1?'s':'')+' du journal '+(dd.length>1?'sont des copies':'est une copie')+' exacte'+(dd.length>1?'s':'')+' d\'une série déjà enregistrée (versée deux fois par « Fusionner »). Elles comptent double dans la courbe et les statistiques.\n\n'+
+    'Les retirer ? Une sauvegarde complète est téléchargée juste avant.')){
+    dl(profFile()+todayISO()+'-avant-doublons.json',JSON.stringify(S,null,2),'application/json');
+    var gone={}; dd.forEach(function(e){ gone[String(e.key)]=String(e.srcKey); });
+    S.log=S.log.filter(function(e){ return !gone[String(e.key)]; });
+    (S.velo||[]).forEach(function(v){ if(v.lien&&gone[String(v.lien.key)])v.lien.key=gone[String(v.lien.key)]; });
+    msgBar(dd.length+' doublon'+(dd.length>1?'s':'')+' retiré'+(dd.length>1?'s':''));
+  }
+  S.m119=1; save(); renderAll();
+},700);
 if(S.bkEvery==null)S.bkEvery=7;          /* rappel de sauvegarde : chaque semaine par defaut */
 if(!S.firstUse)S.firstUse=todayISO();
 dq().view='accueil';   /* lot 102 (G1) : Données s'ouvre sur le Résumé */
