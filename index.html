@@ -1283,7 +1283,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v129';   /* lot 74 */
+var APPV='v130';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -2591,10 +2591,13 @@ function hW0(L,c){
    Lot 57 (MSP-I1) : reprise réglable (P.hRep : 5, 7,5 ou 10 %) ; après le cycle de reprise, chaque vague suivante
    prend l'incrément réduit de moitié (p. 244), par exercice : le lift (J1, J2, J3) ou la variante. */
 function hBlkW(L,c,lab,n){ return flOf(L).some(function(v){ if(v.m!=='h'||(lab!=null&&(v.d!==lab||v.n!==n)))return false; var k=hWk(L,v.w); return k.c===c&&!k.dl; }); }
-function hWave(L,t,s,c0,cy,lab,n){
+/* lot 122 (audit du 26/10, point 2) : un pourcentage de baisse s'applique à la charge système (PdC + lest), pas à la charge
+   du modèle (PdC × 30/29 + lest) : s et le résultat restent en unités du modèle. bw = PdC du calcul. */
+function hPct(L,s,f,bw){ var e=eff(L,bw), z=bwZ(L,bw); return (s-e+z)*f-z+e; }
+function hWave(L,t,s,c0,cy,lab,n,bw){
   if(t.fail!=='inter')return s+L.prog.inc*(cy-c0);
   var p=t.inc?hRepOf(L.prog):7.5, fb=t.inc?hBlk1(L,lab,n):null, ir=hIncR(L.prog.inc);
-  for(var c=c0+1;c<=cy;c++)s=hBlkW(L,c-1,lab,n)?s*(1-p/100):s+((fb!=null&&fb<c-1)?ir:L.prog.inc);
+  for(var c=c0+1;c<=cy;c++)s=hBlkW(L,c-1,lab,n)?hPct(L,s,1-p/100,bw):s+((fb!=null&&fb<c-1)?ir:L.prog.inc);
   return s;
 }
 function hRepOf(P){ return [5,7.5,10].indexOf(+P.hRep)>=0?+P.hRep:7.5; }
@@ -4723,14 +4726,18 @@ function pdcCard(k){
     '<p class="note" id="pdcmsg" style="margin:4px 0 0">'+(deps.length?'Départ '+(same?'<b>'+F(deps[0].bw)+'</b>':deps.map(function(x){return x.n+' <b>'+F(x.bw)+'</b>';}).join(', '))+
       (same&&deps[0].f?' ('+ec(deps[0].bw)+' kg)':'')+(deps.some(function(x){return !x.f;})?', pas encore figé':'')+' · ':'')+
       '<button type="button" class="linkbtn" data-pdcmod="1">autres réglages</button></p></div>';
+  if(pdcKept(jour))up=dn=false;   /* lot 122 (audit du 26/10, point 5) : départ gardé à ce PdC, le bandeau ne revient qu'au prochain changement */
+  var kb='<button class="act ghost mini" onclick="pdcKeep()">Garder le départ</button>';
   if(up)h+='<div class="flag" data-pdcflag><b>Au moins 1,25 kg au-dessus du départ.</b> '+
     'Recalculer la suite du bloc à '+F(jour)+' kg garde la charge système prévue (le lest baisse d\'autant).'+
-    '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button></div></div>';
+    '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button>'+kb+'</div></div>';
   else if(dn)h+='<div class="flag" data-pdcflag><b>Au moins 1,25 kg sous le départ.</b> '+
     'Recalculer la suite du bloc à '+F(jour)+' kg garde la charge système prévue (le lest monte d\'autant). En perte de poids, la force suit rarement : à vous de voir.'+
-    '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button></div></div>';
+    '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button>'+kb+'</div></div>';
   return h;
 }
+function pdcKept(jour){ var k=S.pdcKeep; return !!(k&&k.b===S.blockId&&Math.abs(+k.bw-(+jour))<1e-9); }
+function pdcKeep(){ S.pdcKeep={b:S.blockId,bw:(S.tbw!=null?S.tbw:S.bw)}; save(); renderToday(); }
 function pdcPlace(){   /* lot 73 */
   var o=$('todayout'), cs=$('cardsess'), l=$('pdcline'), fl=o&&o.querySelector?o.querySelector('[data-pdcflag]'):null, cf=$('cardform');
   if(!o||!cs||!l||!o.insertBefore)return;
@@ -5507,7 +5514,7 @@ function buildPlan(){
             if(li.tech)info+=' (jour technique, livre : RPE 5, soit 4 à 6 reps de l\'échec, p. 242 ; l\'outil prend 5 ; jamais compté comme échec, p. 245)';   /* lot 56 */
             var b1=t.inc?hB1(L,li,ha)*hFacB(L,li,hb):0, hi=hIncOf(P), vNo=!!(t.inc&&li.vari&&P.varMod!=='standard'&&vLestOf(P)==null);   /* lot 56 : charge de S1, incrément de vague */   /* lot 57 : S1 en état B ; variante sans lest de départ (réponse 1) */
             if(hk.dl){   /* Q6 : deload S4 = reps de la derniere semaine, charge de la S1, deux tiers des series */
-              sysP=sys=hWave(L,t,t.inc?b1:rm/(1+L.k*(li.reps[0]+(li.rir[0]||0)-1)),ha.c,cy,lab,li_i); q=null; role='deload';
+              sysP=sys=hWave(L,t,t.inc?b1:rm/(1+L.k*(li.reps[0]+(li.rir[0]||0)-1)),ha.c,cy,lab,li_i,ha.bw); q=null; role='deload';
               sets=hDlSets(t,hSets(li,ww,1)); info='deload S'+(hk.n+1)+' : reps de S'+hk.n+', charge de S1, '+(t.inc?sets+' séries (table du livre, p. 243)':'2/3 des séries')+
                 (hk.fg?' · deload de tous les mouvements après le blocage de '+(hGdl()[w]||[]).join(', ')+' (p. 244)':'');   /* lot 57 */   /* lot 56 */   /* D11 */
             }else if(lin){   /* lot 51 (E1) : progression simple, règle novice (p. 106, 109, 241) ; le J2 (variante) n'échoue jamais */
@@ -5516,7 +5523,7 @@ function buildPlan(){
               else{
                 sysP=hs.sys;
                 if(hs.m10){sys=hs.blk; tag=' · retour à la charge de blocage (livre p. 109)';}
-                else if(hs.f&&hs.st>=2){sys=0.9*hs.sys; m10=true; blk=hs.sys; n10++;
+                else if(hs.f&&hs.st>=2){sys=hPct(L,hs.sys,0.9,ha.bw); m10=true; blk=hs.sys; n10++;
                   tag=' · −10 % après deux échecs (règle novice, p. 109)'+(n10>=3?' ; blocage persistant : passer à l\'intermédiaire (p. 241)':'');}
                 else if(hs.f){sys=hs.sys; tag=' · même charge qu\'en S'+(hs.w+1)+' (échec)';}
                 else{sys=hs.sys+P.inc/(n10>=2?2:1); if(n10>=2)tag=' · incrément réduit de moitié (blocage répété, p. 241)';}
@@ -5524,19 +5531,19 @@ function buildPlan(){
               var fv=flAt(L,w,lab,li_i), fl=!li.vari&&!!(fv&&fv.m==='h');
               HS[sk]={sys:sys,f:fl,st:fl?((hs&&hs.f&&hs.st<2)?hs.st:0)+1:0,m10:m10,blk:blk,n10:n10,c:cy,w:w};
             }else{   /* B2 / Q3 : regle du livre, par creneau ; le decalage vaut jusqu'a la fin de la vague */
-              sysP=hWave(L,t,t.inc?b1+hi*hStepW(li,ww,hb):rm/(1+L.k*(r+(q||0)-1)),ha.c,cy,lab,li_i);   /* lot 57 : J2 en état B, +1 incrément toutes les 2 semaines */   /* lot 56 : S2 et S3 = S1 + incrément */
+              sysP=hWave(L,t,t.inc?b1+hi*hStepW(li,ww,hb):rm/(1+L.k*(r+(q||0)-1)),ha.c,cy,lab,li_i,ha.bw);   /* lot 57 : J2 en état B, +1 incrément toutes les 2 semaines */   /* lot 56 : S2 et S3 = S1 + incrément */
               var sk=o.i+'|'+lab+'|'+li_i, hs=HS[sk], dd=(hs&&hs.c===cy)?hs.d:0, fx=(itr&&hs&&hs.c===cy)?hs.fx:null;
               sys=sysP+dd; if(dd<0)tag=' · décalée (échec)';
               if(itr){   /* lot 51 : règle intermédiaire (p. 244), la suite de la vague reste à la charge ratée */
                 if(fx!=null&&fx<sys){sys=fx; tag=' · charge ratée, règle intermédiaire : baissez si besoin pour faire toutes les reps (livre p. 244)';}
               }else if(hs&&hs.f){
-                if(hs.st>=2){ if(0.9*hs.sys<sys){sys=0.9*hs.sys; tag=' · −10 % après deux échecs';} }
+                if(hs.st>=2){ var h90=hPct(L,hs.sys,0.9,ha.bw); if(h90<sys){sys=h90; tag=' · −10 % après deux échecs';} }
                 else if(hs.sys<sys){sys=hs.sys; tag=' · même charge qu\'en S'+(hs.w+1)+' (échec)';}
               }
               var fv=flAt(L,w,lab,li_i), fl=!li.tech&&!!(fv&&fv.m==='h');   /* lot 56 : le J2 n'est jamais un échec */
               HS[sk]={sys:sys,f:fl,st:fl?((hs&&hs.f&&hs.st<2)?hs.st:0)+1:0,d:sys-sysP,c:cy,w:w,fx:fl?sys:fx};
               if(t.inc&&ww>0){   /* lot 56 : réserve estimée depuis le 1RM implicite de la S1, indicative */
-                var s1=hWave(L,t,b1,ha.c,cy,lab,li_i), qe=(s1*(1+L.k*(hR0(li,hb)+(li.rir[0]||0)-1))/sys-1)/L.k+1-r;
+                var s1=hWave(L,t,b1,ha.c,cy,lab,li_i,ha.bw), qe=(s1*(1+L.k*(hR0(li,hb)+(li.rir[0]||0)-1))/sys-1)/L.k+1-r;
                 q=Math.max(0,Math.round(qe*2)/2);
                 info='≈ '+F(q)+' en réserve (estimation : en S'+(ww+1)+', la charge vient de S1 + '+F(hi*hStepW(li,ww,hb))+' kg, p. 243)'+(li.tech?' ; jour technique, jamais compté comme échec (p. 245)':'');
               }
