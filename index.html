@@ -541,6 +541,7 @@ svg.vplot .lb{opacity:.65}
 /* lot 74 : PdC en un bouton qui s'ouvre sur place */
 .pdcbtn{display:inline-flex;align-items:center;gap:6px;min-height:44px;max-width:100%;padding:6px 12px;border:1px solid var(--rule);
   border-radius:var(--r);background:var(--surface);color:var(--ink);font:500 15px/1.2 var(--txt);white-space:nowrap;cursor:pointer}
+.pdcrec{cursor:default;border-style:dashed}   /* lot 123 : PdC enregistré d'une séance passée, non modifiable ici */
 .pdcbtn b{font:700 16px/1 var(--num)}
 .pdcbtn .pdce{color:var(--muted);font-weight:500}
 #pdcline.open{display:block}
@@ -1283,7 +1284,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v130';   /* lot 74 */
+var APPV='v131';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -4718,6 +4719,8 @@ function pdcCard(k){
   var same=deps.length&&deps.every(function(x){return x.bw===deps[0].bw;});
   var ec=function(b){var e=Math.round((jour-b)*100)/100; return (e>0?'+':(e<0?'\u2212':'\u00b1'))+F(Math.abs(e));};
   var h;
+  var rec=pdcRec(w,lab);   /* lot 123 : séance passée → le PdC enregistré avec ses séries, pas celui d'aujourd'hui */
+  if(rec)return '<div id="pdcline"><span class="pdcbtn pdcrec" title="PdC noté avec les séries de cette séance">⚖ PdC enregistré <b>'+rec.txt+'</b> kg <span class="pdce">· le '+frDate(rec.d)+'</span></span></div>';
   if(!PDCOPEN)h='<div id="pdcline"><button type="button" class="pdcbtn" data-pdcopen="1" aria-label="PdC du jour '+F(jour)+' kg, toucher pour le changer">'+
     '⚖ PdC <b>'+F(jour)+'</b> kg'+(same&&deps[0].f?' <span class="pdce">· '+ec(deps[0].bw)+'</span>':'')+' ✎</button></div>';
   else h='<div id="pdcline" class="open"><div class="pdcrow"><label for="pdcin">PdC du jour</label>'+
@@ -4735,6 +4738,17 @@ function pdcCard(k){
     'Recalculer la suite du bloc à '+F(jour)+' kg garde la charge système prévue (le lest monte d\'autant). En perte de poids, la force suit rarement : à vous de voir.'+
     '<div class="btnrow"><button class="act mini" onclick="pdcRebase()">Recalculer la suite du bloc</button>'+kb+'</div></div>';
   return h;
+}
+/* lot 123 (27/10, demande de Luka) : PdC enregistré d'une séance passée, lu sur ses séries (e.bw), sinon sur la pesée du jour */
+function pdcRec(w,lab){
+  var vs=[], d=null, t=todayISO();
+  S.log.forEach(function(e){ var q=String(e.key).split('|'); if(+q[2]!==w||q[3]!==lab||!inBlock(e.key)||e.state==='skip'||!e.date)return;
+    if(!d||e.date>d)d=String(e.date).slice(0,10); if(+e.bw>0&&vs.indexOf(+e.bw)<0)vs.push(+e.bw); });
+  if(!d||d>=t)return null;
+  if(!vs.length&&S.pesees&&+S.pesees[d]>0)vs.push(+S.pesees[d]);
+  if(!vs.length)return null;
+  vs.sort(function(x,y){return x-y;});
+  return {d:d,txt:vs.length>1?F(vs[0])+' à '+F(vs[vs.length-1]):F(vs[0])};
 }
 function pdcKept(jour){ var k=S.pdcKeep; return !!(k&&k.b===S.blockId&&Math.abs(+k.bw-(+jour))<1e-9); }
 function pdcKeep(){ S.pdcKeep={b:S.blockId,bw:(S.tbw!=null?S.tbw:S.bw)}; save(); renderToday(); }
