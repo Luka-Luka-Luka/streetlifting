@@ -230,7 +230,7 @@ function masqueRose(data, W, H, stride, etat) {
   for (let i = 0, p = 0; i < n; i++, p += stride) {
     const r = data[p], g = data[p + 1], b = data[p + 2];
     let v = 0;
-    if (r >= g && r >= b && r >= 70) {            // max = rouge, et V >= 70
+    if (r >= g && r >= b && r >= 100) {           // max = rouge, et V >= 100 (v132 : a 70, un tee-shirt bordeaux a l'ombre passait pour la marque, 01/11/2026)
       const mn = g < b ? g : b, d = r - mn;
       if (d !== 0 && Math.round((255 * d) / r) >= 60) {   // S > 0 et S >= 60
         let h = (60 * (g - b)) / d;
@@ -3617,7 +3617,8 @@ function demuxerMaison(buf) {
           const cp = cand[i - g], kp = cout[i - g];
           for (let p = 0; p < cp.length; p++) {
             const q = cp[p], dy = Math.abs(b.y - q.y);
-            if (dy >= PD.SAUT * g) continue;
+            // v132 : pas de saut lateral de plus de 150 px (une chaise rouge au fond prenait le relais de la ceinture, 01/11/2026)
+            if (dy >= PD.SAUT * g || Math.abs(b.x - q.x) >= Math.min(PD.SAUT * g, 150)) continue;
             const v = kp[p] + PD.MANQUE * (g - 1) + dy / g + PD.KX * Math.abs(b.x - q.x) / g +
               PD.KA * Math.abs(Math.log(b.aire / q.aire));
             if (v < best) { best = v; arg = [i - g, p]; }
@@ -4305,7 +4306,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"v132","note_v132":"02/11/2026 : seuil de luminosite de la marque 70 -> 100 et saut lateral du suivi borne a 150 px (series du 01/11 : 5 et 4 reps trouvees sur 7)","note_lot90_version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
