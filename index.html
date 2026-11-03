@@ -1284,7 +1284,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v132';   /* lot 74 */
+var APPV='v133';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -10494,7 +10494,7 @@ function serieLab(v){
   var le=lienEntry(v);   /* lot 57 bis */
   return typeLab(v)+' '+(+v.lest_kg?F(v.lest_kg):'PdC')+'×'+v.reps.length+(v.variante?' · '+esc(v.variante):'')+(le&&le.fin?' · '+finCourt(le):'');
 }
-function vui(){ if(!S.vui)S.vui={scr:'seance',date:'',mv:'',open:null,warm:false,cmv:'',cgrp:'',ctype:'',cmes:'h'}; if(!S.vui.cmode)S.vui.cmode='egal'; if(!Array.isArray(S.vui.csel))S.vui.csel=[]; return S.vui; }
+function vui(){ if(!S.vui)S.vui={scr:'seance',date:'',mv:'',open:null,warm:false,cmv:'',cgrp:'',ctype:'',cmes:'h'}; if(!S.vui.cmode||S.vui.cmode==='egal')S.vui.cmode='fil';   /* lot 124 */ if(!Array.isArray(S.vui.csel))S.vui.csel=[]; return S.vui; }
 function vById(id){ return (S.velo||[]).filter(function(x){return x.id===id;})[0]||null; }
 function hCol(h,s){
   if(h==null)return 'var(--muted)';
@@ -10588,8 +10588,8 @@ function vScrSeance(){
 /* ---------- charge egale ----------
    Meme mouvement, meme variante, charge systeme (PdC du jour + lest) a 1,25 kg pres d'un
    centre de groupe. Sans PdC, regroupement au lest, signale. */
-function vGroups(mv){
-  var l=(S.velo||[]).filter(function(v){return v.mouvement===mv;});
+function vGroups(mv){ return vGroupsOf((S.velo||[]).filter(function(v){return v.mouvement===mv;})); }
+function vGroupsOf(l){   /* lot 124 */
   var key=function(v){return v.charge_systeme_kg!=null?+v.charge_systeme_kg:null;};
   var out=[];
   l.slice().sort(function(a,b){return (key(a)||+a.lest_kg||0)-(key(b)||+b.lest_kg||0);}).forEach(function(v){
@@ -10607,46 +10607,109 @@ function vGroups(mv){
   });
   return out.filter(function(G){return G.l.length>=2;});
 }
-function vScrComparer(){
+/* lot 124 (réponses de Luka 03/11) : « Au fil des séances » remplace « À charge égale ». Séries de la période, d'un type.
+   Charge « toutes » : écart de la 1re rep à la vitesse attendue à sa charge, d'après la droite des séances d'AVANT
+   (vsFitPts, au moins 6 séries) ; un point par série sur une petite courbe. Charge choisie (même lest, ou même charge
+   totale à 1,25 kg près) : valeurs brutes, écarts avec la plus ancienne de la liste (la référence). */
+function vfLestLab(x){ return +x?'+'+F(+x)+' kg de lest':'PdC seul (sans lest)'; }
+function vfDw(v){
+  var c=v.charge_systeme_kg, v1=v.reps&&v.reps[0]&&v.reps[0].vitesse_moy_ms!=null?+v.reps[0].vitesse_moy_ms:null;
+  if(v.variante)return {why:'variante : pas de droite'};
+  if(tpOutE(lienEntry(v)))return {why:'tempo imposé : hors droite'};
+  if(c==null||v1==null)return {why:c==null?'PdC absent':'1re rep absente'};
+  var P=vsFitPts(vsPts(v.mouvement).filter(function(o){return String(o.v.date)<String(v.date);}));
+  if(!P)return {why:'pas encore 6 séries filmées avant',v1:v1};
+  var ex=P.a+P.b*(+c);
+  return {v1:v1,ex:ex,d:v1-ex};
+}
+function vfCurve(rows){
+  var pts=rows.filter(function(o){return o.w.d!=null;}); if(pts.length<2)return '';
+  var ds=[]; rows.forEach(function(o){ if(ds.indexOf(o.v.date)<0)ds.push(o.v.date); });
+  var W=340,H=130,x0=34,x9=W-8,mt=10,mb=22, m=0.15;
+  pts.forEach(function(o){ m=Math.max(m,Math.abs(o.w.d)*1.15); });
+  var X=function(d){ var i=ds.indexOf(d); return ds.length<2?(x0+x9)/2:x0+(x9-x0)*i/(ds.length-1); };
+  var Y=function(y){ return mt+(H-mt-mb)*(m-y)/(2*m); };
+  var o='<svg class="vbars" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="écart de la 1re rep à la vitesse attendue, séance par séance">'+
+    '<rect x="'+x0+'" y="'+Y(0.07).toFixed(1)+'" width="'+(x9-x0)+'" height="'+(Y(-0.07)-Y(0.07)).toFixed(1)+'" fill="currentColor" opacity=".08"/>'+
+    '<line x1="'+x0+'" x2="'+x9+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'" stroke="currentColor" opacity=".35"/>';
+  [m*0.8,-m*0.8].forEach(function(g){ var r=Math.round(g*100)/100; o+='<text x="'+(x0-4)+'" y="'+(Y(r)+3.5).toFixed(1)+'" text-anchor="end" class="lb">'+(r>0?'+':'−')+F(Math.abs(r))+'</text>'; });
+  o+='<text x="'+(x0-4)+'" y="'+(Y(0)+3.5).toFixed(1)+'" text-anchor="end" class="lb">0</text>';
+  var line=pts.map(function(q){ return X(q.v.date).toFixed(1)+','+Y(q.w.d).toFixed(1); });
+  o+='<polyline points="'+line.join(' ')+'" fill="none" stroke="var(--a8)" stroke-width="1.5"/>';
+  pts.forEach(function(q){ var c=Math.abs(q.w.d)<=0.07?'var(--a8)':(q.w.d>0?'var(--ok)':'var(--warn)');
+    o+='<circle cx="'+X(q.v.date).toFixed(1)+'" cy="'+Y(q.w.d).toFixed(1)+'" r="4" fill="'+c+'"/>'; });
+  var lab=[0,ds.length-1]; if(ds.length>4)lab.splice(1,0,Math.round((ds.length-1)/2));
+  lab.forEach(function(i){ var d=ds[i]; o+='<text x="'+X(d).toFixed(1)+'" y="'+(H-6)+'" text-anchor="'+(i===0?'start':i===ds.length-1?'end':'middle')+'" class="lb">'+perDs(d)+'</text>'; });
+  return o+'</svg>';
+}
+function vScrFil(){
   var U=vui(), mvs=[];
   (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
   if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
-  var gs=vGroups(U.cmv);
-  var head='<div class="card"><div class="row">'+(mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div>':'');
-  if(!gs.length)return head+'</div><p class="note">Aucune charge filmée deux fois pour ce mouvement. La comparaison apparaît dès la deuxième série à la même charge (±1,25 kg de charge système).</p></div>';
-  var ids=gs.map(function(G){return G.id;});
-  if(ids.indexOf(U.cgrp)<0){ var last=gs.slice().sort(function(a,b){return b.l.length-a.l.length;})[0]; U.cgrp=last.id; }
-  var G=gs[ids.indexOf(U.cgrp)];
-  var types=[]; G.l.forEach(function(v){var t=typeLab(v); if(types.indexOf(t)<0)types.push(t);});
-  if(U.ctype!=='tous'&&types.indexOf(U.ctype)<0)U.ctype=types.indexOf('Top set')>=0?'Top set':types[0];
-  var l=G.l.filter(function(v){return U.ctype==='tous'||typeLab(v)===U.ctype;})
-    .sort(function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);});
-  var mes=U.cmes==='v'?'v':'h';
-  var refNow=l.length?vRef(l[l.length-1]):'depart';
-  var sc=scaleOf(l,mes);
-  var perDay={}, prev=null;
-  var rows=l.map(function(v){
+  var all=S.velo.filter(function(v){ return v.mouvement===U.cmv&&perOk(null,'d',vDayInfo(v.date).b,v.date); });
+  var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
+  if(!all.length)return h+'<p class="note">Aucune série filmée sur cette période. Changez la période en haut de Données.</p></div>';
+  var types=[]; all.forEach(function(v){ var t=typeLab(v); if(types.indexOf(t)<0)types.push(t); });
+  var ord=['Top set','Back-off','Série','Série max','Montée fixe','Deload','Échauffement'];
+  types.sort(function(a,b){ return ord.indexOf(a)-ord.indexOf(b); });
+  if(U.ftyp!=='tous'&&types.indexOf(U.ftyp)<0)U.ftyp=types[0];
+  var l=all.filter(function(v){ return U.ftyp==='tous'||typeLab(v)===U.ftyp; })
+    .sort(function(a,b){ return String(a.date).localeCompare(String(b.date))||vSortN(a,b); });
+  /* charges proposées : celles filmées au moins deux fois dans la liste */
+  var cntL={}, dL={}; l.forEach(function(v){ var k=String(+v.lest_kg||0); cntL[k]=(cntL[k]||0)+1; (dL[k]=dL[k]||{})[v.date]=1; });
+  var nd=function(k){ return Object.keys(dL[k]).length; };   /* au moins deux séances : une seule = fatigue dans la séance, pas progrès */
+  var lests=Object.keys(cntL).filter(function(k){return nd(k)>=2;}).sort(function(a,b){return +a-+b;});
+  var gs=vGroupsOf(l.filter(function(v){return v.charge_systeme_kg!=null;})).filter(function(G){return G.nd>=2;});
+  var opts=[''].concat(lests.map(function(k){return 'l:'+k;}),gs.map(function(G){return 's:'+G.id;}));
+  if(opts.indexOf(U.fch||'')<0)U.fch='';
+  var chLab=function(x){
+    if(!x)return 'toutes (écart à votre droite)';
+    if(x.slice(0,2)==='l:')return 'même lest : '+vfLestLab(x.slice(2))+' — '+cntL[x.slice(2)]+' séries, '+nd(x.slice(2))+' séances';
+    var G=gs.filter(function(g){return 's:'+g.id===x;})[0];
+    return 'même charge totale : ≈'+F(G.c)+' kg'+(G.va?' · '+esc(G.va):'')+' — '+G.l.length+' séries, '+G.nd+' séances';
+  };
+  h+='<div class="row" style="margin-top:6px"><div class="field md"><label>Type de série</label>'+
+      vSel('ftyp',types.concat(['tous']),U.ftyp,function(t){return t==='tous'?'tous les types':t;})+'</div>'+
+    '<div class="field w"><label>Charge</label>'+vSel('fch',opts,U.fch||'',chLab)+'</div></div>';
+  if(U.ftyp==='tous')h+='<p class="note">Types mélangés : un back-off fait après le top set n’est pas une série fraîche.</p>';
+  if(!U.fch){
+    var rows=l.map(function(v){ return {v:v,w:vfDw(v)}; }), nd=rows.filter(function(o){return o.w.d!=null;}).length;
+    h+=nd>=2?vfCurve(rows):'';
+    h+=rows.slice().reverse().map(function(o){ var v=o.v, w=o.w;
+      var verdict=w.d==null?'<small>'+w.why+'</small>':
+        (Math.abs(w.d)<=0.07?'<b>habituelle</b>':(w.d>0?'<b class="vsok">plus rapide</b>':'<b class="vswarn">plus lente</b>'))+
+        ' <small>'+(Math.round(w.d*100)?(w.d>0?'+':'−')+v2(Math.abs(w.d)):'±0')+' m/s</small>';
+      return '<div class="vrow" data-vopen="'+esc(v.id)+'"><div class="vrh"><b>'+frDate(v.date)+' <span class="muted">'+serieLab(v)+'</span></b><span>'+verdict+' ›</span></div>'+
+        '<p class="note" style="margin:2px 0 0">1re rep '+(w.v1==null?'—':v2(w.v1)+' m/s')+(w.ex!=null?' · attendue '+v2(w.ex)+' m/s à '+F(v.charge_systeme_kg)+' kg au total':'')+'</p></div>';
+    }).join('');
+    h+='<p class="note">Chaque série comparée à la vitesse attendue à sa charge, d’après votre droite charge-vitesse calculée sur les séances d’<b>avant</b> (au moins 6 séries filmées). '+
+      'Plus rapide = 1re rep au-dessus de l’attendu, donc plus en forme ou plus fort. Bande grise et « habituelle » : écart sous la marge de mesure (0,07 m/s, Weakley 2021). '+
+      (opts.length>1?'Pour comparer une même charge, choisissez-la dans « Charge ».':'Aucune charge de ce type filmée sur deux séances de la période : « Charge » n’a que cette vue.')+'</p>';
+    return h+'</div>';
+  }
+  /* même charge : valeurs brutes, la plus ancienne en référence */
+  var sel=U.fch.slice(0,2)==='l:'?l.filter(function(v){return String(+v.lest_kg||0)===U.fch.slice(2);}):
+    gs.filter(function(g){return 's:'+g.id===U.fch;})[0].l.slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);});
+  var mes=U.cmes==='v'?'v':'h', sc=scaleOf(sel,mes), R=sel[0], st=sel.map(function(v){return vcStats(v,null);}), r0=st[0];
+  var cs=sel.map(function(v){return v.charge_systeme_kg;}).filter(function(c){return c!=null;});
+  if(U.fch.slice(0,2)==='l:'&&cs.length>1){ var lo=Math.min.apply(null,cs), hi=Math.max.apply(null,cs);
+    if(hi-lo>1.25+1e-6)h+='<p class="note">Même lest, mais votre poids a varié : charge totale de '+F(lo)+' à '+F(hi)+' kg. Pour une charge totale égale, choisissez « même charge totale ».</p>'; }
+  var perDay={};
+  h+=sel.map(function(v,i){ var o=st[i], ref=i===0, d=function(a,b){return ref||a==null||b==null?null:a-b;};
     perDay[v.date]=(perDay[v.date]||0)+1;
-    var val=mes==='v'?vLast(v):vMini(v), fz=mes==='v'&&!!(lienEntry(v)||{}).fin, other=(mes==='h'&&vRef(v)!==refNow)||fz;   /* lot 57 bis */
-    var d=(prev!=null&&val!=null&&!other)?val-prev:null; if(!other&&val!=null)prev=val;
-    return '<div class="vrow" data-vopen="'+esc(v.id)+'">'+
-      '<div class="vrh"><b>'+frDate(v.date)+(l.filter(function(x){return x.date===v.date;}).length>1?' <span class="muted">· '+perDay[v.date]+'</span>':'')+
-        ' <span class="muted">'+serieLab(v)+'</span></b>'+
-        '<span>'+(mes==='v'?'dern. rep ':'mini ')+'<b>'+(val==null?'—':F(val))+'</b>'+(d==null?'':' <b class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+F(Math.abs(Math.round(d*(mes==='v'?100:10))/(mes==='v'?100:10)))+'</b>')+'</span></div>'+
-      barsSvg(v,sc.lo,sc.hi,mes)+(other?'<p class="note" style="margin:0">'+(fz?'Échec fini en fractionné ou en EMOM : la dernière rep suit une pause, non comparable.':'Ancienne mesure de hauteur : non comparable.')+'</p>':'')+'</div>';
+    var nSame=sel.filter(function(x){return x.date===v.date;}).length;
+    return '<div class="vrow" data-vopen="'+esc(v.id)+'"><div class="vrh"><b>'+frDate(v.date)+(nSame>1?' <span class="muted">· '+perDay[v.date]+'</span>':'')+' <span class="muted">'+serieLab(v)+'</span></b><span>'+(ref?'<span class="tag">référence</span> ':'')+'›</span></div>'+
+      '<p class="note" style="margin:2px 0 0">1re rep '+(o.v1==null?'—':v2(o.v1))+vcDelta(d(o.v1,r0.v1),100,1,0.07)+
+        ' · dern. rep '+(o.vl==null?'—':v2(o.vl))+(o.fin?' <small>(après une pause)</small>':vcDelta(r0.fin?null:d(o.vl,r0.vl),100,1,0.07))+
+        ' · mini '+(o.mn==null?'—':F(o.mn)+' cm')+(vRef(v)!==vRef(R)?'':vcDelta(d(o.mn,r0.mn),10,1,VBANDE))+
+        (o.cs!=null?' · '+F(o.cs)+' kg au total':'')+'</p>'+
+      barsSvg(v,sc.lo,sc.hi,mes)+'</div>';
   }).join('');
-  var glab=function(id){ var g=gs[ids.indexOf(id)];
-    return (g.bw?'≈'+F(g.c)+' kg système':F(g.c)+' kg de lest (PdC absent)')+(g.va?' · '+g.va:'')+' — '+g.l.length+' séries, '+g.nd+' séance'+(g.nd>1?'s':''); };
-  return head+'<div class="field w"><label>Charge</label>'+vSel('cgrp',ids,U.cgrp,glab)+'</div></div>'+
-    '<div class="row" style="margin-top:8px"><div class="field md"><label>Type de série</label>'+vSel('ctype',types.concat(['tous']),U.ctype,function(t){return t==='tous'?'tous les types':t;})+'</div>'+
-    '<div class="field md"><label>Mesure</label><div class="vseg">'+
-      '<button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Hauteur</button>'+
-      '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Vitesse</button></div></div></div>'+
-    rows+
-    '<p class="note">'+(mes==='h'?'Hauteur la plus basse de chaque série, et écart avec la ligne précédente.':'Vitesse moyenne de la dernière rep, et écart avec la ligne précédente.')+
-      ' Charge égale : même mouvement, même variante, charge système (PdC du jour + lest) à 1,25 kg près.'+
-      (U.ctype==='tous'?' <b>Types mélangés</b> : un back-off fait après le top set n\'est pas une série fraîche.':'')+'</p></div>';
+  h+='<div class="vseg" style="margin-top:6px"><button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Barres : hauteur</button>'+
+    '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Barres : vitesse</button></div>';
+  h+='<p class="note">Écarts avec la plus ancienne série de la liste (la référence), vitesses en m/s. Vert = mieux, rouge = moins bien, en gris : sous la marge de mesure (0,07 m/s ; '+F(VBANDE)+' cm). Touchez une série pour le détail.</p>';
+  return h+'</div>';
 }
 /* lot 120 : écran Comparer, deux façons (réponses de Luka 26/10, tout en recommandé).
    À charge égale = vScrComparer (inchangé). Séries choisies = jusqu'à VCMAX séries cochées, n'importe lesquelles du
@@ -10656,9 +10719,9 @@ var VCMAX=3;
 function vScrCmp(){
   var U=vui();
   return '<div class="vseg vcmode">'+
-      '<button class="pill" data-vcmode="egal" aria-pressed="'+(U.cmode!=='choix')+'">À charge égale</button>'+
+      '<button class="pill" data-vcmode="fil" aria-pressed="'+(U.cmode!=='choix')+'">Au fil des séances</button>'+
       '<button class="pill" data-vcmode="choix" aria-pressed="'+(U.cmode==='choix')+'">Séries choisies</button></div>'+
-    (U.cmode==='choix'?vScrChoix():vScrComparer());
+    (U.cmode==='choix'?vScrChoix():vScrFil());
 }
 /* lot 120 bis (audit Vitesse 26/10) : la référence de « Comparer avec… » : même mouvement, même variante, même type de
    série, charge système à 1,25 kg près (lest égal sans PdC), la plus récente avant celle-ci (le même jour : ordre n).
@@ -10705,9 +10768,6 @@ function vScrChoix(){
     var cs=st.map(function(o){return o.cs;}), diff=sel.some(function(v){return String(v.variante||'')!==String(sel[0].variante||'');})||
       cs.some(function(c){return c==null||cs[0]==null||Math.abs(c-cs[0])>1.25+1e-6;}),
       oldH=mes==='h'&&sel.some(function(v){return vRef(v)!==vRef(sel[0]);});
-    h+='<div class="row" style="margin-top:8px"><div class="field md"><label>Mesure des barres</label><div class="vseg">'+
-        '<button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Hauteur</button>'+
-        '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Vitesse</button></div></div></div>';
     if(diff)h+='<div class="flag"><b>Charges différentes</b> ('+sel.map(function(v,i){return st[i].cs!=null?F(st[i].cs)+' kg':vcLoadLab(v);}).join(' · ')+
       (sel.some(function(v){return v.variante;})?', ou variante différente':'')+') : plus la charge monte, plus la vitesse baisse. '+
       'Les écarts bruts ne disent pas qui était le plus en forme ; la ligne <b>vs votre droite</b> le dit, elle compare chaque 1re rep à la vitesse attendue à sa charge.</div>';
@@ -10728,6 +10788,8 @@ function vScrChoix(){
           ' · <button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></p>'+
         '<dl class="vsvl">'+lines+'</dl>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>';
     }).join('');
+    h+='<div class="vseg" style="margin-top:6px"><button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Barres : hauteur</button>'+
+      '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Barres : vitesse</button></div>';   /* lot 124 */
     h+='<p class="note">Écarts avec la référence, la 1re série choisie. Vert = mieux, rouge = moins bien. '+
       'En gris : écart sous la marge de mesure (0,07 m/s pour la vitesse, Weakley 2021 ; '+F(VBANDE)+' cm pour la hauteur). Barres à la même échelle.</p>';
   }else h+='<p class="note" style="margin-top:8px">'+(sel.length===1?'Aucune série d’avant au même lest, de même type et même variante : ':'')+'<b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La 1re cochée sert de référence.</p>';
@@ -10811,8 +10873,9 @@ function vsPts(mv){
     .map(function(v){ return {x:+v.charge_systeme_kg,y:+v.reps[0].vitesse_moy_ms,v:v}; });
 }
 /* droite des moindres carrés ; prolongée jusqu'au 1RM seulement si elle est nette (r <= -0,8) et couvre au moins 25 kg */
-function vsFit(mv){
-  var p=vsPts(mv), n=p.length; if(n<6)return null;
+function vsFit(mv){ return vsFitPts(vsPts(mv)); }
+function vsFitPts(p){   /* lot 124 : la même droite, sur des points donnés */
+  var n=p.length; if(n<6)return null;
   var mx=0,my=0; p.forEach(function(o){mx+=o.x;my+=o.y;}); mx/=n; my/=n;
   var sxx=0,sxy=0,syy=0; p.forEach(function(o){ sxx+=(o.x-mx)*(o.x-mx); sxy+=(o.x-mx)*(o.y-my); syy+=(o.y-my)*(o.y-my); });
   if(!sxx||!syy)return null;
@@ -10936,7 +10999,7 @@ function vsProfil(){
   (S.velo||[]).forEach(function(v){ if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
   if(!mvs.length)return '<div class="card"><p class="note">Aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
-  var P=vsFit(U.cmv), pts=vsPts(U.cmv), cmp='<div class="btnrow" style="margin-top:10px"><button class="act ghost mini" data-vcmode="egal">Comparer à charge égale ›</button></div>';
+  var P=vsFit(U.cmv), pts=vsPts(U.cmv), cmp='<div class="btnrow" style="margin-top:10px"><button class="act ghost mini" data-vcmode="fil">Comparer au fil des séances ›</button></div>';
   var h='<div class="card" data-chk="vprofil"><div class="vtitle">Profil charge-vitesse'+chIB('vprofil')+'</div>'+
     (mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(!P)return h+'<p class="note">Il faut au moins 6 séries filmées sans variante, avec le PdC, pour tracer votre droite ('+pts.length+' pour l’instant).</p>'+cmp+'</div>';
