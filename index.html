@@ -1309,7 +1309,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v140';   /* lot 74 */
+var APPV='v141';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -7618,16 +7618,125 @@ function painBilan(bid,nSess){
   return '<p class="note" data-painbilan>Gêne notée : '+ls.map(function(l){ var o=by[l], li=Object.keys(o.li).sort(function(a,b){return o.li[b]-o.li[a];});
     return '<b>'+plocName(l)+'</b> '+o.n+' séance'+(o.n>1?'s':'')+(nSess?' sur '+nSess:'')+(li.length?' (après '+li.map(function(i){ return esc((S.lifts[+i]||{}).name||'?')+' '+o.li[i]; }).join(', ')+')':''); }).join(' ; ')+'.</p>';
 }
+/* ===== lot 141 : SRSS (Short Recovery and Stress Scale, Kellmann et Kölling), à la place de la forme du jour pour Luka =====
+   Sources : Kölling et al. 2020, J Sports Sci 38(2) (échelle 0-6, état actuel noté par rapport au meilleur état jamais atteint,
+   8 items lus séparément, pas de total) ; passation-SRSS du 04/11/2026. Descripteurs : v = lu dans l'article, n = seconde main.
+   La consigne exacte du manuel n'est pas connue : celle-ci est une formulation de travail. Aucune charge n'en dépend.
+   S.form[séance].srss = {ppc:0-6,…} ; S.arss = {d, a:{mot:0-6}} ou {skip:date} ; S.ostrc['bloc|semaine'] = {q1..q4 : indice, d}. */
+var SRSS=[
+ {k:'ppc',g:'r',en:'Physical Performance Capability',fr:'Capacité de performance physique',w:[['strong','fort',1],['physically capable','physiquement capable',1],['energetic','énergique',0],['full of power','plein de puissance',0]]},
+ {k:'mpc',g:'r',en:'Mental Performance Capability',fr:'Capacité de performance mentale',w:[['attentive','attentif',1],['receptive','réceptif',1],['mentally alert','mentalement alerte',0],['concentrated','concentré',0]]},
+ {k:'eb',g:'r',en:'Emotional Balance',fr:'Équilibre émotionnel',w:[['pleased','content',1],['stable','stable',1],['in a good mood','de bonne humeur',0],['having everything under control','tout sous contrôle',0]]},
+ {k:'or',g:'r',en:'Overall Recovery',fr:'Récupération générale',w:[['recovered','récupéré',0],['rested','reposé',0],['muscle relaxation','muscles détendus',0],['physically relaxed','physiquement détendu',0]]},
+ {k:'ms',g:'s',en:'Muscular Stress',fr:'Stress musculaire',w:[['muscle exhaustion','muscles épuisés',1],['muscle fatigue','muscles fatigués',1],['muscle soreness','courbatures',1],['muscle stiffness','raideur musculaire',1]]},
+ {k:'la',g:'s',en:'Lack of Activation',fr:'Manque d’activation',w:[['unmotivated','sans motivation',1],['unenthusiastic','sans enthousiasme',1],['sluggish','lent',0],['lacking energy','manque d’énergie',0]]},
+ {k:'nes',g:'s',en:'Negative Emotional State',fr:'État émotionnel négatif',w:[['feeling down','déprimé',1],['stressed','stressé',0],['annoyed','agacé',0],['short-tempered','irritable',0]]},
+ {k:'os',g:'s',en:'Overall Stress',fr:'Stress général',w:[['tired','fatigué',0],['worn-out','usé',0],['overloaded','surchargé',0],['physically exhausted','physiquement épuisé',0]]}
+];
+var SRSSSC=['does not apply at all','','','','','','fully applies'];
+function srssOn(){ return PROF.cur==='luka'; }
+function srssOf(k){ var f=formOf(k); return f.srss||null; }
+function srssN(s){ return s?SRSS.filter(function(q){return s[q.k]!=null;}).length:0; }
+function srssUse(k){ var f=formOf(k); return srssOn()&&!(f.gen&&!f.srss); }   /* une séance déjà notée à l'ancienne garde sa note */
+function srssAll(skip){   /* toutes les SRSS, blocs archivés compris, sauf la séance skip */
+  var o=[]; function add(fo,bid){ for(var k in fo){ if(bid===null&&k===skip)continue; var s=fo[k]&&fo[k].srss; if(s&&srssN(s)===8)o.push(s); } }
+  (S.blocks||[]).forEach(function(b){ add(b.formData||{},+b.id); }); add(S.form||{},null); return o;
+}
+function srssRead(k){
+  var s=srssOf(k); if(srssN(s)<8)return '';
+  var H=srssAll(k), n=H.length;
+  if(n<6)return '<p class="note" data-srssread>Votre habitude se construit : '+n+' séance'+(n>1?'s':'')+' sur 6 avant de comparer.</p>';
+  var fl=[];
+  SRSS.forEach(function(q){ var v=H.map(function(h){return h[q.k];}), m=v.reduce(function(a,b){return a+b;},0)/n,
+      sd=Math.sqrt(v.reduce(function(a,b){return a+(b-m)*(b-m);},0)/(n-1)), d=s[q.k]-m;
+    if(Math.abs(d)>=1&&Math.abs(d)>=1.5*Math.max(sd,0.5)){ var bad=(q.g==='r')?d<0:d>0;
+      fl.push('<b>'+q.en+'</b> '+s[q.k]+' (d’habitude '+F(Math.round(m*10)/10)+') '+(bad?'▼ moins bien':'▲ mieux')); } });
+  return '<p class="note" data-srssread>'+(fl.length?'Hors de votre habitude ('+n+' séances) : '+fl.join(' ; ')+'.':'Dans votre habitude sur les 8 items ('+n+' séances).')+' Aucune charge n’en dépend.</p>';
+}
+function srssWords(q,fr){ return q.w.map(function(x){ return (fr?x[1]:x[0])+(x[2]?'':'<sup title="non vérifié">*</sup>'); }).join(', '); }
+function srssHTML(k){
+  var s=srssOf(k)||{}, n=srssN(s), h='';
+  if(!n&&!S.done[k])h+='<p class="note fask"><b>À noter avant la 1re série</b> : 8 items de 0 à 6, environ 30 secondes.</p>';
+  h+=arssHTML();
+  h+='<p class="note" style="margin:4px 0 0">Right now, how well does each statement apply to you, compared with the best state you have ever experienced? <span class="src">0 = '+SRSSSC[0]+' · 6 = '+SRSSSC[6]+'</span></p>';
+  SRSS.forEach(function(q,i){
+    if(i===4)h+='<p class="note" style="margin:10px 0 0"><b>Stress</b></p>'; else if(i===0)h+='<p class="note" style="margin:8px 0 0"><b>Recovery</b></p>';
+    h+='<p class="note" style="margin:6px 0 2px;color:var(--ink)"><b>'+q.en+'</b> <span class="src">'+srssWords(q)+'</span><br><span class="src">'+q.fr+' : '+srssWords(q,1)+'</span></p>'+
+      '<div class="pillrow fdemi">'+[0,1,2,3,4,5,6].map(function(v){
+        return '<button class="pill" data-srss="'+q.k+'|'+v+'" aria-pressed="'+(s[q.k]===v)+'">'+v+'</button>'; }).join('')+'</div>';
+  });
+  h+=srssRead(k)+ostrcHTML(k);
+  return h;
+}
+function srssHelp(){
+  return '<p class="note">SRSS (Short Recovery and Stress Scale, Kellmann et Kölling) : 4 items de récupération, 4 de stress, chacun lu seul, sans total. '+
+    'Notez votre état maintenant, par rapport au meilleur état que vous ayez connu. Les items se lisent par rapport à votre propre habitude, pas à une norme.</p>'+
+    '<p class="note">La consigne affichée est une formulation de travail : celle du manuel n’est pas connue. Les mots marqués * sont de seconde main, non vérifiés dans l’article. Traduction française non validée.</p>';
+}
+/* ARSS : une fois, pour se familiariser (recommandation des manuels) ; mêmes 32 mots, notés un par un */
+function arssHTML(){
+  if(S.arss||srssAll(null).length)return '';
+  var a=S.arssP||{}, n=Object.keys(a).length;
+  var h='<details class="fmore" data-arss'+(ARSSO?' open':'')+'><summary class="note"><b>Une fois avant la 1re SRSS</b> : 32 mots notés un par un (ARSS), environ 3 minutes, pour vous familiariser'+(n?' · '+n+'/32':'')+'</summary>';
+  SRSS.forEach(function(q){ q.w.forEach(function(x){
+    h+='<p class="note" style="margin:6px 0 2px">'+x[0]+(x[2]?'':'<sup title="non vérifié">*</sup>')+' <span class="src">'+x[1]+'</span></p><div class="pillrow fdemi">'+[0,1,2,3,4,5,6].map(function(v){
+      return '<button class="pill" data-arss="'+x[0]+'|'+v+'" aria-pressed="'+(a[x[0]]===v)+'">'+v+'</button>'; }).join('')+'</div>'; }); });
+  h+='<div class="pillrow" style="margin-top:8px"><button class="pill" data-arssact="skip">Ne pas la faire</button></div></details>';
+  return h;
+}
+var ARSSO=false;
+/* OSTRC (Clarsen et al. 2013, figure 2, vérifié) : à la 1re séance d'une semaine, si une gêne a été notée la semaine d'avant */
+var OSTRC=[
+ {t:'Have you had any difficulties participating in normal training and competition due to injury, illness or other health problems during the past week?',fr:'Avez-vous eu du mal à participer à l’entraînement normal à cause d’une blessure, d’une maladie ou d’un autre problème de santé la semaine passée ?',
+  o:['Full participation without health problems','Full participation, but with injury/illness','Reduced participation due to injury/illness','Cannot participate due to injury/illness']},
+ {t:'To what extent have you reduced your training volume due to injury, illness or other health problems during the past week?',fr:'Dans quelle mesure avez-vous réduit votre volume d’entraînement pour ces raisons ?',
+  o:['No reduction','To a minor extent','To a moderate extent','To a major extent','Cannot participate at all']},
+ {t:'To what extent has injury, illness or other health problems affected your performance during the past week?',fr:'Dans quelle mesure ces problèmes ont-ils affecté votre performance ?',
+  o:['No effect','To a minor extent','To a moderate extent','To a major extent','Cannot participate at all']},
+ {t:'To what extent have you experienced symptoms/health complaints during the past week?',fr:'Dans quelle mesure avez-vous ressenti des symptômes ?',
+  o:['No symptoms/health complaints','To a mild extent','To a moderate extent','To a severe extent']}
+];
+function ostrcKey(k){ return (+S.blockId||1)+'|'+String(k).split('|')[0]; }
+function ostrcDue(k){
+  var q=String(k||'').split('|'), w=q[0], wk=PLAN.filter(function(x){return String(x.w)===w;})[0];
+  if(!wk||!wk.days.length||wk.days[0].label!==q[1])return false;
+  if((S.ostrc||{})[ostrcKey(k)])return true;
+  var pw=String(+w-1), pre=(+S.blockId||1)+'|'+pw+'|';
+  return Object.keys(S.pain||{}).some(function(p){ return p.indexOf(pre)===0&&Object.keys(S.pain[p]).length; });
+}
+function ostrcHTML(k){
+  if(!ostrcDue(k))return '';
+  var a=(S.ostrc||{})[ostrcKey(k)]||{};
+  var h='<p class="note" style="margin:12px 0 2px"><b>Gêne la semaine passée</b> : 4 questions (OSTRC, Clarsen 2013).</p>';
+  OSTRC.forEach(function(q,i){
+    h+='<p class="note" style="margin:6px 0 2px;color:var(--ink)">'+q.t+'<br><span class="src">'+q.fr+'</span></p><div class="pillrow">'+q.o.map(function(o,j){
+      return '<button class="pill sub" data-ostrc="'+(i+1)+'|'+j+'" aria-pressed="'+(a['q'+(i+1)]===j)+'">'+o+'</button>'; }).join('')+'</div>'; });
+  return h;
+}
+function srssClick(ev){
+  var b=ev.target.closest?ev.target.closest('[data-srss],[data-arss],[data-arssact],[data-ostrc]'):null; if(!b)return false;
+  var k=S.tsel; if(!k)return true;
+  if(b.dataset.srss){ var p=b.dataset.srss.split('|'), v=+p[1]; if(!S.form[k])S.form[k]={}; var s=S.form[k].srss||(S.form[k].srss={});
+    if(s[p[0]]===v)delete s[p[0]]; else s[p[0]]=v; if(!srssN(s))delete S.form[k].srss; S.form[k].d=todayISO(); }
+  else if(b.dataset.arss){ var r=b.dataset.arss.split('|'), w=+r[1], P=S.arssP||(S.arssP={}); if(P[r[0]]===w)delete P[r[0]]; else P[r[0]]=w; ARSSO=true;
+    if(Object.keys(P).length===32){ S.arss={d:todayISO(),a:P}; delete S.arssP; } }
+  else if(b.dataset.arssact==='skip'){ S.arss={skip:todayISO()}; delete S.arssP; }
+  else if(b.dataset.ostrc){ var o=b.dataset.ostrc.split('|'), ok=ostrcKey(k); if(!S.ostrc)S.ostrc={}; var a=S.ostrc[ok]||(S.ostrc[ok]={});
+    if(a['q'+o[0]]===+o[1])delete a['q'+o[0]]; else a['q'+o[0]]=+o[1]; a.d=todayISO(); if(Object.keys(a).length===1)delete S.ostrc[ok]; }
+  save(); renderForm(); return true;
+}
+
 function renderForm(){
   var k=S.tsel;
   if(!k){$('formrows').innerHTML='';$('formnote').textContent='';var hd0=$('formhd'); if(hd0)hd0.innerHTML='';return;}
   var f=formOf(k), simple=true, h='', tg=(S.dayTags&&S.dayTags[k])||[];   /* lot 44 (8b) */
-  if(!f.gen&&!S.done[k])h+='<p class="note fask"><b>À noter avant la 1re série</b> : une note de 1 à 5, cinq secondes.</p>';   /* lot 59 (réponse 24) */
+  var us=srssUse(k);   /* lot 141 */
+  if(!us&&!f.gen&&!S.done[k])h+='<p class="note fask"><b>À noter avant la 1re série</b> : une note de 1 à 5, cinq secondes.</p>';   /* lot 59 (réponse 24) */
   if(simple){
-    h+='<div class="pillrow fdemi">'+[1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){   /* lot 58 : demi-notes */
+    h+=(us?srssHTML(k):'<div class="pillrow fdemi">'+[1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){   /* lot 58 : demi-notes ; lot 141 : SRSS à la place */
       return '<button class="pill'+(v%1?' demi':'')+'" data-fq="gen" data-fv="'+v+'" aria-pressed="'+(f.gen===v)+'">'+F(v)+'</button>';
-    }).join('')+'</div>'+
-    (f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+formAnch(f.gen)+'</b></p>':'')+
+    }).join('')+'</div>')+
+    (us?'':f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+formAnch(f.gen)+'</b></p>':'')+
     '<details class="fmore" data-fmore'+(FMORE?' open':'')+'><summary class="note">'+fmoreSum(k,tg)+'</summary>'+   /* lot 73 */
     '<div class="pillrow dtags" style="margin-top:6px">'+DTAGS.map(function(q){   /* lot 59 */
       return '<button class="pill" data-dtag="'+q[0]+'" aria-pressed="'+(tg.indexOf(q[0])>=0)+'">'+q[1]+'</button>';}).join('')+'</div>'+painHTML(k);   /* lot 70 (Q31) */
@@ -7640,7 +7749,7 @@ function renderForm(){
     }).join('');
   }
   h+='<details style="margin-top:6px"><summary class="note">Signification des notes</summary>'+
-    (simple?[5,4,3,2,1].map(function(v){return '<p class="note" style="margin:3px 0 0">'+v+' '+FORMANCH[v-1]+'</p>';}).join(''):'')+
+    (us?srssHelp():simple?[5,4,3,2,1].map(function(v){return '<p class="note" style="margin:3px 0 0">'+v+' '+FORMANCH[v-1]+'</p>';}).join(''):'')+
     '<p class="note">Aucune charge n\'en d\u00e9pend. Une s\u00e9rie rat\u00e9e un jour \u00e0 2 ne dit pas la m\u00eame chose qu\'une s\u00e9rie rat\u00e9e '+
     'un jour \u00e0 5, et trois semaines plus tard la diff\u00e9rence est invisible.</p>'+
     '</details>'+(simple?'</details>':'');   /* lot 73 : fin du repli */
@@ -7649,15 +7758,15 @@ function renderForm(){
   $('formrows').innerHTML=h;
   var fm=$('formrows').querySelector('[data-fmore]'); if(fm&&tw&&fm.appendChild)fm.appendChild(tw);
   var t=formSum(f), hd=$('formhd');
-  if(hd)hd.innerHTML=t!=null?'<b>'+F(t)+'</b> / '+formMax():(S.done[k]?'':'à noter');   /* lot 73 */
-  $('formnote').innerHTML=t!=null
+  if(hd)hd.innerHTML=us?(srssN(f.srss)?'SRSS <b>'+srssN(f.srss)+'</b>/8':(S.done[k]?'':'à noter')):t!=null?'<b>'+F(t)+'</b> / '+formMax():(S.done[k]?'':'à noter');   /* lot 73 ; lot 141 */
+  $('formnote').innerHTML=us?'':t!=null
     ? 'Not\u00e9 <b>'+F(t)+'/'+formMax()+'</b>'+(f.d?' le '+frDate(f.d):'')+'. Touchez la note choisie pour l\'annuler.'
     : '';
   if(document.activeElement!==$('formtxt'))$('formtxt').value=(k&&S.dayNotes[k])||'';   /* lot 44 (8a) : meme texte que Notes › Cette seance */
   renderFin();   /* lot 44 (R9) */
 }
 var FMORE=false;   /* lot 73 : le repli de la forme reste ouvert d'un rendu à l'autre */
-$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; },true);
+$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-arss'))ARSSO=!!d.open; },true);
 function fmoreSum(k,tg){
   var pp=(S.pain||{})[painKey(k)], n=tg.length+(pp?Object.keys(pp).length:0), t=String((S.dayNotes||{})[k]||'').trim();
   var a=[]; if(n)a.push(n+' noté'+(n>1?'s':'')); if(t)a.push('texte');
@@ -7668,6 +7777,7 @@ $('formtxt').addEventListener('input',function(){
   var t=document.querySelector('#todayout [data-note="day"]'); if(t&&t.dataset.k===k)t.value=this.value;
 });
 $('formrows').addEventListener('click',function(ev){
+  if(srssClick(ev))return;   /* lot 141 */
   var md=ev.target.closest?ev.target.closest('[data-fmode]'):null;
   if(md){ S.formMode=md.dataset.fmode; save(); renderForm(); return; }
   var t=ev.target.closest?ev.target.closest('[data-fon]'):null;
