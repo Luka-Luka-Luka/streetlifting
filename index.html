@@ -773,6 +773,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
   </div>
   <div id="profbar" hidden></div>   <!-- lot 109 (P1) : personne courante, dès 2 personnes -->
   <div id="ghconf"></div>   <!-- lot S1 : données changées sur un autre appareil -->
+  <div id="ghguest"></div>   <!-- lot S2 : appareil prêté (Terminer) ou connexion par phrase sur un appareil neuf -->
   <div class="appmenu" id="appmenu" hidden>   <!-- lot 78 (P4) : réglages de l'app, sortis de Réglages du bloc -->
     <p class="note">Réglages de l'app</p>
     <button type="button" class="act ghost" id="pal" title="Palette" aria-label="Palette">🎨</button>
@@ -1237,6 +1238,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
         <button class="act ghost mini" id="ghforce" hidden>Envoyer quand même</button>
       </div>
       <p class="note" id="ghst"></p>
+      <div id="cofbox" style="margin-top:10px;border-top:1px solid var(--rule);padding-top:10px"></div>   <!-- lot S2 -->
     </div>
   </div>
 </section>
@@ -1307,7 +1309,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v138';   /* lot 74 */
+var APPV='v140';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1366,6 +1368,18 @@ document.addEventListener('input',function(ev){
    SK(base) donne la clé de la personne courante : pour 'luka', exactement l'ancienne (aucune migration) ; sinon base+':'+id.
    cp-inbox (page vidéo) n'est pas par personne : il n'est lu que chez Luka. Changer de personne = enregistrer puis recharger. */
 var PKEYS=['cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page','cp-state-illisible'];   /* lot 119 : + copie illisible */
+/* lot S2 : appareil prêté. La clé n'est qu'en sessionStorage (perdue à la fermeture de l'onglet) ; si le site s'ouvre avec
+   la marque cp-guest mais sans clé de session, l'onglet a été fermé sans « Terminer » : on efface tout avant de charger. */
+function cpWipe(){
+  try{ var ks=[], i, k; for(i=0;i<localStorage.length;i++){ k=localStorage.key(i); if(k&&k.indexOf('cp-')===0)ks.push(k); } ks.forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+  try{ sessionStorage.removeItem('cp-gh'); }catch(e){}
+}
+var GUEST=false;
+var GUEST2=false;   /* un second onglet ouvert pendant une session « appareil prêté » encore vivante (battement < 10 min) */
+try{ var cpg=localStorage.getItem('cp-guest');
+  if(cpg){ if(sessionStorage.getItem('cp-gh'))GUEST=true; else if(Date.now()-(+cpg||0)<600000)GUEST2=true; else cpWipe(); } }catch(e){}
+if(GUEST2){ document.body.innerHTML='<p style="padding:24px;font:17px/1.5 sans-serif">L\'outil est déjà ouvert en mode « appareil prêté » dans un autre onglet. Revenez à cet onglet-là pour continuer, et touchez « Terminer » avant de partir.</p>';
+  throw new Error('appareil prêté : second onglet'); }
 var PROF=(function(){
   var r=null; try{ r=JSON.parse(localStorage.getItem('cp-profiles')||'null'); }catch(e){}
   if(!r||!Array.isArray(r.list)||!r.list.some(function(p){return p&&p.id==='luka';})){
@@ -7025,7 +7039,7 @@ function daysSince(iso){ if(!iso)return 1e9; return Math.floor((Date.parse(today
 function bkLast(){ var g=ghSt().at; g=g?g.slice(0,10):''; var e=S.lastExport||''; return g>e?g:e; }   /* lot 113 : export ou envoi GitHub, le plus récent */
 function renderBackup(){
   var LE=bkLast(), n=+S.bkEvery||0, since=daysSince(LE||S.firstUse), ban=$('bkban');
-  renderGh();
+  renderGh(); renderCof(); renderGhGuest();   /* lot S2 */
   if($('bkevery'))$('bkevery').value=String(n);
   /* B11 : la copie d'avant import n'existe que pendant la session ou l'import a eu lieu ;
      le bouton n'apparait que si elle est la. */
@@ -7063,7 +7077,8 @@ $('bkevery').addEventListener('change',function(){ S.bkEvery=+this.value; save()
    sha = verrou : si GitHub a une autre version (409/422), on relit le sha et on réécrit (l'historique garde l'autre). */
 var GHT=null, GHBUSY=false, GHGAP=180000, GHGEN=0;   /* lot S1 : 10 min -> 3 min */
 var GHCONF=null, GHPULL=false, GHBOOT=true;   /* lot S1 : conflit en attente de votre choix ; lecture en cours ; démarrage (migrations) */   /* lot 119 : GHGEN compte les enregistrements, pour ne pas marquer « à jour » un changement fait pendant un envoi */
-function ghCfg(){ try{ var c=JSON.parse(localStorage.getItem('cp-gh')||'null'); return c&&c.repo&&c.tok?c:null; }catch(e){ return null; } }
+function ghCfg(){ try{ var c=JSON.parse((GUEST&&sessionStorage.getItem('cp-gh'))||localStorage.getItem('cp-gh')||'null');   /* lot S2 : clé de session sur un appareil prêté */
+   return c&&c.repo&&c.tok?c:null; }catch(e){ return null; } }
 function ghSt(){ try{ return JSON.parse(localStorage.getItem(SK('cp-gh-st'))||'{}')||{}; }catch(e){ return {}; } }
 function ghSet(o){ var s=ghSt(); for(var k in o)s[k]=o[k]; try{ localStorage.setItem(SK('cp-gh-st'),JSON.stringify(s)); }catch(e){} return s; }
 function ghPath(){ return encodeURIComponent(PROF.cur)+'.json'; }
@@ -7164,7 +7179,7 @@ $('ghforce').addEventListener('click',function(){   /* lot 119 */
 });
 $('ghforget').addEventListener('click',function(){
   if(!confirm('Oublier la clé sur ce téléphone ? Les envois automatiques s\'arrêtent. Les sauvegardes déjà sur GitHub restent.'))return;
-  try{ localStorage.removeItem('cp-gh'); }catch(e){} if(GHT){ clearTimeout(GHT); GHT=null; } renderBackup();
+  try{ localStorage.removeItem('cp-gh'); sessionStorage.removeItem('cp-gh'); }catch(e){} if(GHT){ clearTimeout(GHT); GHT=null; } renderBackup();
 });
 window.addEventListener('online',function(){ if(ghCfg()){ ghSet({err:''}); ghSync(); } });   /* lot S1 */
 document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&ghCfg()&&!STALE)ghSync(); });   /* lot S1 */
@@ -7272,6 +7287,115 @@ $('ghconf').addEventListener('click',function(e){
   } else { r.later=true; renderGhConf(); renderBackup(); }
 });
 
+
+/* lot S2 (04/11) : connexion par phrase secrète. Le coffre (coffre.json, à la racine du site public) contient {repo, tok}
+   chiffrés en AES-GCM 256 avec une clé tirée de la phrase (PBKDF2-SHA256, 600 000 tours, sel aléatoire). Phrase = 6 mots tirés
+   au hasard parmi 1 024 (60 bits, choix de Luka du 04/11) : le coffre est lisible par tous, la lenteur du calcul rend les essais hors de portée.
+   L'app crée le coffre (Sauvegarde › Connexion par phrase) ; Claude le dépose sur le site. Sur un autre appareil :
+   « Me connecter » + la phrase. Appareil prêté (GUEST) : clé en sessionStorage seulement, « Terminer » envoie puis efface
+   toutes les clés cp-* ; un onglet fermé sans « Terminer » est effacé à la prochaine ouverture du site (voir cpWipe, en tête). */
+var COFW='abeille abricot acier acrobate action adresse affiche agile agneau aigle aigre aiguille aile aimable aimant album algue allee alpage alpiniste amande ambre amer ami amiral ample ampoule ancien ancre ane angle anneau antenne aout aquarium arbre arc arche archer arctique ardent ardoise argent argile aride armoire arome artiste asperge astronaute atelier atlas atome aube auberge aurore austral automne autruche avare avion avocat avoine avril azur badge bagage bague baie balcon baleine ballon bambou banane banc bandeau banjo banque barbe baron barque barrage bassin bateau batelier baton baume bavard bazar beige beignet belette berceau berger beurre biche bijou billard biscuit bison bizarre blanc blason bleu blond blouse bocal bodega bois boite bol bonbon bonnet bord bosquet bossu botte bouche bougie boulanger boule bouquet bourgeon boussole bouteille bouton boxeur bracelet branche brave brebis brigand brillant brindille brioche brique brise brochet brosse brouette brume brun brusque buffet buisson bulle bureau buvard cabane cabine cable cacao cactus cadeau cadran cafe cage cahier caillou caisse calin calme camion canal canard canif canne canot cantine cape capuche carafe caramel cargo carotte carpe carre carreau carte carton cascade casque castor cavalier cave cedre ceinture celeri ceramique cerceau cerf cerise chaise chalet chameau champ chanson chapeau charbon chariot chasseur chat chateau chaton chaud chaussure chauve chef chemin cheminee chene chenille cher cheval chevalier cheveu chevre chien chiffre choux cible cidre ciel cigale cigogne cime cinema cirque citron citrouille civil clair clairon classeur clavier clef cloche clocher clou clown cobra coccinelle cocon coffre coiffe colibri colline colombe comete commun compas comptoir concert condor conque content copain coq coquille corail corbeau corde cornet corsaire costaud costume coton coude couleur coupe courbe coureur courge couronne court coussin couteau crabe craie crapaud cratere cravate crayon creme crepe crete creux cristal crochet croissant cru cube cuillere cuir cuisinier cuit cuivre cumin curieux cygne dalle dame damier danseur dauphin decembre dense dentelle desert dessin diamant dimanche dindon disque divin docile docteur doigt domino donjon dore double doux dragon drap drapeau droit drole duc dune dur duvet eau echarpe echelle eclair ecole ecorce ecran ecureuil edredon eglise elan elegant elephant email enclume encre enigme enorme epais epee epi epice eponge equerre erable ermite escalier escargot etable etage etang etoile etroit etui eventail exact fable facile facteur faisan falaise fameux famille fanfare farine fatigue faucon fauteuil fenetre fenouil fer ferme fermier fertile feuille feutre fevrier fidele fier figue filet fin flacon flamme flan fleche fleur fleuve flocon flou fluide flute foin fontaine foret forge forgeron fort fou fougere fourche fourmi frais fraise framboise franc frelon frene frileux froid fromage fruit fruite fumee fusee gai galet gant garage gardien gare gateau gazelle gazon geant gelee genou gentil geologue gibier girafe girouette givre glace gland globe gomme gorille gouache gourmand goutte gracieux grain graine grand grange grappe gras grenier grenouille griffe grille gris gros grotte grue guide guitare habile hache haie hamac hamster hangar hardi haricot harpe haut hautbois herbe heron heureux hibou hiver homard honnete horloge hotel houblon houx huile huitre humble humide hutte icone igloo ile image immense indigo insecte intense iris ivoire jacinthe jade jambon janvier jardin jardinier jasmin jaune jeton jeudi jeune jockey joli jonc jongleur journal joyau joyeux judo juge juillet juin jument jungle jupe juste kayak kiosque kiwi koala lac lacet laine lama lampe lance lanterne lapin large laurier lavande lecture leger legume lent lentille lettre levain levier lezard liane libre lierre lievre lilas limace lime limonade lin lion lisse livre loge long losange loup loutre loyal lucide luge lumineux lundi lune lutin lutteur lynx macaron magicien magie magique mai maigre maillot main maison malin manege mangue manteau marbre marche mardi mare marelle marin marmotte marron mars marteau masque matelas matin mauve mazout medaille melon menthe mercredi meringue merle metal meteore meule meunier miel miette mimosa mince mineur miroir moderne moelleux moine moineau moisson momie monnaie montagne moquette morse mosaique motte mou mouette moufle moulin mousse moustache mouton muet muguet mulet mur muscade musicien musique myrtille nacre nageur naif nappe navet navigateur navire neige nenuphar neuf nid noble noir noisette noix nomade normal nougat nouveau novembre nuage nuit oasis obscur ocean ocre octobre odeur oeillet oignon oiseau olive ombre onde ongle opale opaque orage orageux orange orchestre ordinateur oreille orge orgue orme ortie otarie ouragan ourson outil pagaie paille pain paisible palais pale palette palmier panda panier panneau papier papillon paquet parapluie parc parfait parfum pastel patate patin paume pave pavot peche pecheur peigne peintre pelle pelote pendule perle perroquet persil petit phare piano pierre pieuvre pigeon pilote piment pin pinceau pingouin pioche pipe pique pirate piscine piste pivoine placard plage planche planete plante plat plateau plein pluie plume poche poele poete pointu poire poireau poisson poivre polaire poli pollen pomme pompe pont porche porte potager poterie potier pouce poulain poule poupee prairie pratique precis prince printemps propre prudent prune puits pull pur puzzle pyjama quai quartz quille quinoa racine radeau radis raisin rame rampe rapace rapide raquette rare rateau ravi rayon rebelle recolte refuge regle reglisse reine renard requin reseau rideau riviere robe robot robuste rocher roi rond rose roseau roue rouge rouleau roux ruban ruche rude ruisseau rustique sable sabot sabre sac safran sage salade salin salon samedi sandale sapin sardine satin sauge saule saumon sauvage savant savon scarabee scie sculpteur seau sec secret seigle sel selle semelle sentier septembre serein serieux serpent serre siege sifflet signal silex simple sincere singe sirop ski soldat soleil solide sombre sommet sorbet sorcier soucoupe soupe souple source souris stable stade statue stylo subtil sucre superbe sur sureau table tableau tablier tabouret tailleur tambour tamis tapis tardif tasse taupe taureau tempete tenaille tendre tente terrain terrasse theiere thon thym tiede tigre tilleul timbre timide tiroir tisserand tissu toile toit tomate tonneau tonnerre topaze torche tordu tortue toupie tour tournesol train traineau tranquille trappeur trefle treillis tresor tribu tricot triste trompette tronc trophee trottoir truffe truite tuile tulipe tunnel turban tuyau unique urbain usine utile vache vague vaillant valise vallee vanille vapeur vase vaste veau velo velours velu vendredi vent verger vernis verre vert veste viaduc vieux vif viking village vin violet violon vipere viril vivant voile voilier volage volcan volet voyage voyageur wagon yacht yaourt yoga zebre zeste'.split(' '), COFIT=600000, COF=null, COFHIDE=false;
+function cofB64(u){ var b='', i; for(i=0;i<u.length;i++)b+=String.fromCharCode(u[i]); return btoa(b); }
+function cofU8(s){ var b=atob(s), u=new Uint8Array(b.length), i; for(i=0;i<b.length;i++)u[i]=b.charCodeAt(i); return u; }
+function cofNorm(p){ return String(p||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z]+/g,' ').trim(); }
+function cofPhrase(){ var r=new Uint16Array(6); crypto.getRandomValues(r); return Array.prototype.map.call(r,function(x){ return COFW[x&1023]; }).join(' '); }
+function cofKey(ph,salt,it){
+  return crypto.subtle.importKey('raw',new TextEncoder().encode(cofNorm(ph)),'PBKDF2',false,['deriveKey']).then(function(k){
+    return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:it,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); });
+}
+function cofMake(ph,c){
+  var salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  return cofKey(ph,salt,COFIT).then(function(k){
+    return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,new TextEncoder().encode(JSON.stringify({repo:c.repo,tok:c.tok,at:todayISO()}))); })
+    .then(function(ct){ return {v:1,kdf:'PBKDF2-SHA256',it:COFIT,salt:cofB64(salt),iv:cofB64(iv),ct:cofB64(new Uint8Array(ct))}; });
+}
+function cofOpen(ph,box){
+  if(!box||box.v!==1||!box.salt||!box.iv||!box.ct)return Promise.reject('bad');
+  return cofKey(ph,cofU8(box.salt),+box.it||COFIT).then(function(k){ return crypto.subtle.decrypt({name:'AES-GCM',iv:cofU8(box.iv)},k,cofU8(box.ct)); })
+    .then(function(b){ return JSON.parse(new TextDecoder().decode(b)); });
+}
+function cofLoginHTML(x){
+  return '<p style="margin:0 0 6px"><b>Me connecter avec ma phrase</b> — vos données sont déjà sur GitHub ? Tapez votre phrase de 6 mots.</p>'+
+    '<div class="field w"><input id="cofp-'+x+'" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="six mots séparés par des espaces"></div>'+
+    '<div style="margin:6px 0 0"><label style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:15px;color:inherit"><input type="radio" name="cofm-'+x+'" value="own" checked style="width:auto;height:auto;margin:0;flex:none"> Mon appareil (reste connecté)</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:15px;color:inherit"><input type="radio" name="cofm-'+x+'" value="guest" style="width:auto;height:auto;margin:0;flex:none"> Appareil prêté (tout est effacé en partant)</label></div>'+
+    '<div class="btnrow"><button class="act" data-cofgo="'+x+'">Me connecter</button>'+(x==='b'?'<button class="act ghost" data-cof="hide">Plus tard</button>':'')+'</div>'+
+    '<p class="note" id="cofmsg-'+x+'" style="margin:6px 0 0"></p>';
+}
+function renderCof(force){
+  var el=$('cofbox'); if(!el)return;
+  var sig=!ghCfg()?'login':GUEST?'guest':!COF?'off':!COF.box?'ph:'+COF.ph:'box';
+  if(!force&&el.dataset.m===sig)return; el.dataset.m=sig;   /* ne pas effacer une phrase en cours de saisie */
+  if(sig==='login'){ el.innerHTML=cofLoginHTML('g'); return; }
+  if(sig==='guest'){ el.innerHTML='<p class="note">Appareil prêté : touchez « Terminer » en haut de l\'écran avant de partir.</p>'; return; }
+  if(sig==='off'){ el.innerHTML='<p class="note" style="margin:0 0 6px"><b>Connexion par phrase</b> : pour retrouver vos données sur un autre appareil (ordinateur, téléphone prêté) sans recopier la clé. L\'app tire une phrase de 6 mots et range la clé dans un coffre que seule cette phrase ouvre.</p>'+
+    '<div class="btnrow"><button class="act ghost mini" data-cof="new">Créer une phrase</button></div>'; return; }
+  if(!COF.box){ el.innerHTML='<p class="note" style="margin:0 0 6px">Votre phrase :</p><p style="font-size:20px;font-weight:600;margin:0 0 6px">'+profEsc(COF.ph)+'</p>'+
+    '<p class="note" style="margin:0 0 6px">Notez-la maintenant (papier, gestionnaire de mots de passe). Elle n\'est enregistrée nulle part : sans elle, le coffre ne s\'ouvre pas. Ne réutilisez pas une phrase connue ou une citation.</p>'+
+    '<div class="btnrow"><button class="act mini" data-cof="make">Créer le coffre avec cette phrase</button><button class="act ghost mini" data-cof="new">Autre phrase</button><button class="act ghost mini" data-cof="cancel">Annuler</button></div>'; return; }
+  el.innerHTML='<p class="note" style="margin:0 0 6px">Coffre créé et vérifié. Copiez ce texte et envoyez-le à Claude : il le dépose sur le site (fichier coffre.json). Le texte seul ne révèle pas la clé.</p>'+
+    '<textarea id="cofout" readonly rows="4" style="width:100%;font-size:12px">'+profEsc(JSON.stringify(COF.box))+'</textarea>'+
+    '<div class="btnrow"><button class="act mini" data-cof="copy">Copier</button><button class="act ghost mini" data-cof="cancel">Fermer</button></div>';
+}
+function renderGhGuest(){
+  var el=$('ghguest'); if(!el)return;
+  var sig=GUEST?'guest':(!ghCfg()&&!(S.log||[]).length&&!COFHIDE)?'login':'';
+  if(el.dataset.m===sig)return; el.dataset.m=sig;
+  el.innerHTML=sig==='guest'?'<div class="bkban"><b>Appareil prêté</b> — vos données sont effacées de ce navigateur quand vous touchez « Terminer » (ou à la prochaine ouverture du site si vous fermez l\'onglet sans le faire).<div class="btnrow"><button class="act" data-cofend="1">Terminer</button></div></div>':
+    sig==='login'?'<div class="bkban">'+cofLoginHTML('b')+'</div>':'';
+}
+function cofGo(x){
+  var inp=$('cofp-'+x), msg=$('cofmsg-'+x); if(!inp)return;
+  var ph=inp.value, m=document.querySelector('input[name="cofm-'+x+'"]:checked'), guest=!!(m&&m.value==='guest');
+  if(cofNorm(ph).split(' ').length!==6){ msg.textContent='Tapez les 6 mots de votre phrase.'; return; }
+  msg.textContent='Ouverture du coffre… (quelques secondes)';
+  fetch('coffre.json',{cache:'no-store'}).catch(function(){ throw 'net'; })
+    .then(function(r){ if(r.status===404)throw 'none'; if(!r.ok)throw 'net'; return r.json().catch(function(){ throw 'none'; }); })
+    .then(function(box){ return cofOpen(ph,box).catch(function(e){ throw e==='bad'?'none':'phrase'; }); })
+    .then(function(c){
+      if(!c||!c.repo||!c.tok)throw 'phrase';
+      var v=JSON.stringify({repo:c.repo,tok:c.tok});
+      try{ if(guest){ sessionStorage.setItem('cp-gh',v); localStorage.setItem('cp-guest',String(Date.now())); GUEST=true; } else localStorage.setItem('cp-gh',v); }
+      catch(e){ throw 'store'; }
+      ghSet({sha:'',cs:'',err:''}); msg.textContent='Connecté. Récupération de vos données…';
+      return ghSync('key');
+    })
+    .then(function(){ renderBackup(); })
+    .catch(function(e){ msg.textContent=e==='none'?'Pas encore de coffre sur le site : créez-le depuis votre téléphone (Sauvegarde › Connexion par phrase).':
+      e==='net'?'Pas de réseau : réessayez.':e==='store'?'Ce navigateur refuse d\'enregistrer (stockage désactivé).':'Phrase incorrecte.'; });
+}
+setInterval(function(){ if(GUEST)try{ localStorage.setItem('cp-guest',String(Date.now())); }catch(e){} },30000);   /* battement de la session prêtée */
+if(GUEST)try{ localStorage.setItem('cp-guest',String(Date.now())); }catch(e){}
+function cofEnd(){
+  var go=function(){ cpWipe(); GUEST=false; location.reload(); };
+  if(!ghCfg()){ go(); return; }
+  if(GHCONF){ if(confirm('Les données ont changé sur un autre appareil et rien n\'a été envoyé d\'ici.\n\nEffacer quand même ce navigateur ? Ce que vous avez saisi ici et pas encore envoyé sera perdu.'))go(); return; }
+  if(!ghSt().dirty){ go(); return; }
+  if(GHT){ clearTimeout(GHT); GHT=null; }
+  msgBar('Envoi des dernières saisies…');
+  var p=GHBUSY?new Promise(function(r){ setTimeout(r,3000); }).then(function(){ return ghPush(true); }):ghPush(true);
+  p.then(function(){ var t=ghSt();
+    if(t.dirty||t.err||GHCONF){ if(confirm('L\'envoi n\'a pas abouti'+(t.err?' ('+t.err+')':'')+'.\n\nEffacer quand même ce navigateur ? Les saisies non envoyées seront perdues.'))go(); }
+    else go(); });
+}
+document.addEventListener('click',function(e){
+  var t=e.target&&e.target.closest?e.target:null; if(!t)return;
+  var g=t.closest('[data-cofgo]'); if(g){ cofGo(g.dataset.cofgo); return; }
+  if(t.closest('[data-cofend]')){ cofEnd(); return; }
+  var b=t.closest('[data-cof]'); if(!b)return;
+  var k=b.dataset.cof;
+  if(k==='hide'){ COFHIDE=true; renderGhGuest(); }
+  else if(k==='new'){ COF={ph:cofPhrase()}; renderCof(); }
+  else if(k==='cancel'){ COF=null; renderCof(); }
+  else if(k==='make'&&COF&&ghCfg()){
+    b.disabled=true; b.textContent='Chiffrement…'; var ph=COF.ph;
+    cofMake(ph,ghCfg()).then(function(box){ return cofOpen(ph,box).then(function(c){ if(c.tok!==ghCfg().tok)throw 0; COF.box=box; renderCof(); }); })
+      .catch(function(){ alert('La création du coffre a échoué sur ce navigateur.'); COF=null; renderCof(); });
+  }
+  else if(k==='copy'){ var ta=$('cofout'); if(!ta)return;
+    (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(ta.value):Promise.reject()).then(function(){ msgBar('Coffre copié.'); },
+      function(){ ta.select(); try{ document.execCommand('copy'); msgBar('Coffre copié.'); }catch(e2){ msgBar('Sélectionnez le texte et copiez-le.'); } }); }
+});
 
 /* B11 : annuler un import. La copie est prise juste avant l'ecrasement (voir l'import),
    elle est effacee au demarrage suivant et apres restauration. */

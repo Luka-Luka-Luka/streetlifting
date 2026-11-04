@@ -1,5 +1,5 @@
 /* Incrémentez CACHE à chaque mise en ligne d'une nouvelle version. */
-const CACHE = 'charges-v138';
+const CACHE = 'charges-v140';
 const FILES = ['./', './index.html', './seance-telephone.html', './manifest.webmanifest', './logo.png', './icon-192.png', './icon-512.png', './fonts/ibm-plex-sans-latin-400-normal.woff2', './fonts/ibm-plex-sans-latin-600-normal.woff2', './fonts/ibm-plex-sans-condensed-latin-500-normal.woff2', './fonts/ibm-plex-sans-condensed-latin-600-normal.woff2', './fonts/ibm-plex-sans-condensed-latin-700-normal.woff2'];
 
 self.addEventListener('install', e => {
@@ -30,6 +30,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;   /* polices et CDN : on laisse passer */
+  if (url.pathname.endsWith('/coffre.json')) return;   /* lot S2 : le coffre vient toujours du réseau */
   /* B14 : la mise a jour en arriere-plan (fetch PUIS put) est rattachee a e.waitUntil, et
      waitUntil comme respondWith sont appeles tout de suite dans le gestionnaire. Sans cela
      le navigateur peut arreter le service worker des que la reponse du cache est rendue :
