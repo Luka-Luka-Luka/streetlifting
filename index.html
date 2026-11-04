@@ -561,6 +561,17 @@ svg.vsvb text.lb,svg.vsprof text.lb{fill:var(--muted)}
 .vcrow small{display:block;color:var(--muted);font-size:12px}
 .vcrow.off{opacity:.45;cursor:default}
 .vccard{padding:10px 0;border-top:1px solid var(--rule)}
+/* lot 125 : tableaux étroits de Comparer (Bloc, Séries choisies) */
+.vctw{overflow-x:auto;margin:8px 0 4px}
+.vct{border-collapse:collapse;font:400 12.5px/1.3 var(--num);font-variant-numeric:tabular-nums;width:100%}
+.vct th,.vct td{padding:5px 4px;border-top:1px solid var(--rule);text-align:right;vertical-align:top;white-space:nowrap}
+.vct th:first-child,.vct td:first-child{text-align:left}
+.vct thead th{font-weight:600;color:var(--muted);border-top:0}
+.vct small{display:block;font-size:11px;color:var(--muted)}
+.vct b.up,.vct b.dn{display:block;font-size:11px}
+.vcday{border-top:1px solid var(--rule);padding:6px 0}
+.vcday>summary{cursor:pointer;font:400 13.5px/1.35 var(--txt);padding:4px 0}
+.vcday>summary small{color:var(--muted)}
 .vccard .vsvh .tag{font:600 11px/1 var(--txt);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .vsvl dd small{color:var(--muted);font-size:12px}
 svg.vplot text{font-family:var(--num);font-size:11px;fill:currentColor}
@@ -1330,7 +1341,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v143';   /* lot 74 */
+var APPV='v144';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -11156,20 +11167,24 @@ var VCMAX=3;
 function vScrCmp(){
   var U=vui();
   return '<div class="vseg vcmode">'+
-      '<button class="pill" data-vcmode="fil" aria-pressed="'+(U.cmode!=='choix')+'">Au fil des séances</button>'+
+      '<button class="pill" data-vcmode="fil" aria-pressed="'+(U.cmode==='fil')+'">Au fil des séances</button>'+
+      '<button class="pill" data-vcmode="bloc" aria-pressed="'+(U.cmode==='bloc')+'">Bloc</button>'+   /* lot 125 */
       '<button class="pill" data-vcmode="choix" aria-pressed="'+(U.cmode==='choix')+'">Séries choisies</button></div>'+
-    (U.cmode==='choix'?vScrChoix():vScrFil());
+    (U.cmode==='choix'?vScrChoix():U.cmode==='bloc'?vScrBloc():vScrFil());
 }
 /* lot 120 bis (audit Vitesse 26/10) : la référence de « Comparer avec… » : même mouvement, même variante, même type de
    série, charge système à 1,25 kg près (lest égal sans PdC), la plus récente avant celle-ci (le même jour : ordre n).
    Remplace veloRef (v26), qui ne regardait ni variante ni type et n'avait plus d'autre appelant. */
-function vcRef(v){
+function vcRang(v){   /* lot 125 : rang de la série parmi celles de son type, ce jour-là */
+  return (S.velo||[]).filter(function(x){ return x.date===v.date&&x.mouvement===v.mouvement&&typeLab(x)===typeLab(v); }).sort(vSortN).indexOf(v);
+}
+function vcRef(v){   /* lot 125 (réponse de Luka 03/11, q. 6) : la séance d'avant, même type, même variante, même rang, quel que soit le lest */
   var l=(S.velo||[]).filter(function(x){
-    if(x.id===v.id||x.mouvement!==v.mouvement||String(x.variante||'')!==String(v.variante||'')||typeLab(x)!==typeLab(v))return false;
-    if(!(String(x.date)<String(v.date)||(x.date===v.date&&vSortN(x,v)<0)))return false;
-    return (x.charge_systeme_kg!=null&&v.charge_systeme_kg!=null)?Math.abs(x.charge_systeme_kg-v.charge_systeme_kg)<=1.25+1e-6:+x.lest_kg===+v.lest_kg;
-  }).sort(function(a,b){ return String(a.date).localeCompare(String(b.date))||vSortN(a,b); });
-  return l.length?l[l.length-1]:null;
+    return x.mouvement===v.mouvement&&String(x.variante||'')===String(v.variante||'')&&typeLab(x)===typeLab(v)&&String(x.date)<String(v.date);
+  });
+  if(!l.length)return null;
+  var d=l.map(function(x){return String(x.date);}).sort().pop(), day=l.filter(function(x){return x.date===d;}).sort(vSortN), k=vcRang(v);
+  return day[Math.min(Math.max(k,0),day.length-1)];
 }
 function vcLoadLab(v){ return +v.lest_kg?'+'+F(v.lest_kg)+' kg':'PdC'; }
 function vcDelta(d,k,good,mg){   /* good : 1 si plus haut = mieux, −1 si plus bas = mieux ; mg : marge de mesure, écart sans couleur en deçà */
@@ -11185,64 +11200,153 @@ function vcStats(v,P){
   return {v1:v1,vl:vLast(v),pe:pe&&pe.p!=null&&!(le&&le.fin)?pe.p:null,mn:vMini(v),fin:!!(le&&le.fin),
     nv:hasH&&s?hs.filter(function(h){return h!=null&&h>=s.valide;}).length:null,n:v.reps.length,rir:vRir(v),dw:dw,cs:v.charge_systeme_kg!=null?+v.charge_systeme_kg:null};
 }
+function vMoyV(v){ return vMoyA(vOk(v).map(function(r){return +r.vitesse_moy_ms;})); }   /* lot 125 : vitesse moyenne de la série */
+function vcLestLab(v){ return (+v.lest_kg?'+'+F(v.lest_kg)+' kg':'PdC seul')+(v.poids_corps_kg!=null?' · PdC '+F(v.poids_corps_kg):''); }
+/* lot 125 (réponses de Luka 03/11) : la référence est la plus ancienne des séries cochées ; tableau côte à côte ;
+   liste par séance, échauffements cachés, période de Données respectée ; écart à la droite des séances d'avant (vfDw). */
 function vScrChoix(){
   var U=vui(), mvs=[];
   (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
   if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
   U.csel=U.csel.filter(function(id){ var v=vById(id); return v&&v.mouvement===U.cmv; });
-  var all=S.velo.filter(function(v){return v.mouvement===U.cmv;})
-    .sort(function(a,b){return String(b.date).localeCompare(String(a.date))||vSortN(b,a);});
+  var byD=function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);};
+  var all=S.velo.filter(function(v){return v.mouvement===U.cmv&&perOk(null,'d',vDayInfo(v.date).b,v.date);}).sort(function(a,b){return byD(b,a);});
   var loads=[], types=[];
   all.forEach(function(v){ var l=vcLoadLab(v), t=typeLab(v); if(loads.indexOf(l)<0)loads.push(l); if(types.indexOf(t)<0)types.push(t); });
   loads.sort(function(a,b){ var x=function(s){return s==='PdC'?0:parseFloat(String(s).replace('+','').replace(',','.'));}; return x(a)-x(b); });
   if(U.cload&&loads.indexOf(U.cload)<0)U.cload='';
   if(U.ctyp2!=='tous'&&types.indexOf(U.ctyp2)<0)U.ctyp2='tous';
-  var sel=U.csel.map(vById), mes=U.cmes==='v'?'v':'h', P=vsFit(U.cmv);
+  var sel=U.csel.map(vById).sort(byD), mes=U.cmes==='v'?'v':'h';
   var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(sel.length>=2){
-    var st=sel.map(function(v){return vcStats(v,P);}), R=st[0], sc=scaleOf(sel,mes);
+    var st=sel.map(function(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); return o; }), R=st[0];
     var cs=st.map(function(o){return o.cs;}), diff=sel.some(function(v){return String(v.variante||'')!==String(sel[0].variante||'');})||
-      cs.some(function(c){return c==null||cs[0]==null||Math.abs(c-cs[0])>1.25+1e-6;}),
-      oldH=mes==='h'&&sel.some(function(v){return vRef(v)!==vRef(sel[0]);});
-    if(diff)h+='<div class="flag"><b>Charges différentes</b> ('+sel.map(function(v,i){return st[i].cs!=null?F(st[i].cs)+' kg':vcLoadLab(v);}).join(' · ')+
-      (sel.some(function(v){return v.variante;})?', ou variante différente':'')+') : plus la charge monte, plus la vitesse baisse. '+
-      'Les écarts bruts ne disent pas qui était le plus en forme ; la ligne <b>vs votre droite</b> le dit, elle compare chaque 1re rep à la vitesse attendue à sa charge.</div>';
-    if(oldH)h+='<p class="note">Une série a l’ancienne mesure de hauteur : ses hauteurs ne se comparent pas aux autres.</p>';
-    h+=sel.map(function(v,i){
-      var o=st[i], ref=i===0, d=function(a,b){return ref||a==null||b==null?null:a-b;};
-      var lines='<dt>1re rep</dt><dd>'+(o.v1==null?'—':v2(o.v1)+' m/s')+vcDelta(d(o.v1,R.v1),100,1,0.07)+'</dd>'+
-        '<dt>vs votre droite</dt><dd>'+(o.dw==null?'<small>'+(v.variante?'variante : pas de droite':!P?'pas encore de droite (Profil)':'—')+'</small>':
-          (Math.abs(o.dw)<=0.07?'habituelle':(o.dw>0?'<b class="vsok">au-dessus</b>':'<b class="vswarn">en dessous</b>'))+
-          ' <small>('+(Math.round(o.dw*100)?(o.dw>0?'+':'−')+v2(Math.abs(o.dw))+' m/s vs attendu':'= attendu')+')</small>')+'</dd>'+
-        '<dt>Dernière rep</dt><dd>'+(o.vl==null?'—':v2(o.vl)+' m/s')+(o.fin?' <small>(après une pause : non comparable)</small>':vcDelta(R.fin?null:d(o.vl,R.vl),100,1,0.07))+'</dd>'+
-        '<dt>Perte de vitesse</dt><dd>'+(o.pe==null?'—':F(Math.round(o.pe))+' %')+vcDelta(d(o.pe,R.pe),1,-1)+'</dd>'+
-        '<dt>Hauteur mini</dt><dd>'+(o.mn==null?'—':F(o.mn)+' cm')+(vRef(v)!==vRef(sel[0])?'':vcDelta(d(o.mn,R.mn),10,1,VBANDE))+'</dd>'+
-        '<dt>Reps valides</dt><dd>'+(o.nv==null?'—':o.nv+' / '+o.n)+'</dd>'+
-        '<dt>Réserve notée</dt><dd>'+(o.rir==null?'—':F(o.rir))+'</dd>';
-      return '<div class="vccard"><div class="vsvh"><b>'+frDate(v.date)+' · '+serieLab(v)+'</b><span class="tag">'+(ref?'référence':'vs réf.')+'</span></div>'+
-        '<p class="note" style="margin:2px 0 0">'+(o.cs!=null?'charge système '+F(o.cs)+' kg':'PdC absent')+(v.semaine?' · S'+v.semaine+(v.seance!=null?' J'+v.seance:''):'')+
-          ' · <button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></p>'+
-        '<dl class="vsvl">'+lines+'</dl>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>';
-    }).join('');
-    h+='<div class="vseg" style="margin-top:6px"><button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Barres : hauteur</button>'+
-      '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Barres : vitesse</button></div>';   /* lot 124 */
-    h+='<p class="note">Écarts avec la référence, la 1re série choisie. Vert = mieux, rouge = moins bien. '+
-      'En gris : écart sous la marge de mesure (0,07 m/s pour la vitesse, Weakley 2021 ; '+F(VBANDE)+' cm pour la hauteur). Barres à la même échelle.</p>';
-  }else h+='<p class="note" style="margin-top:8px">'+(sel.length===1?'Aucune série d’avant au même lest, de même type et même variante : ':'')+'<b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La 1re cochée sert de référence.</p>';
-  var list=all.filter(function(v){ return (!U.cload||vcLoadLab(v)===U.cload)&&(U.ctyp2==='tous'||typeLab(v)===U.ctyp2); });
-  var full=U.csel.length>=VCMAX;
-  var rows=list.map(function(v){
-    var on=U.csel.indexOf(v.id)>=0, k=on?U.csel.indexOf(v.id)+1:0, dis=!on&&full;
-    return '<label class="vcrow'+(dis?' off':'')+'"><input type="checkbox" data-vck="'+esc(v.id)+'"'+(on?' checked':'')+(dis?' disabled':'')+'>'+
-      '<span><b>'+frDate(v.date)+'</b> · '+serieLab(v)+(k?' <b>('+(k===1?'réf.':k)+')</b>':'')+
-      '<small>'+(v.charge_systeme_kg!=null?'charge système '+F(v.charge_systeme_kg)+' kg':'PdC absent')+(vLast(v)!=null?' · dern. rep '+v2(vLast(v))+' m/s':'')+'</small></span></label>';
+      cs.some(function(c){return c==null||cs[0]==null||Math.abs(c-cs[0])>1.25+1e-6;});
+    if(diff)h+='<details class="flag"><summary><b>Charges différentes</b> : comparez par la ligne « vs droite » ›</summary>'+
+      'Plus la charge monte, plus la vitesse baisse : les écarts bruts ne disent pas qui était le plus en forme. La ligne « vs droite » compare chaque 1re rep à la vitesse attendue à sa charge, d’après votre droite des séances d’avant.</details>';
+    var td=function(val,txt,dl){ return '<td>'+(val==null?'—':txt)+(dl||'')+'</td>'; };
+    var row=function(lab,f){ return '<tr><th scope="row">'+lab+'</th>'+st.map(function(o,i){ return f(o,i,i===0); }).join('')+'</tr>'; };
+    var dd=function(a,b,ref){ return ref||a==null||b==null?null:a-b; };
+    h+='<div class="vctw"><table class="vct"><thead><tr><th></th>'+sel.map(function(v,i){
+        return '<th>'+(i===0?'réf. ':'')+perDs(v.date)+'<small>'+esc(typeLab(v))+'</small><small>'+(+v.lest_kg?'+'+F(v.lest_kg):'PdC')+'×'+v.reps.length+'</small></th>'; }).join('')+'</tr></thead><tbody>'+
+      row('1re rep',function(o,i,ref){ return td(o.v1,v2(o.v1),vcDelta(dd(o.v1,R.v1,ref),100,1,0.07)); })+
+      row('vs droite',function(o){ return '<td>'+(o.dw==null?'<small>'+(o.dwhy||'—')+'</small>':(Math.abs(o.dw)<=0.07?'habituelle':(o.dw>0?'<b class="vsok">+'+v2(o.dw)+'</b>':'<b class="vswarn">−'+v2(-o.dw)+'</b>')))+'</td>'; })+
+      row('Moyenne',function(o,i,ref){ return td(o.mv,v2(o.mv),vcDelta(dd(o.mv,R.mv,ref),100,1,0.07)); })+
+      row('Dern. rep',function(o,i,ref){ return td(o.vl,v2(o.vl),o.fin?'<small>après pause</small>':vcDelta(R.fin?null:dd(o.vl,R.vl,ref),100,1,0.07)); })+
+      row('Perte',function(o,i,ref){ return td(o.pe,F(Math.round(o.pe))+' %',vcDelta(dd(o.pe,R.pe,ref),1,-1)); })+
+      row('Mini cm',function(o,i,ref){ return td(o.mn,F(o.mn),vRef(sel[i])!==vRef(sel[0])?'':vcDelta(dd(o.mn,R.mn,ref),10,1,VBANDE)); })+
+      row('Valides',function(o){ return td(o.nv,o.nv+'/'+o.n); })+
+      row('Réserve',function(o){ return td(o.rir,F(o.rir)); })+
+      row('Total kg',function(o){ return td(o.cs,F(o.cs)); })+
+      '</tbody></table></div>';
+    h+='<p class="note">Vitesses en m/s. Écarts avec la plus ancienne (réf.). Vert = mieux, rouge = moins bien, en gris : sous la marge de mesure (0,07 m/s ; '+F(VBANDE)+' cm).</p>';
+    var sc=scaleOf(sel,mes);
+    h+='<details class="chd" data-chd="vcbars"><summary>Barres rep par rep</summary>'+sel.map(function(v){
+        return '<div class="vccard"><div class="vsvh"><b>'+frDate(v.date)+' · '+serieLab(v)+'</b><button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></div>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>'; }).join('')+
+      '<div class="vseg" style="margin-top:6px"><button class="pill" data-vmes="h" aria-pressed="'+(mes==='h')+'">Barres : hauteur</button>'+
+      '<button class="pill" data-vmes="v" aria-pressed="'+(mes==='v')+'">Barres : vitesse</button></div></details>';
+  }else h+='<p class="note" style="margin-top:8px">'+(sel.length===1?'Pas de séance d’avant avec ce type de série : ':'')+'<b>Cochez 2 ou '+VCMAX+' séries</b> ci-dessous. La plus ancienne sert de référence.</p>';
+  var list=all.filter(function(v){ return (!U.cload||vcLoadLab(v)===U.cload)&&(U.ctyp2==='tous'||typeLab(v)===U.ctyp2)&&(U.cwarm||!isWarm(v)||U.csel.indexOf(v.id)>=0); });
+  var full=U.csel.length>=VCMAX, days=[];
+  list.forEach(function(v){ if(days.indexOf(v.date)<0)days.push(v.date); });
+  var rows=days.map(function(d,di){
+    var l=list.filter(function(v){return v.date===d;}).sort(vSortN), any=l.some(function(v){return U.csel.indexOf(v.id)>=0;}), x=l[0];
+    var top=l.filter(function(v){return typeLab(v)==='Top set';})[0];
+    return '<details class="vcday"'+(any||(di===0&&!U.csel.length)?' open':'')+'><summary><b>'+frDate(d)+'</b>'+(x.semaine?' · S'+x.semaine+(x.seance!=null?' J'+x.seance:''):'')+
+      ' <small>· '+(top?'top set '+(+top.lest_kg?F(top.lest_kg):'PdC')+'×'+top.reps.length+' · ':'')+l.length+' série'+(l.length>1?'s':'')+(any?' · cochée':'')+'</small></summary>'+
+      l.map(function(v){
+        var on=U.csel.indexOf(v.id)>=0, dis=!on&&full;
+        return '<label class="vcrow'+(dis?' off':'')+'"><input type="checkbox" data-vck="'+esc(v.id)+'"'+(on?' checked':'')+(dis?' disabled':'')+'>'+
+          '<span><b>'+serieLab(v)+'</b><small>'+vcLestLab(v)+(vLast(v)!=null?' · dern. rep '+v2(vLast(v))+' m/s':'')+'</small></span></label>';
+      }).join('')+'</details>';
   }).join('');
+  var nw=all.filter(isWarm).length;
   var pick='<div class="row" style="margin-top:6px"><div class="field md"><label>Lest</label>'+vSel('cload',[''].concat(loads),U.cload,function(x){return x===''?'tous':esc(x);})+'</div>'+
       '<div class="field md"><label>Type de série</label>'+vSel('ctyp2',types.concat(['tous']),U.ctyp2,function(t){return t==='tous'?'tous les types':t;})+'</div></div>'+
+    (nw?'<p class="note"><label><input type="checkbox" data-vcwarm="1"'+(U.cwarm?' checked':'')+'> montrer les échauffements ('+nw+')</label></p>':'')+
     (full?'<p class="note">'+VCMAX+' séries cochées : décochez-en une pour en choisir une autre.</p>':'')+
-    (rows||'<p class="note">Aucune série pour ces filtres.</p>');
+    (rows||'<p class="note">Aucune série pour ces filtres sur cette période.</p>');
   h+=sel.length>=2?'<details class="chd" data-chd="vcpick"><summary>Changer les séries <b>('+sel.length+' / '+VCMAX+')</b></summary>'+pick+'</details>':pick;
+  return h+'</div>';
+}
+/* lot 125 (demande de Luka 04/11) : vue Bloc. Les top sets d'un bloc à la suite, filtrables par jour (J1, J3 : conditions
+   différentes), ce qui change d'un top set à l'autre, rep par rep, et un bloc après l'autre. Rien de nouveau n'est mesuré :
+   1re rep, moyenne, dernière rep, perte (meilleure rep → dernière), écart à la droite des séances d'avant (vfDw). */
+function vbStats(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); o.v=v; return o; }
+function vbMoy(a,k){ return vMoyA(a.map(function(o){return o[k];}).filter(function(x){return x!=null;})); }
+function vScrBloc(){
+  var U=vui(), mvs=[];
+  (S.velo||[]).forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
+  if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
+  if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
+  var byD=function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);};
+  var tops=S.velo.filter(function(v){return v.mouvement===U.cmv&&typeLab(v)==='Top set';}).sort(byD);
+  var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
+  if(!tops.length)return h+'<p class="note">Aucun top set filmé pour ce mouvement.</p></div>';
+  var bl=[]; tops.forEach(function(v){ var b=String(vBloc(v)); if(bl.indexOf(b)<0)bl.push(b); });
+  bl.sort(function(a,b){return +b-+a;});
+  if(bl.indexOf(String(U.bbl))<0)U.bbl=bl[0];
+  var inB=tops.filter(function(v){return String(vBloc(v))===String(U.bbl);});
+  var js=[]; inB.forEach(function(v){ if(v.seance!=null&&js.indexOf(String(v.seance))<0)js.push(String(v.seance)); }); js.sort();
+  if(U.bj&&js.indexOf(String(U.bj))<0)U.bj='';
+  var jOk=function(v){ return !U.bj||String(v.seance)===String(U.bj); };
+  var l=inB.filter(jOk), st=l.map(vbStats);
+  h+='<div class="row" style="margin-top:6px"><div class="field md"><label>Bloc</label>'+vSel('bbl',bl,U.bbl,vBlocLab)+'</div>'+
+    '<div class="field md"><label>Jour</label>'+vSel('bj',[''].concat(js),U.bj||'',function(j){return j===''?'tous les jours':'J'+j+' seulement';})+'</div></div>';
+  if(!l.length)return h+'<p class="note">Aucun top set filmé ce jour-là dans ce bloc.</p></div>';
+  /* résumé : premier → dernier */
+  var A=st[0], Z=st[st.length-1];
+  var ch=function(lab,a,z,k,unit,good,mg){
+    if(a==null||z==null)return '';
+    var d=z-a, r=Math.round(d*k)/k, col=mg!=null&&Math.abs(d)<mg?'':(r?((r>0)===(good>0)?'vsok':'vswarn'):'');
+    var fmt=function(x){return k===100?v2(x):F(Math.round(x*k)/k);};
+    return '<li>'+lab+' : '+fmt(a)+' → '+fmt(z)+unit+' <b class="'+col+'">('+(r>0?'+':r<0?'−':'±')+fmt(Math.abs(d))+')</b></li>';
+  };
+  if(st.length>=2){
+    h+='<p class="note" style="margin-top:8px"><b>Du premier au dernier top set</b> ('+perDs(A.v.date)+' → '+perDs(Z.v.date)+', '+st.length+' top sets) :</p><ul class="note" style="margin:2px 0 0">'+
+      ch('Lest',+A.v.lest_kg,+Z.v.lest_kg,100,' kg',1)+
+      ch('1re rep',A.v1,Z.v1,100,' m/s',1,0.07)+
+      ch('Vitesse moyenne',A.mv,Z.mv,100,' m/s',1,0.07)+
+      ch('Dernière rep',A.vl,Z.vl,100,' m/s',1,0.07)+
+      ch('Perte de vitesse',A.pe,Z.pe,1,' %',-1)+
+      (vbMoy(st,'dw')!=null?'<li>Écart moyen à votre droite : '+(function(m){return (m>=0?'+':'−')+v2(Math.abs(m))+' m/s ('+(Math.abs(m)<=0.07?'habituel':m>0?'plus rapide':'plus lent')+')';})(vbMoy(st,'dw'))+'</li>':'')+
+      '</ul>';
+  }
+  /* tableau : un top set par ligne, écart avec celui d'avant sous chaque valeur */
+  var dl=function(o,i,k,mul,good,mg){ if(!i)return ''; var p=st[i-1][k]; return o[k]==null||p==null?'':vcDelta(o[k]-p,mul,good,mg); };
+  h+='<div class="vctw"><table class="vct"><thead><tr><th>Top set</th><th>1re</th><th>Moy.</th><th>Dern.</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+
+    st.map(function(o,i){ var v=o.v;
+      return '<tr data-vopen="'+esc(v.id)+'" style="cursor:pointer"><td><b>'+(v.semaine?'S'+v.semaine+(v.seance!=null?' J'+v.seance:''):perDs(v.date))+'</b><small>'+perDs(v.date)+' · '+(+v.lest_kg?F(v.lest_kg):'PdC')+'×'+v.reps.length+(o.nv!=null&&o.nv<o.n?' ('+o.nv+' val.)':'')+'</small>'+(o.rir!=null?'<small>réserve '+F(o.rir)+'</small>':'')+'</td>'+
+        '<td>'+(o.v1==null?'—':v2(o.v1))+dl(o,i,'v1',100,1,0.07)+'</td>'+
+        '<td>'+(o.mv==null?'—':v2(o.mv))+dl(o,i,'mv',100,1,0.07)+'</td>'+
+        '<td>'+(o.vl==null?'—':v2(o.vl))+(o.fin?'<small>pause</small>':dl(o,i,'vl',100,1,0.07))+'</td>'+
+        '<td>'+(o.pe==null?'—':F(Math.round(o.pe))+' %')+dl(o,i,'pe',1,-1)+'</td>'+
+        '<td>'+(o.dw==null?'<small>—</small>':(Math.abs(o.dw)<=0.07?'hab.':(o.dw>0?'<b class="vsok">+'+v2(o.dw)+'</b>':'<b class="vswarn">−'+v2(-o.dw)+'</b>')))+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<p class="note">Vitesses en m/s. Sous chaque valeur : l’écart avec le top set de la ligne d’avant (gris = sous la marge de mesure, 0,07 m/s). Perte = de la meilleure rep à la dernière. Touchez une ligne pour le détail.</p>';
+  /* rep par rep */
+  var gm=U.bgr==='p'?'p':'v', nmax=Math.max.apply(null,l.map(function(v){return v.reps.length;}));
+  var head='<tr><th>Rep</th>'; for(var r=1;r<=nmax;r++)head+='<th>'+r+'</th>'; head+='</tr>';
+  h+='<p class="note" style="margin-top:10px"><b>Rep par rep</b></p><div class="vseg"><button class="pill" data-vbgr="v" aria-pressed="'+(gm==='v')+'">en m/s</button>'+
+    '<button class="pill" data-vbgr="p" aria-pressed="'+(gm==='p')+'">en % de la 1re rep</button></div>'+
+    '<div class="vctw"><table class="vct"><thead>'+head+'</thead><tbody>'+l.map(function(v){
+      var R=v.reps, r0=R[0]&&R[0].vitesse_moy_ms!=null?+R[0].vitesse_moy_ms:null, c='';
+      for(var i=0;i<nmax;i++){ var q=R[i], y=q&&q.vitesse_moy_ms!=null?+q.vitesse_moy_ms:null;
+        c+='<td>'+(y==null?'':q.tentative_ratee?'❌':(gm==='p'?(r0?F(Math.round(y/r0*100)):'—'):v2(y)))+'</td>'; }
+      return '<tr><td>'+(v.semaine?'S'+v.semaine+(v.seance!=null?' J'+v.seance:''):perDs(v.date))+'<small>'+(+v.lest_kg?F(v.lest_kg):'PdC')+' kg</small></td>'+c+'</tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<p class="note">Une rep isolée varie d’environ 0,07 m/s d’une mesure à l’autre : lisez la tendance d’une colonne, pas un chiffre seul.</p>';
+  /* bloc après bloc */
+  var rowsB=bl.slice().sort(function(a,b){return +a-+b;}).map(function(b){
+    var lb=tops.filter(function(v){return String(vBloc(v))===b&&jOk(v);}); if(!lb.length)return '';
+    var sb=lb.map(vbStats), le=lb.map(function(v){return +v.lest_kg||0;}), m=function(k,mul){ var x=vbMoy(sb,k); return x==null?'—':(mul===100?v2(x):F(Math.round(x))); };
+    var dwm=vbMoy(sb,'dw');
+    return '<tr'+(b===String(U.bbl)?' style="font-weight:600"':'')+'><td>'+esc(vBlocLab(b)).replace(/, .*$/,'')+'<small>'+lb.length+' top sets</small></td><td>'+F(Math.min.apply(null,le))+'–'+F(Math.max.apply(null,le))+'</td><td>'+m('v1',100)+'</td><td>'+m('vl',100)+'</td><td>'+m('pe',1)+' %</td><td>'+(dwm==null?'—':(dwm>=0?'+':'−')+v2(Math.abs(dwm)))+'</td></tr>';
+  }).join('');
+  h+='<p class="note" style="margin-top:10px"><b>Bloc après bloc</b>'+(U.bj?' (J'+esc(U.bj)+' seulement)':'')+'</p>'+
+    '<div class="vctw"><table class="vct"><thead><tr><th>Bloc</th><th>Lest</th><th>1re</th><th>Dern.</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+rowsB+'</tbody></table></div>'+
+    '<p class="note">Moyennes des top sets de chaque bloc. « vs droite » : écart moyen de la 1re rep à la vitesse attendue à sa charge (droite des séances d’avant) ; c’est la seule colonne qui se compare quand les charges diffèrent d’un bloc à l’autre.</p>';
   return h+'</div>';
 }
 function vScrSerie(v){
@@ -11261,7 +11365,7 @@ function vScrSerie(v){
     '<div class="vtitle">'+serieLab(v)+'</div>'+
     '<p class="note" style="margin-top:2px">'+frDate(v.date)+' · '+esc(v.mouvement)+(v.semaine?' · S'+v.semaine+(v.seance!=null?' J'+v.seance:''):'')+
       (v.charge_systeme_kg?' · charge système '+F(v.charge_systeme_kg)+' kg':'')+'</p>'+
-    '<div class="btnrow" style="margin:6px 0 8px"><button class="act ghost mini" data-vcmp="'+esc(v.id)+'">Comparer avec… ›</button></div>'+   /* lot 120 */
+    '<div class="btnrow" style="margin:6px 0 8px"><button class="act ghost mini" data-vcmp="'+esc(v.id)+'">Comparer à la séance d’avant ›</button></div>'+   /* lot 120 ; lot 125 */
     '<div class="scroll"><table><thead><tr><th>Rep</th><th>Hauteur cm</th><th>Vitesse m/s</th><th>Votre jugement</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<p class="note">Seuil '+(s?'<b>'+F(s.valide)+' cm</b> — '+s.src:'inconnu')+'. Hauteur '+refLab(v)+'.</p>'+
     ((v.alertes||[]).length?'<div class="flag">'+v.alertes.map(esc).join('<br>')+'</div>':'')+veloDur(v,le)+veloTempo(v,le)+   /* lot R3 ; lot 118 */
@@ -11364,7 +11468,8 @@ function vsRow(v,P,hi){
       '<dt>Dernière rep</dt><dd><b class="'+vd.c+'">'+vd.t+'</b>'+(vl!=null?' <span class="muted">('+F(vl)+' m/s)</span>':'')+'</dd>'+
       '<dt>Forme du jour</dt><dd>'+fo+'</dd>'+vsRow82(v)+   /* lot 82 */
       ((v.alertes||[]).length?'<dt>Vidéo</dt><dd><b class="vswarn">⚠ '+v.alertes.length+' alerte'+(v.alertes.length>1?'s':'')+'</b> <span class="muted">: '+v.alertes.map(esc).join(' ; ')+'</span></dd>':'')+   /* lot 121 (audit Vitesse, 6) */
-    '</dl>'+vsBars(v,hi)+'</div>';
+    '</dl>'+vsBars(v,hi)+
+    (isWarm(v)?'':'<div class="btnrow" style="margin:4px 0 0"><button class="act ghost mini" data-vcmp="'+esc(v.id)+'">Comparer à la séance d’avant ›</button></div>')+'</div>';   /* lot 125 */
 }
 /* lot 104 (T1, T2, P1) : repos en bas entre deux reps (pause_apres_s, toutes les séries filmées), comparé à la même série
    la dernière fois (même mouvement, même nombre de reps, charge système à 1 kg près) ; pause en haut, rep par rep, en
@@ -11507,8 +11612,11 @@ $('p-velo').addEventListener('click',function(e){
   if(cm){ var U0=vui();
     if(cm.dataset.vcmode)U0.cmode=cm.dataset.vcmode;
     else{ var v0=vById(cm.dataset.vcmp); if(!v0)return; var r0=vcRef(v0);
-      U0.cmode='choix'; U0.cmv=v0.mouvement; U0.csel=r0?[r0.id,v0.id]:[v0.id]; U0.cload=''; U0.ctyp2='tous'; window.scrollTo(0,0); }
+      U0.cmode='choix'; U0.cmv=v0.mouvement; U0.csel=r0?[r0.id,v0.id]:[v0.id]; U0.cload=''; U0.ctyp2='tous'; window.scrollTo(0,0);
+      if(r0&&!perOk(null,'d',vDayInfo(r0.date).b,r0.date)){ DPER={m:'all'}; }   /* lot 125 : la séance d'avant peut être hors période */ }
     U0.scr='comparer'; save(); renderVelo(); return; }
+  var gr=e.target.closest?e.target.closest('[data-vbgr]'):null;   /* lot 125 */
+  if(gr){ vui().bgr=gr.dataset.vbgr; save(); renderVelo(); return; }
   var b=e.target.closest?e.target.closest('[data-vs],[data-vopen],[data-vback],[data-vwarm],[data-vmes],[data-vdeldate]'):null;
   if(!b||e.target.closest('[data-juge],[data-velodel],select,a,[data-open]'))return;
   var U=vui();
@@ -11527,6 +11635,7 @@ $('p-velo').addEventListener('click',function(e){
 });
 $('p-velo').addEventListener('change',function(e){
   var t=e.target;
+  if(t.dataset&&t.dataset.vcwarm){ vui().cwarm=t.checked; save(); renderVelo(); return; }   /* lot 125 */
   if(t.dataset&&t.dataset.vck!=null){ var U=vui(), id=t.dataset.vck;   /* lot 120 : séries choisies, dans l'ordre du choix */
     U.csel=U.csel.filter(function(x){return x!==id;}); if(t.checked&&U.csel.length<VCMAX)U.csel.push(id);
     save(); renderVelo(); return; }
