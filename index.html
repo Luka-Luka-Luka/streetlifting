@@ -272,6 +272,10 @@ html,body{overflow-x:clip}
 .line.s-skip .nm{text-decoration:line-through}
 .line .nm{font:600 12.5px/1.3 var(--txt);flex:1 1 auto}
 .line .nm em{font-style:normal;font-weight:400;color:var(--muted)}
+.line .nm .rl{font-weight:400;color:var(--muted)}   /* lot 126 : rôle court en vue Bloc */
+#progplan:not(.chinfo) .line .in,#progplan:not(.chinfo) .line .inx{display:none}
+.pplbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pplbar .chi{margin-left:auto}
 .line .pr{font:600 17px/1 var(--num);white-space:nowrap}
 .line .in{font:400 11px/1.3 var(--txt);color:var(--muted);flex:0 1 auto;text-align:right;min-width:72px;max-width:50%;overflow-wrap:anywhere}
 /* lot 56 B : la precision d'une ligne longue passe dessous, sur toute la largeur */
@@ -865,10 +869,12 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
     <div id="sync"></div>
   </div>
   <div id="closebox"></div>   <!-- lot 59 B : hors de « Réglages du bloc », visible même carte repliée -->
-  <div id="progplan">
-  <div class="btnrow" style="margin:0 0 8px"><span class="note" style="align-self:center;margin:0">Exporter le programme :</span><button class="act ghost mini" data-pexp="md">Markdown</button><button class="act ghost mini" data-pexp="csv">CSV</button></div>   <!-- lot 60 -->
-  <div class="daypick" style="margin:0 0 9px"><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Afficher les mouvements secondaires</label></div>
+  <div id="progplan" data-chk="plan">   <!-- lot 126 : règle derrière le « i », réglage du %, export en volet -->
+  <div class="daypick pplbar" style="margin:0 0 9px"><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Secondaires</label><label class="dchip" id="pctchip"><input type="checkbox" id="showpct">Afficher le %</label><button type="button" class="chi" data-chinfo="plan" aria-label="Détail du calcul" aria-pressed="false">i</button></div>
   <div id="out"></div>
+  <details class="chd" data-chd="pexp"><summary>Exporter le programme</summary>   <!-- lot 60 ; lot 126 : en volet -->
+    <div class="btnrow" style="margin-top:4px"><button class="act ghost mini" data-pexp="md">Markdown</button><button class="act ghost mini" data-pexp="csv">CSV</button></div>
+  </details>
   </div>
   <div class="card" id="cardind">
     <h2>Où en est le bloc <em>main lifts</em></h2>
@@ -1300,7 +1306,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v134';   /* lot 74 */
+var APPV='v136';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -5799,13 +5805,12 @@ function renderPlan(into,weeks,pfx,scope){
         var st=lineState(x.key);
         var e80=SIM?null:entryOf(x.key);   /* lot 80 : à compléter, douteuse */
         html+='<div class="line '+(st?'s-'+st:'')+(e80&&e80.doubt?' dbt':(aComp(e80)?' acp':''))+'" data-key="'+x.key+'">'+
-          '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':'')+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
-          '<span class="pr">'+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+pctHTML(x)+'</span>'+
+          '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(pfx==='p'?roleShort(x):(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':''))+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
+          '<span class="pr">'+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+(pfx==='p'&&S.planPctOff?'':pctHTML(x))+'</span>'+
           (pfx==='t'?'':infoHTML(x.info))+'</div>'+(pfx==='t'?'<div class="tdet" data-det="'+x.key+'">'+(x.info?'<p class="note tdin">'+x.info+'</p>':'')+
           descLine(x,day)+(x.tempo?'<div class="lastp descp">⏱ Tempo : '+tpTxt(S.lifts[x.li],x.tempo)+'</div>':'')+lastPerfHTML(x)+recordHTML(x,day.label)+'</div>':'');   /* lot 118 bis : tempo dans le détail, au clic */   /* lot 46 (R5) ; lot R3 : le détail s'ouvre avec la ligne */
         txt+='  '+x.name+' '+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+(x.tempo?' tempo '+tpTxt(S.lifts[x.li],x.tempo):'')+' ('+x.info+')\n';
       });
-      if(hid)html+='<div class="note hidnote" style="margin:2px 0 0">'+hid+' ligne'+(hid>1?'s':'')+' de mouvement'+(hid>1?'s':'')+' secondaire'+(hid>1?'s':'')+' masquée'+(hid>1?'s':'')+'</div>';
       html+='</div>';
     });
     html+='</div></div>';
@@ -5815,6 +5820,11 @@ function renderPlan(into,weeks,pfx,scope){
 }
 /* Lot 56 B : une précision longue (« ≈ 3 en réserve (estimation : …) ») ne tient pas à droite de la ligne sur un
    téléphone : la partie entre parenthèses passe sous la ligne, sur toute la largeur. */
+/* lot 126 : vue Bloc, rôle court sans tiret ni italique */
+function roleShort(x){
+  var r=x.tg||{top:'top',back:'back-off',amrap:'série max',acc:'accessoire',extra:'ajout',deload:'deload',test:'test 7-8RM'}[x.role];
+  return r?' <span class="rl">· '+r+'</span>':'';
+}
 function planLoad(x){ return x.load==null?'lest à saisir':loadLab(S.lifts[x.li],x.load); }   /* lot 57 : variante sans lest de départ */
 function infoHTML(s){
   s=String(s==null?'':s); var k=s.indexOf(' (');
@@ -11308,6 +11318,7 @@ function renderAll(){
   $('verbo').value=S.verbo;
   $('rirexpm').value=S.rirExpShow?'1':'';   /* lot 79 (A6) */
   $('showacc').checked=!!S.showAcc; $('accchip').classList.toggle('on',!!S.showAcc);
+  $('showpct').checked=!S.planPctOff; $('pctchip').classList.toggle('on',!S.planPctOff);   /* lot 126 */
   fillSelects(); renderHead(); renderLifts();
   if(CTOUCH)renderCharges(); else fillCharges();
   bestNote(); renderPct(); renderCatPick(); renderCatList(); renderAssign(); renderSim();
@@ -11315,6 +11326,9 @@ function renderAll(){
 }
 $('showacc').addEventListener('change',function(){
   S.showAcc=this.checked; $('accchip').classList.toggle('on',S.showAcc); save(); generate(); applyFolds();
+});
+$('showpct').addEventListener('change',function(){   /* lot 126 : % du 1RM en vue Bloc, affiché par défaut */
+  if(this.checked)delete S.planPctOff; else S.planPctOff=1; $('pctchip').classList.toggle('on',this.checked); save(); generate(); applyFolds();
 });
 $('verbo').addEventListener('change',function(){S.verbo=this.value;save();renderAssign();applyFolds();});
 $('rirexpm').addEventListener('change',function(){ S.rirExpShow=this.value==='1'; save(); renderToday(); });   /* lot 79 (A6) */
