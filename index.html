@@ -323,6 +323,27 @@ button.whyb{font:400 12.5px/1 var(--txt);color:var(--muted);background:none;bord
 .nwarn::before{content:'! '}   /* lot 71 (Q33) */
 details.failfold>summary{cursor:pointer}
 .pillrow{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+/* lot 143 : SRSS, deux panneaux teintés (récupération / stress), échelle 0-6 en bande, bouton EN / FR */
+.srhd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 8px}
+.srlang{display:inline-flex;border:1px solid var(--rule);border-radius:999px;overflow:hidden;flex:none}
+.srlang button{font:600 12px/1 var(--txt);padding:7px 12px;border:0;background:transparent;color:var(--muted);min-height:32px}
+.srlang button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.srg{--gc:var(--a3);border-radius:10px;padding:10px 10px 4px;margin:0 0 10px;background:color-mix(in srgb,var(--gc) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--gc) 30%,var(--surface))}
+.srs,.srg.srs{--gc:var(--a4)}
+.srr{--gc:var(--a3)}
+.srgt{display:flex;justify-content:space-between;margin:0;color:var(--gc);font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+.srgt span{font:600 12px var(--num);color:var(--muted);text-transform:none}
+.srgc{margin:3px 0 6px;font-size:12px;line-height:1.35;color:var(--muted)}
+.sri{padding:7px 0 9px;border-top:1px solid color-mix(in srgb,var(--gc,var(--rule)) 18%,transparent)}
+.sri p{margin:0 0 6px;font-size:14px;line-height:1.3;color:var(--ink)}
+.sri p span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.srsc{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.srsc button{font:600 15px/1 var(--num);min-height:38px;border-radius:8px;border:1px solid color-mix(in srgb,var(--gc,var(--ink)) 28%,var(--surface));background:var(--surface);color:var(--ink);padding:0}
+.srsc button[aria-pressed="true"]{background:var(--gc,var(--ink));border-color:var(--gc,var(--ink));color:var(--surface);transform:scale(1.06)}
+.srsc button:focus-visible,.srlang button:focus-visible{outline:2px solid var(--a2);outline-offset:2px}
+.srarss{margin:0 0 10px}.srarss .sri{--gc:var(--a3)}.srarss .sri.srs{--gc:var(--a4)}
+.srleg{margin:2px 0 4px}
+@media (prefers-reduced-motion:reduce){.srsc button{transform:none!important}}
 .fdemi{gap:3px;flex-wrap:nowrap}.fdemi .pill{flex:1 1 0;min-width:0;padding-left:0;padding-right:0}.fdemi .pill.demi{font-size:.82em}   /* lot 58 */
 .pill{font:600 13px/1 var(--num);min-width:38px;padding:8px 7px;border:1px solid var(--rule);border-radius:var(--r);
   background:var(--surface);color:var(--ink);cursor:pointer;text-align:center}
@@ -1309,7 +1330,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v142';   /* lot 74 */
+var APPV='v143';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -7623,16 +7644,21 @@ function painBilan(bid,nSess){
    8 items lus séparément, pas de total) ; passation-SRSS du 04/11/2026. Descripteurs : v = lu dans l'article, n = seconde main.
    La consigne exacte du manuel n'est pas connue : celle-ci est une formulation de travail. Aucune charge n'en dépend.
    S.form[séance].srss = {ppc:0-6,…} ; S.arss = {d, a:{mot:0-6}} ou {skip:date} ; S.ostrc['bloc|semaine'] = {q1..q4 : indice, d}. */
-var SRSS=[
- {k:'ppc',g:'r',en:'Physical Performance Capability',fr:'Capacité de performance physique',w:[['strong','fort',1],['physically capable','physiquement capable',1],['energetic','énergique',0],['full of power','plein de puissance',0]]},
- {k:'mpc',g:'r',en:'Mental Performance Capability',fr:'Capacité de performance mentale',w:[['attentive','attentif',1],['receptive','réceptif',1],['mentally alert','mentalement alerte',0],['concentrated','concentré',0]]},
- {k:'eb',g:'r',en:'Emotional Balance',fr:'Équilibre émotionnel',w:[['pleased','content',1],['stable','stable',1],['in a good mood','de bonne humeur',0],['having everything under control','tout sous contrôle',0]]},
- {k:'or',g:'r',en:'Overall Recovery',fr:'Récupération générale',w:[['recovered','récupéré',0],['rested','reposé',0],['muscle relaxation','muscles détendus',0],['physically relaxed','physiquement détendu',0]]},
- {k:'ms',g:'s',en:'Muscular Stress',fr:'Stress musculaire',w:[['muscle exhaustion','muscles épuisés',1],['muscle fatigue','muscles fatigués',1],['muscle soreness','courbatures',1],['muscle stiffness','raideur musculaire',1]]},
- {k:'la',g:'s',en:'Lack of Activation',fr:'Manque d’activation',w:[['unmotivated','sans motivation',1],['unenthusiastic','sans enthousiasme',1],['sluggish','lent',0],['lacking energy','manque d’énergie',0]]},
- {k:'nes',g:'s',en:'Negative Emotional State',fr:'État émotionnel négatif',w:[['feeling down','déprimé',1],['stressed','stressé',0],['annoyed','agacé',0],['short-tempered','irritable',0]]},
- {k:'os',g:'s',en:'Overall Stress',fr:'Stress général',w:[['tired','fatigué',0],['worn-out','usé',0],['overloaded','surchargé',0],['physically exhausted','physiquement épuisé',0]]}
+var SRSS=[   /* lot 143 : les 32 mots et les deux consignes viennent de l'annexe 11 du mémoire de J. Thomas (STAPS Lille, 2022), « d'après l'ouvrage de Kellmann et Kölling 2019 » ; ils concordent avec les 14 mots lus dans Kölling et al. 2020. Traduction française : annexe 10 du même mémoire, non validée. */
+ {k:'ppc',g:'r',en:'Physical Performance Capability',fr:'Capacité à performer physiquement',w:['strong','physically capable','energetic','full of power'],wf:['force','capacité physique','énergie','pleine puissance']},
+ {k:'mpc',g:'r',en:'Mental Performance Capability',fr:'Capacité à performer mentalement',w:['attentive','receptive','mentally alert','concentrated'],wf:['attention','réceptif','mentalement alerte','concentré']},
+ {k:'eb',g:'r',en:'Emotional Balance',fr:'Équilibre émotionnel',w:['pleased','stable','in a good mood','having everything under control'],wf:['heureux','stable','de bonne humeur','sous contrôle']},
+ {k:'or',g:'r',en:'Overall Recovery',fr:'Niveau de récupération général',w:['recovered','rested','muscle relaxation','physically relaxed'],wf:['récupéré','reposé','relaxé musculairement','physiquement détendu']},
+ {k:'ms',g:'s',en:'Muscular Stress',fr:'Stress musculaire',w:['muscle exhaustion','muscle fatigue','muscle soreness','muscle stiffness'],wf:['épuisement musculaire','fatigue musculaire','douleurs musculaires','raideur musculaire']},
+ {k:'la',g:'s',en:'Lack of Activation',fr:'Manque d’activation',w:['unmotivated','sluggish','unenthusiastic','lacking energy'],wf:['démotivé','lent','peu enthousiaste','manque d’énergie']},
+ {k:'nes',g:'s',en:'Negative Emotional State',fr:'État émotionnel négatif',w:['feeling down','stressed','annoyed','short-tempered'],wf:['se sent déprimé','stressé','agacé','colérique']},
+ {k:'os',g:'s',en:'Overall Stress',fr:'Niveau de stress global',w:['tired','worn-out','overloaded','physically exhausted'],wf:['fatigué','usé','surchargé','épuisé physiquement']}
 ];
+var SRSSG={r:{en:'Short Recovery Scale',fr:'Échelle de récupération',c:'Below you find a list of expressions that describe different aspects of your current state of recovery. Rate how you feel right now in relation to your best ever recovery state.',
+  cf:'Vous trouverez ci-contre une liste d’expressions qui décrivent différents aspects de votre état actuel de récupération. Évaluez ce que vous ressentez en ce moment par rapport à votre meilleur état de récupération.'},
+ s:{en:'Short Stress Scale',fr:'Échelle de stress',c:'Below you find a list of expressions that describe different aspects of your current state of stress. Rate how you feel right now in relation to your highest ever stress state.',
+  cf:'Vous trouverez ci-contre une liste d’expressions qui décrivent différents aspects de votre état de stress actuel. Évaluez ce que vous ressentez en ce moment par rapport à votre état de stress le plus élevé de tous les temps.'}};
+function srssFr(){ return S.srssLang==='fr'; }
 var SRSSSC=['does not apply at all','','','','','','fully applies'];
 function srssOn(){ return PROF.cur==='luka'; }
 function srssOf(k){ var f=formOf(k); return f.srss||null; }
@@ -7653,34 +7679,34 @@ function srssRead(k){
       fl.push('<b>'+q.en+'</b> '+s[q.k]+' (d’habitude '+F(Math.round(m*10)/10)+') '+(bad?'▼ moins bien':'▲ mieux')); } });
   return '<p class="note" data-srssread>'+(fl.length?'Hors de votre habitude ('+n+' séances) : '+fl.join(' ; ')+'.':'Dans votre habitude sur les 8 items ('+n+' séances).')+' Aucune charge n’en dépend.</p>';
 }
-function srssWords(q,fr){ return q.w.map(function(x){ return (fr?x[1]:x[0])+(x[2]?'':'<sup title="non vérifié">*</sup>'); }).join(', '); }
+function srssWords(q){ return (srssFr()?q.wf:q.w).join(', '); }
 function srssHTML(k){
-  var s=srssOf(k)||{}, n=srssN(s), h='';
-  if(!n&&!S.done[k])h+='<p class="note fask"><b>À noter avant la 1re série</b> : 8 items de 0 à 6, environ 30 secondes.</p>';
-  h+=arssHTML();
-  h+='<p class="note" style="margin:4px 0 0">Right now, how well does each statement apply to you, compared with the best state you have ever experienced? <span class="src">0 = '+SRSSSC[0]+' · 6 = '+SRSSSC[6]+'</span></p>';
-  SRSS.forEach(function(q,i){
-    if(i===4)h+='<p class="note" style="margin:10px 0 0"><b>Stress</b></p>'; else if(i===0)h+='<p class="note" style="margin:8px 0 0"><b>Recovery</b></p>';
-    h+='<p class="note" style="margin:6px 0 2px;color:var(--ink)"><b>'+q.en+'</b> <span class="src">'+srssWords(q)+'</span><br><span class="src">'+q.fr+' : '+srssWords(q,1)+'</span></p>'+
-      '<div class="pillrow fdemi">'+[0,1,2,3,4,5,6].map(function(v){
-        return '<button class="pill" data-srss="'+q.k+'|'+v+'" aria-pressed="'+(s[q.k]===v)+'">'+v+'</button>'; }).join('')+'</div>';
-  });
+  var s=srssOf(k)||{}, n=srssN(s), fr=srssFr(), h='';
+  h+='<div class="srhd"><span class="note">'+(n||S.done[k]?'':'<b>Avant la 1re série</b> · 30 s')+'</span>'+
+    '<span class="srlang" role="group" aria-label="Langue"><button data-srlang="en" aria-pressed="'+!fr+'">EN</button><button data-srlang="fr" aria-pressed="'+fr+'">FR</button></span></div>';
+  ['r','s'].forEach(function(g){ var G=SRSSG[g], qs=SRSS.filter(function(q){return q.g===g;}), ng=qs.filter(function(q){return s[q.k]!=null;}).length;
+    h+='<div class="srg sr'+g+'"><p class="srgt"><b>'+(fr?G.fr:G.en)+'</b><span>'+ng+'/4</span></p><p class="srgc">'+(fr?G.cf:G.c)+'</p>';
+    qs.forEach(function(q){
+      h+='<div class="sri"><p><b>'+(fr?q.fr:q.en)+'</b> <span>'+srssWords(q)+'</span></p><div class="srsc">'+[0,1,2,3,4,5,6].map(function(v){
+        return '<button data-srss="'+q.k+'|'+v+'" aria-pressed="'+(s[q.k]===v)+'">'+v+'</button>'; }).join('')+'</div></div>'; });
+    h+='</div>'; });
+  h+='<p class="srleg note">0 = '+(fr?'ne s’applique pas du tout':'does not apply at all')+' · 6 = '+(fr?'s’applique totalement':'fully applies')+(fr?' · <i>traduction non validée</i>':'')+'</p>';
   h+=srssRead(k)+ostrcHTML(k);
   return h;
 }
 function srssHelp(){
-  return '<p class="note">SRSS (Short Recovery and Stress Scale, Kellmann et Kölling) : 4 items de récupération, 4 de stress, chacun lu seul, sans total. '+
-    'Notez votre état maintenant, par rapport au meilleur état que vous ayez connu. Les items se lisent par rapport à votre propre habitude, pas à une norme.</p>'+
-    '<p class="note">La consigne affichée est une formulation de travail : celle du manuel n’est pas connue. Les mots marqués * sont de seconde main, non vérifiés dans l’article. Traduction française non validée.</p>';
+  return '<p class="note">SRSS (Short Recovery and Stress Scale, Kellmann et Kölling 2019) : 4 items de récupération, 4 de stress, chacun lu seul, sans total. '+
+    'Les items se lisent par rapport à votre propre habitude, pas à une norme. Aucune charge n’en dépend.</p>'+
+    '<p class="note">Mots et consignes : annexe 11 du mémoire de J. Thomas (Lille, 2022), reprise du manuel ; ils concordent avec l’article de Kölling et al. Version française : annexe 10 du même mémoire, non validée.</p>';
 }
 /* ARSS : une fois, pour se familiariser (recommandation des manuels) ; mêmes 32 mots, notés un par un */
-function arssHTML(){
+function arssHTML(){   /* plus affichée depuis le 05/11 (choix de Luka) */
   if(S.arss||srssAll(null).length)return '';
-  var a=S.arssP||{}, n=Object.keys(a).length;
-  var h='<details class="fmore" data-arsswrap'+(ARSSO?' open':'')+'><summary class="note"><b>Une fois avant la 1re SRSS</b> : 32 mots notés un par un (ARSS), environ 3 minutes, pour vous familiariser'+(n?' · '+n+'/32':'')+'</summary>';
-  SRSS.forEach(function(q){ q.w.forEach(function(x){
-    h+='<p class="note" style="margin:6px 0 2px">'+x[0]+(x[2]?'':'<sup title="non vérifié">*</sup>')+' <span class="src">'+x[1]+'</span></p><div class="pillrow fdemi">'+[0,1,2,3,4,5,6].map(function(v){
-      return '<button class="pill" data-arss="'+x[0]+'|'+v+'" aria-pressed="'+(a[x[0]]===v)+'">'+v+'</button>'; }).join('')+'</div>'; }); });
+  var a=S.arssP||{}, n=Object.keys(a).length, fr=srssFr();
+  var h='<details class="fmore srarss" data-arsswrap'+(ARSSO?' open':'')+'><summary class="note"><b>Une fois avant la 1re SRSS</b> : 32 mots notés un par un (ARSS), environ 3 minutes, pour vous familiariser'+(n?' · '+n+'/32':'')+'</summary>';
+  SRSS.forEach(function(q){ q.w.forEach(function(x,i){
+    h+='<div class="sri sr'+q.g+'"><p><b>'+(fr?q.wf[i]:x)+'</b></p><div class="srsc">'+[0,1,2,3,4,5,6].map(function(v){
+      return '<button data-arss="'+x+'|'+v+'" aria-pressed="'+(a[x]===v)+'">'+v+'</button>'; }).join('')+'</div></div>'; }); });
   h+='<div class="pillrow" style="margin-top:8px"><button class="pill" data-arssact="skip">Ne pas la faire</button></div></details>';
   return h;
 }
@@ -7714,9 +7740,10 @@ function ostrcHTML(k){
   return h;
 }
 function srssClick(ev){
-  var b=ev.target.closest?ev.target.closest('button[data-srss],button[data-arss],button[data-arssact],button[data-ostrc]'):null; if(!b)return false;
+  var b=ev.target.closest?ev.target.closest('button[data-srss],button[data-arss],button[data-arssact],button[data-ostrc],button[data-srlang]'):null; if(!b)return false;
   var k=S.tsel; if(!k)return true;
-  if(b.dataset.srss){ var p=b.dataset.srss.split('|'), v=+p[1]; if(!S.form[k])S.form[k]={}; var s=S.form[k].srss||(S.form[k].srss={});
+  if(b.dataset.srlang){ S.srssLang=b.dataset.srlang; }
+  else if(b.dataset.srss){ var p=b.dataset.srss.split('|'), v=+p[1]; if(!S.form[k])S.form[k]={}; var s=S.form[k].srss||(S.form[k].srss={});
     if(s[p[0]]===v)delete s[p[0]]; else s[p[0]]=v; if(!srssN(s))delete S.form[k].srss; S.form[k].d=todayISO(); }
   else if(b.dataset.arss){ var r=b.dataset.arss.split('|'), w=+r[1], P=S.arssP||(S.arssP={}); if(P[r[0]]===w)delete P[r[0]]; else P[r[0]]=w; ARSSO=true;
     if(Object.keys(P).length===32){ S.arss={d:todayISO(),a:P}; delete S.arssP; } }
