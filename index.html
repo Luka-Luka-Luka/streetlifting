@@ -1341,7 +1341,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v145';   /* lot 74 */
+var APPV='v146';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -4819,7 +4819,7 @@ function pdcRec(w,lab){
   if(!vs.length&&S.pesees&&+S.pesees[d]>0)vs.push(+S.pesees[d]);
   if(!vs.length)return null;
   vs.sort(function(x,y){return x-y;});
-  return {d:d,txt:vs.length>1?F(vs[0])+' à '+F(vs[vs.length-1]):F(vs[0])};
+  return {d:d,bw:vs[Math.floor((vs.length-1)/2)],txt:vs.length>1?F(vs[0])+' à '+F(vs[vs.length-1]):F(vs[0])};
 }
 function pdcKept(jour){ var k=S.pdcKeep; return !!(k&&k.b===S.blockId&&Math.abs(+k.bw-(+jour))<1e-9); }
 function pdcKeep(){ S.pdcKeep={b:S.blockId,bw:(S.tbw!=null?S.tbw:S.bw)}; save(); renderToday(); }
@@ -5701,6 +5701,19 @@ function buildPlan(){
     if(week.days.length)PLAN.push(week);
   }
   tpPlan();   /* lot 118 */
+  topRepPlan();   /* lot 124 */
+}
+/* lot 124 (questionnaire du 27/10, piste P1 de l'audit des calculs) : un top set à une charge déjà faite ou déjà prévue dans le
+   bloc pour ce mouvement est signalé sur sa ligne (au plus un avertissement, décision du 03/10). Charge faite si la série est
+   enregistrée, sinon prescrite. Robin (semaines répétées voulues) et le deload d'avant bloc ne sont pas comptés. */
+function topRepPlan(){
+  var seen={};
+  PLAN.forEach(function(wk){ if(wk.w<0)return; wk.days.forEach(function(d){ d.lines.forEach(function(x){
+    if(x.role!=='top'||x.load==null)return; var L=S.lifts[x.li]; if(!L||!L.prog||isRB(L.prog.tpl))return;
+    var e=entryOf(x.key), ld=(e&&e.state!=='skip'&&e.load!=null)?+e.load:+x.load, k=x.li+'|'+F(ld), lb='S'+(wk.w+1)+' '+d.label;
+    if(seen[k]&&!/charge r\u00e9p\u00e9t\u00e9e|charge répétée/.test(String(x.info)))x.info=String(x.info||'')+' \u00b7 top set à '+F(ld)+' kg déjà en '+seen[k];
+    if(!seen[k])seen[k]=lb;
+  }); }); });
 }
 /* advanced peaking : microcycles de 2 semaines, semaine 0 = introduction */
 function apDays(w){
@@ -5794,11 +5807,19 @@ function lineState(key,date){
 /* Lot 58 (réponses du 11/10, Q1-Q3) : % du 1RM estimé DU MOMENT (rkRM : meilleure série du bloc, sinon la plus récente), en charge
    système (PdC + lest) au PdC d'en-tête, sur les lignes des main lifts (pas les variantes). Cache vidé à chaque renderPlan. */
 var PCTC={};
+/* lot 124 (questionnaire du 27/10) : une ligne d'une séance passée se lit au PdC de ce jour-là (celui de sa série, sinon celui
+   enregistré pour la séance) ; la séance du jour et les séances à venir, au PdC du jour. */
+function pctBw(x){
+  var e=x&&x.key?entryOf(x.key):null, t=todayISO();
+  if(e&&+e.bw>0&&e.date&&String(e.date).slice(0,10)<t)return +e.bw;
+  var q=String(x&&x.key||'').split('|'), r=q.length>3?pdcRec(+q[2],q[3]):null;
+  return r?r.bw:dayBw();
+}
 function pctOf(x){   /* lot 60 : PdC = dayBw(), le meme que l'onglet Charges */
   var L=S.lifts[x.li]; if(!L||!L.main||isM(L)||x.load==null||x.role==='var'||x.vmod||x.tech)return null;
   if(!(x.li in PCTC))PCTC[x.li]=rkBase(x.li);   /* lot 60 B : e1RM du bloc précédent */
   var st=PCTC[x.li]; if(!st)return null;
-  var bw=dayBw(), rm=st.cur.rm-eff(L,bw)+bwZ(L,bw), sy=bwZ(L,bw)+(+x.load||0);
+  var bw=pctBw(x), rm=st.cur.rm-eff(L,bw)+bwZ(L,bw), sy=bwZ(L,bw)+(+x.load||0);   /* lot 124 : séance passée au PdC de ce jour-là */
   return rm>0?sy/rm*100:null;
 }
 /* Lot 61 (12/10, demande de Luka) : réserve attendue d'une série, d'après la même base que les % (rkBase : top sets du bloc
@@ -8318,7 +8339,7 @@ function fitLift(li){
 function rmSeries(i){
   var L=S.lifts[i]; if(!L)return [];
   return (S.log||[]).filter(function(e){
-    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&!e.doubt&&!tpOutE(e)&&   /* lot 80 (A8) ; lot 118 */
+    return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&!e.doubt&&!tpOutE(e)&&!serieTrichee(e)&&   /* lot 80 (A8) ; lot 118 ; lot 124 : trichées hors du 1RM record */
            e.sets&&e.sets.length&&e.sets[e.sets.length-1];
   }).map(function(e){
     return {e:e,date:e.date||'',
@@ -10514,12 +10535,31 @@ function veloImportAny(d){
       if(!x.date)x.date=d.date;
       if(x.poids_corps_kg==null)x.poids_corps_kg=d.poids_corps_kg;
       var err=veloImport(x);
-      if(err)ko.push('vidéo '+(x.n||i+1)+' : '+err); else ok++;
+      if(err){ ko.push('vidéo '+(x.n||i+1)+' : '+err); vRefus(x,err); } else ok++;
     });
     return {ok:ok,ko:ko};
   }
   var e=veloImport(d);
+  if(e)vRefus(d,e);
   return e?{ok:0,ko:[e]}:{ok:1,ko:[]};
+}
+/* lot 124 (audit du code, point 7 ; questionnaire du 27/10) : une analyse refusée n'est plus perdue. Elle est gardée telle
+   quelle dans S.veloRefus, listée dans Données › Vitesse › Réglages, avec Réessayer, Télécharger et Retirer. */
+function vRefus(raw,why){
+  if(!S.veloRefus)S.veloRefus=[];
+  var j=typeof raw==='string'?raw:JSON.stringify(raw);
+  if(S.veloRefus.some(function(r){return r.raw===j;}))return;
+  S.veloRefus.push({id:'rf'+Date.now().toString(36)+S.veloRefus.length,at:todayISO(),why:String(why||''),raw:j});
+}
+function vRefusHTML(){
+  var a=S.veloRefus||[]; if(!a.length)return '';
+  return '<div class="card mini"><h2>Analyses refusées <em>'+a.length+'</em></h2>'+
+    '<p class="note">Gardées telles quelles. « Réessayer » les reprend (après une mise à jour qui les accepte), « Télécharger » en fait un fichier.</p>'+
+    a.map(function(r){ var d=null; try{ d=JSON.parse(r.raw); }catch(e){}
+      return '<div class="line"><span class="nm">'+esc(d&&d.date?frDate(String(d.date).slice(0,10)):'reçue le '+frDate(r.at))+(d&&d.mouvement?' · '+esc(d.mouvement):'')+
+        '<br><span class="note">'+esc(r.why)+'</span></span></div><div class="btnrow">'+
+        '<button class="act ghost mini" data-rfr="'+r.id+'">Réessayer</button><button class="act ghost mini" data-rfd="'+r.id+'">Télécharger</button>'+
+        '<button class="act ghost mini" data-rfx="'+r.id+'">Retirer</button></div>'; }).join('')+'</div>';
 }
 function veloImport(d){
   if(!d||d.schema!==VSCHEMA)return 'schéma inattendu';
@@ -10786,7 +10826,7 @@ function inboxPull(){
   if(!Array.isArray(a)||!a.length)return;
   try{ localStorage.removeItem('cp-inbox'); }catch(e){}
   var ok=0, ko=[];
-  a.forEach(function(t){ var r; try{ r=veloImportAny(typeof t==='string'?JSON.parse(t):t); }catch(e){ r={ok:0,ko:['JSON illisible']}; } ok+=r.ok; ko=ko.concat(r.ko); });
+  a.forEach(function(t){ var r; try{ r=veloImportAny(typeof t==='string'?JSON.parse(t):t); }catch(e){ r={ok:0,ko:['JSON illisible']}; vRefus(t,'JSON illisible'); } ok+=r.ok; ko=ko.concat(r.ko); });
   veloAutoAll(); save();
   if(curTab()==='data')renderData();
   msgBar(ok+' analyse'+(ok>1?'s':'')+' reçue'+(ok>1?'s':'')+' et rangée'+(ok>1?'s':'')+(ko.length?' ; '+ko.length+' refusée'+(ko.length>1?'s':''):'')+' (Données › Vitesse)');
@@ -11685,11 +11725,19 @@ function renderVelo(){
     var on=b.dataset.vs===U.scr||(U.scr==='serie'&&b.dataset.vs===U.from)||(b.dataset.vs==='comparer'&&U.scr==='serie'&&U.from==='comparer');   /* lot 120 : la pastille Comparer */
     b.setAttribute('aria-pressed',String(on));
   });
-  $('velolist').innerHTML=U.scr==='comparer'?vScrCmp():U.scr==='seuil'?vScrSeuil():
+  $('velolist').innerHTML=U.scr==='comparer'?vScrCmp():U.scr==='seuil'?vRefusHTML()+vScrSeuil():
     U.scr==='profil'?vsProfil():U.scr==='serie'?vScrSerie(vById(U.open)):vsSeance();   /* lot 76 */
   chInfo();
 }
 $('p-velo').addEventListener('click',function(e){
+  var rf=e.target.closest?e.target.closest('[data-rfr],[data-rfd],[data-rfx]'):null;   /* lot 124 : analyses refusées */
+  if(rf){ var id=rf.dataset.rfr||rf.dataset.rfd||rf.dataset.rfx, r=(S.veloRefus||[]).filter(function(x){return x.id===id;})[0]; if(!r)return;
+    if(rf.dataset.rfd){ dl('analyse-refusee-'+r.at+'.json',r.raw,'application/json'); return; }
+    if(rf.dataset.rfx){ S.veloRefus=S.veloRefus.filter(function(x){return x!==r;}); save(); renderVelo(); return; }
+    var d=null, m; try{ d=JSON.parse(r.raw); }catch(e2){}
+    S.veloRefus=S.veloRefus.filter(function(x){return x!==r;});
+    m=d?veloImportAny(d):{ok:0,ko:['JSON illisible']}; if(!d)S.veloRefus.push(r);
+    veloAutoAll(); save(); renderVelo(); msgBar(m.ok?'Analyse reprise et rangée.':'Toujours refusée : '+m.ko.join(' ; ')); return; }
   var ok=e.target.closest?e.target.closest('[data-vok]'):null;   /* lot 82 (A16) */
   if(ok){ var vv=vById(ok.dataset.vok); if(vv&&vv.lien){ delete vv.lien.ord; save(); renderVelo(); } return; }
   var rc=e.target.closest?e.target.closest('[data-vrec]'):null;   /* lot 90 (V2) */
