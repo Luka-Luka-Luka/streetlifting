@@ -499,6 +499,24 @@ table.chfew th:nth-child(n+6),table.chfew td:nth-child(n+6){display:none}
 .bgt .bgs{color:var(--muted);font-size:12.5px}
 .bgt .bgd{display:block;font-weight:400;font-size:11.5px}
 .bgn{font:400 12px/1.35 var(--txt);color:var(--muted);margin:8px 0 0}
+/* lot 127 : vue Tableau de Programme (toucher une case ouvre la saisie) ; records à venir */
+#out .bgt td{font-size:13.5px;padding:5px 2px;white-space:normal}
+#out .bgt th.bgw{width:2.7em;padding-left:0}
+#out .bgt .line{display:block;margin:0 0 1px;padding:1px 0 1px 4px;border-left:3px solid transparent;border-radius:3px;gap:0}
+#out .bgt .line.gt{font-weight:600}
+#out .bgt .line.gs{color:var(--muted);font-size:12.5px}
+#out .bgt .line.s-ok::before{content:'✓ ';color:var(--ok);font-weight:800}
+#out .bgt .line.s-mod::before{content:'! ';color:var(--warn);font-weight:800}
+#out .bgt .line.s-miss::before{content:'✗ ';color:var(--bad);font-weight:800}
+#out .bgt .line.s-skip{opacity:.55;text-decoration:line-through}
+#out .bgt .line.acp,#out .bgt .line.dbt{border-left-color:var(--warn)}
+#out .bgt .line.gsel{background:var(--soft)}
+#out .bgt .pc{font-size:11px;font-weight:400;color:var(--muted);white-space:nowrap}
+#out .bgt .rl{font-size:11px;font-weight:400;color:var(--muted)}
+.bgt tr.bgcur{background:var(--softer)}
+.bgt .pric{font-size:12px}
+.prsum{font:400 13px/1.45 var(--txt);margin:0 0 8px}
+.prsum b{font-weight:600}
 details.brmodif{border-top:1px solid var(--sbxr);margin-top:14px;padding-top:2px}
 #brassign .liftcard .asgmod{padding-left:8px}
 .appmenu{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
@@ -926,7 +944,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
   </div>
   <div id="closebox"></div>   <!-- lot 59 B : hors de « Réglages du bloc », visible même carte repliée -->
   <div id="progplan" data-chk="plan">   <!-- lot 126 : règle derrière le « i », réglage du %, export en volet -->
-  <div class="daypick pplbar" style="margin:0 0 9px"><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Secondaires</label><label class="dchip" id="pctchip"><input type="checkbox" id="showpct">Afficher le %</label><button type="button" class="chi" data-chinfo="plan" aria-label="Détail du calcul" aria-pressed="false">i</button></div>
+  <div class="daypick pplbar" style="margin:0 0 9px"><label class="dchip" id="tabchip"><input type="checkbox" id="showtab">Tableau</label><label class="dchip" id="accchip"><input type="checkbox" id="showacc">Secondaires</label><label class="dchip" id="pctchip"><input type="checkbox" id="showpct">Afficher le %</label><button type="button" class="chi" data-chinfo="plan" aria-label="Détail du calcul" aria-pressed="false">i</button></div>
   <div id="out"></div>
   <details class="chd" data-chd="pexp"><summary>Exporter le programme</summary>   <!-- lot 60 ; lot 126 : en volet -->
     <div class="btnrow" style="margin-top:4px"><button class="act ghost mini" data-pexp="md">Markdown</button><button class="act ghost mini" data-pexp="csv">CSV</button></div>
@@ -1363,7 +1381,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v149';   /* lot 74 */
+var APPV='v150';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -3906,17 +3924,44 @@ function copyTxt(t,btn){
 }
 /* R7 : PR prevu = charge systeme prevue (PdC du jour + lest) au-dessus du record a ce nombre de reps
    (meme record que la ligne « record a N reps », hors series de cette meme ligne). */
-function prPlanned(x,lab){
-  if(SIM)return null; var L=S.lifts[x.li]; if(!L||isM(L))return null;
+function prPlanned(x,lab,sets){
+  var L=S.lifts[x.li]; if(!L||isM(L))return null;   /* lot 127 : aussi dans le bac à sable (PdC d'essai) */
   if(x.role==='var'||x.role==='deload'||jourLeger(L,lab))return null;
   var n=parseInt(x.reps,10); if(!(n>0)||x.load==null)return null;
-  var sys=(L.useBw?(+(S.tbw!=null?S.tbw:S.bw)||0):0)+(+x.load), c=rkCell(x.li,n,false,x.key), best=c?c.sys:null;   /* lot 48 */
+  var sys=(L.useBw?(+(!SIM&&S.tbw!=null?S.tbw:S.bw)||0):0)+(+x.load), c=rkCell(x.li,n,false,x.key,sets), best=c?c.sys:null;   /* lot 48 */
   if(!best)return null;
   if(sys>best.sys+1e-9)return {sys:sys,rec:best};
   return (best.fd===0&&sys>=best.sys-1e-9)?{sys:sys,rec:best,forme:1}:null;   /* egaler sans triche un record triche */
 }
-function prIcon(x,lab){
-  var p=prPlanned(x,lab);
+function prIcon(x,lab){ return prTag(prPlanned(x,lab)); }
+/* lot 127 : records à venir, dans Programme et le bac à sable. Lignes pas encore faites (ni passées) dont la charge
+   système dépasse le record actuel à ce nombre de reps : chacune comparée aux records déjà faits, pas aux autres lignes prévues. */
+var PRF={};
+function prFuture(){
+  var list=[], map={}, cs={}, t=todayISO();
+  PLAN.forEach(function(wk){ wk.days.forEach(function(d){
+    if(!SIM){ var di=dayISO(wk.w,d.label); if(di&&di<t)return; }
+    d.lines.forEach(function(x){
+      if(!SIM&&entryOf(x.key))return;
+      var L=S.lifts[x.li]; if(!L||isM(L))return;
+      if(!cs[x.li])cs[x.li]=rkSets(x.li);
+      var p=prPlanned(x,d.label,cs[x.li]); if(!p)return;
+      map[x.key]=p; list.push({x:x,w:wk.w,d:d.label,p:p});
+    });
+  }); });
+  return {list:list,map:map};
+}
+function prSum(list){
+  if(!list.length)return '';
+  var by={}, ord=[];
+  list.forEach(function(o){ if(!by[o.x.li]){ by[o.x.li]=[]; ord.push(o.x.li); } by[o.x.li].push(o); });
+  return '<div class="prsum">🏆 <b>'+list.length+' record'+(list.length>1?'s':'')+' à venir</b> si les séances sont faites comme prévu : '+ord.map(function(li){
+    var a=by[li], f=function(o){ return (o.w<0?'DL':'S'+(o.w+1))+' '+o.d+' '+o.x.reps+' rep'+(+o.x.reps>1?'s':''); };
+    return '<b class="n'+col(li)+'">'+esc(S.lifts[li].name)+'</b> '+a.slice(0,4).map(f).join(', ')+(a.length>4?' +'+(a.length-4):'');
+  }).join(' · ')+'</div>';
+}
+function prTag(p,c){
+  if(p&&c)return ' <span class="pric" title="Record prévu : '+F(p.sys)+' kg système, record actuel '+F(p.rec.sys)+' kg">🏆</span>';   /* lot 127 : tableau */
   return p?' <span class="pric" title="PR prévu : '+F(p.sys)+' kg système, record '+F(p.rec.sys)+' kg'+
     (p.forme?' (trichée) : record s’il est égalé sans triche':'')+'">🏆 PR</span>':'';
 }
@@ -5211,7 +5256,8 @@ function brPanel(){
 /* lot 125 : le bac à sable ne sert qu'à voir le bloc suivant : une grille par mouvement (semaines en lignes, jours
    en colonnes, 1re ligne du jour en gras, les suivantes dessous), sans % ni règle. Plus de 4 jours pour un mouvement :
    la liste semaine par semaine d'avant. Appelée dans brWith (S.start, S.jours, S.blockId du brouillon). */
-function brGrid(){
+function brGrid(prm){   /* lot 127 : prm = records à venir */
+  prm=prm||{};
   var sep=S.sep, by={}, ord=[], many=false;
   PLAN.forEach(function(wk){ wk.days.forEach(function(d){
     if(ord.indexOf(d.label)<0)ord.push(d.label);
@@ -5234,19 +5280,19 @@ function brGrid(){
       var d0=g.days.filter(function(d){return r[d];})[0], dt=d0?dayDt(wk.w,d0):null;
       t+='<tr><th class="bgw">'+(wk.w<0?'DL':'S'+(wk.w+1))+(dt?'<span class="bgd">'+dt.getDate()+'/'+(dt.getMonth()+1)+'</span>':'')+'</th>'+
         g.days.map(function(d){ var xs=r[d]; if(!xs)return '<td></td>';
-          return '<td>'+xs.map(function(x,k){ return k?'<span class="bgs">'+tx(x)+'</span>':'<b>'+tx(x)+'</b>'; }).join('<br>')+'</td>'; }).join('')+'</tr>';
+          return '<td>'+xs.map(function(x,k){ var pr=prTag(prm[x.key],1); return k?'<span class="bgs">'+tx(x)+pr+'</span>':'<b>'+tx(x)+'</b>'+pr; }).join('<br>')+'</td>'; }).join('')+'</tr>';
     });
     return t+'</tbody></table></div>';
   }).join('');
   if(many){ var box=document.createElement('div'); renderPlan(box,PLAN,'sb','week');
     h+='<details class="chd" data-chd="brweeks"'+(cui().open.brweeks?' open':'')+'><summary>Mouvements sur plus de 4 jours : semaine par semaine</summary>'+box.innerHTML+'</details>'; }
   var first=ord[0], dt0=first?dayDt(0,first):null;
-  return {html:h?h+'<p class="bgn">En gras la 1re série du jour (top set), dessous les suivantes (back-off). Lest en kg.</p>':'<p class="note">Rien au programme dans ce brouillon.</p>',
+  return {html:h?h+'<p class="bgn">En gras la 1re série du jour (top set), dessous les suivantes (back-off). Lest en kg.'+(Object.keys(prm).length?' 🏆 : record si la série est faite comme prévu (comparée à vos records actuels, sans compter ceux du bloc en cours).':'')+'</p>':'<p class="note">Rien au programme dans ce brouillon.</p>',
     bid:S.blockId, nwk:S.nwk, jours:String(S.jours).split(',').join(' / '), bw:S.bw, dt:dt0};
 }
 function brPlan(){
-  var err=null, mine=null, G=null;
-  try{ brWith(function(){ SIM=1; try{ buildPlan(); G=brGrid(); mine=brTops(); }finally{ SIM=0; } }); }
+  var err=null, mine=null, G=null, PF=null;
+  try{ brWith(function(){ SIM=1; try{ buildPlan(); PF=prFuture(); G=brGrid(PF.map); mine=brTops(); }finally{ SIM=0; } }); }
   catch(e){ err=e; }
   buildPlan();
   if(err){
@@ -5264,7 +5310,7 @@ function brPlan(){
   var w1=0; S.lifts.forEach(function(L,i){ if(mine[i]&&mine[i].w1>w1)w1=mine[i].w1; });
   $('brsum').innerHTML='<div class="bsl">Bloc '+G.bid+' · '+G.nwk+' sem. · '+esc(G.jours)+(G.dt?' · dès le '+G.dt.getDate()+'/'+(G.dt.getMonth()+1):'')+
     ' · PdC '+F(G.bw)+' kg'+(B.bw!=null?' (d’essai)':'')+'</div>'+
-    (arr.length?'<div class="bsl m">Arrivée S'+(w1+1)+' : '+arr.join(' · ')+'</div>':'');
+    (arr.length?'<div class="bsl m">Arrivée S'+(w1+1)+' : '+arr.join(' · ')+'</div>':'')+(PF?prSum(PF.list.filter(function(o){ return B.sec||S.lifts[o.x.li].main; })):'');   /* lot 127 */
   $('simout').innerHTML=G.html;
   if($('brmodsum'))$('brmodsum').innerHTML='Modifier le brouillon'+(d.length?' <b>· '+d.length+' écart'+(d.length>1?'s':'')+'</b>':'');
   $('brdiff').innerHTML=d.length?'<p class="note" style="margin:6px 0 4px"><b>Écarts avec votre programme :</b> '+d.join(' · ')+'.</p>':'<p class="note" style="margin:6px 0 4px">Mêmes réglages que votre programme.</p>';
@@ -5871,6 +5917,53 @@ function rirExpHTML(x,e){
     (x.role==='back'?(function(){ var g=boffGap(x.li); return g?'<p class="note" data-boffgap>'+boffTxt(g)+'</p>':''; })():'');   /* lot 69 (Q26) */
 }
 function pctHTML(x){ var v=pctOf(x); return v==null?'':' <span class="pc" title="% de l\'e1RM des top sets du bloc précédent, charge système">'+Math.round(v)+' %</span>'; }
+/* lot 127 : vue Tableau de Programme, sur le modèle du bac à sable (une grille par mouvement, semaines en lignes, jours en
+   colonnes) mais avec ce que la vue Bloc apporte en plus : état des séries (✓ ! ✗), % si affiché, 🏆, 🎥, ⚠, saisie en cours.
+   Toucher une case ouvre la saisie, sous le tableau. Mouvement sur plus de 4 jours : la liste, pour lui seul. */
+function pgGrid(){
+  var sep=S.sep, by={}, ord=[], many={}, ns=nextSession(), cw=ns?+String(ns).split('|')[0]:NaN, hid=0;
+  PLAN.forEach(function(wk){ wk.days.forEach(function(d){
+    var dl=wk.w<0;   /* deload : une séance, rangée dans la 1re colonne du mouvement */
+    if(!dl&&ord.indexOf(d.label)<0)ord.push(d.label);
+    d.lines.forEach(function(x){
+      var L=S.lifts[x.li]; if(!L)return;
+      if(!S.showAcc&&!L.main){ hid++; return; }
+      var g=by[x.li]||(by[x.li]={days:[],vr:{},rows:{}});
+      if(!dl&&g.days.indexOf(d.label)<0)g.days.push(d.label);
+      var r=g.rows[wk.w]||(g.rows[wk.w]={}), dk=dl?'*':d.label; (r[dk]=r[dk]||[]).push(x);
+      if(x.name!==L.name&&!g.vr[d.label]){ var v=x.name.indexOf(L.name)===0?x.name.slice(L.name.length).trim():x.name; if(v)g.vr[d.label]=v; }
+    });
+  }); });
+  var rl={amrap:'série max',test:'test',extra:'ajout'};
+  var cell=function(x,k){
+    var st=lineState(x.key), e=entryOf(x.key);
+    return '<span class="line '+(k?'gs':'gt')+(st?' s-'+st:'')+(e&&e.doubt?' dbt':(aComp(e)?' acp':''))+'" data-key="'+x.key+'">'+
+      (x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?'<wbr>'+sep+x.sets:''))+(S.planPctOff?'':pctHTML(x))+
+      (rl[x.role]?' <span class="rl">'+rl[x.role]+'</span>':'')+prTag(PRF[x.key],1)+lineMarks(x.key)+
+      (DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>';
+  };
+  var h=Object.keys(by).map(Number).sort(function(a,b){return a-b;}).map(function(li){
+    var L=S.lifts[li], g=by[li]; g.days.sort(function(a,b){return ord.indexOf(a)-ord.indexOf(b);});
+    if(g.days.length>4){ many[li]=1; return ''; }
+    var vr=g.days.filter(function(d){return g.vr[d];}).map(function(d){return d+' : '+esc(g.vr[d]);}).join(' · ');
+    var t='<div class="bgl"><div class="tagname n'+col(li)+'">'+esc(L.name)+(vr?'<span class="bgv">'+vr+'</span>':'')+'</div>'+
+      '<table class="bgt"><thead><tr><th class="bgw"></th>'+g.days.map(function(d){return '<th>'+d+'</th>';}).join('')+'</tr></thead><tbody>';
+    PLAN.forEach(function(wk){ var r=g.rows[wk.w]; if(!r)return;
+      var d0=r['*']?'DL':g.days.filter(function(d){return r[d];})[0], dt=d0?dayDt(wk.w,d0):null;
+      t+='<tr'+(wk.w===cw?' class="bgcur"':'')+'><th class="bgw">'+(wk.w<0?'DL':'S'+(wk.w+1))+(dt?'<span class="bgd">'+dt.getDate()+'/'+(dt.getMonth()+1)+'</span>':'')+'</th>'+
+        g.days.map(function(d,j){ var xs=(!j&&r['*'])?r['*']:r[d]; if(!xs)return '<td></td>';
+          return '<td>'+xs.map(cell).join('')+'</td>'; }).join('')+'</tr>';
+    });
+    return t+'</tbody></table></div>';
+  }).join('');
+  if(Object.keys(many).length){
+    var wks=PLAN.map(function(wk){ return Object.assign({},wk,{days:wk.days.map(function(d){ return Object.assign({},d,{lines:d.lines.filter(function(x){return many[x.li];})}); })
+      .filter(function(d){return d.lines.length;})}); }).filter(function(wk){return wk.days.length;});
+    var box=document.createElement('div'); renderPlan(box,wks,'p','week'); h+='<div class="pgmany">'+box.innerHTML+'</div>';
+  }
+  return h?h+'<p class="bgn">En gras la 1re série du jour (top set), dessous les suivantes. Touchez une case pour la saisir.'+(Object.keys(PRF).length?' 🏆 : record si la série est faite comme prévu (comparée à vos records actuels).':'')+(hid?' Secondaires masquées.':'')+'</p>':
+    '<p class="note">Rien à afficher'+(hid?' : seuls des mouvements secondaires sont prévus (puce « Secondaires »).':'.')+'</p>';
+}
 function renderPlan(into,weeks,pfx,scope){
   PCTC={};
   pfx=pfx||'p'; scope=scope||'week';
@@ -5895,7 +5988,7 @@ function renderPlan(into,weeks,pfx,scope){
         var st=lineState(x.key);
         var e80=SIM?null:entryOf(x.key);   /* lot 80 : à compléter, douteuse */
         html+='<div class="line '+(st?'s-'+st:'')+(e80&&e80.doubt?' dbt':(aComp(e80)?' acp':''))+'" data-key="'+x.key+'">'+
-          '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(pfx==='p'?roleShort(x):(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':''))+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
+          '<span class="nm n'+col(x.li)+'">'+x.name+(pfx==='t'?prIcon(x,day.label):'')+(pfx==='p'?roleShort(x)+prTag(PRF[x.key]):(x.tg?' <em>— '+x.tg+'</em>':x.role==='top'?' <em>— top set</em>':x.role==='back'?' <em>— back-off</em>':x.role==='amrap'?' <em>— série maximale</em>':x.role==='acc'?' <em>— accessoire</em>':x.role==='extra'?' <em>— ajout ponctuel</em>':x.role==='deload'?' <em>— deload</em>':x.role==='test'?' <em>— test 7-8RM</em>':''))+lineMarks(x.key)+(!SIM&&DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>'+
           '<span class="pr">'+(x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:''))+(pfx==='p'&&S.planPctOff?'':pctHTML(x))+'</span>'+
           (pfx==='t'?'':infoHTML(x.info))+'</div>'+(pfx==='t'?'<div class="tdet" data-det="'+x.key+'">'+(x.info?'<p class="note tdin">'+x.info+'</p>':'')+
           descLine(x,day)+(x.tempo?'<div class="lastp descp">⏱ Tempo : '+tpTxt(S.lifts[x.li],x.tempo)+'</div>':'')+lastPerfHTML(x)+recordHTML(x,day.label)+'</div>':'');   /* lot 118 bis : tempo dans le détail, au clic */   /* lot 46 (R5) ; lot R3 : le détail s'ouvre avec la ligne */
@@ -6216,7 +6309,11 @@ function generate(){
   if(BRSWAP)return;   /* lot 45 */
   buildPlan();
   progWeekFold();   /* lot 78 */
+  var pf=prFuture(); PRF=pf.map;   /* lot 127 */
   LASTTXT=renderPlan($('out'),PLAN);
+  if(!S.planList&&PLAN.length)$('out').innerHTML=pgGrid();   /* lot 127 : vue Tableau par défaut */
+  var pl=pf.list.filter(function(o){ return S.showAcc||S.lifts[o.x.li].main; });   /* secondaires masquées : pas dans le résumé */
+  if(pl.length)$('out').insertAdjacentHTML('afterbegin',prSum(pl));
   renderSync(); renderCloseBox();   /* lot 59 */
   $('indout').innerHTML=indHTML();   /* lot 78 */
   reopenPanel('out');
@@ -6776,7 +6873,9 @@ function openPanel(el,key){
   PV=panelValid(key,entryOf(key));
   var div=document.createElement('div'); div.innerHTML=panelHTML(key);
   var p=div.firstChild;
-  el.parentNode.insertBefore(p,el.nextSibling); OPENKEY=key;
+  var at=(el.closest&&el.closest('.bgt'))?el.closest('.bgl'):el;   /* lot 127 : case du tableau, panneau sous le tableau */
+  at.parentNode.insertBefore(p,at.nextSibling); OPENKEY=key;
+  if(at!==el)el.classList.add('gsel');
   if(el.closest&&el.closest('#todayout')){ var dt=Array.prototype.filter.call(el.parentNode.querySelectorAll('.tdet'),function(q){return q.dataset.det===key;})[0];
     if(dt){ dt.classList.add('show'); el.parentNode.insertBefore(dt,p); } }   /* lot R3 : détail de la ligne ouverte, juste sous elle */
   LASTOPEN={key:key,where:el.closest('#todayout')?'today':'out'}; histPanel();   /* lot 64 */
@@ -6787,6 +6886,7 @@ function openPanel(el,key){
 function closePanel(){
   var p=document.querySelector('[data-panel]'); if(p){ draftSnap(p); p.remove(); } OPENKEY=null;
   Array.prototype.forEach.call(document.querySelectorAll('.tdet.show'),function(q){ q.classList.remove('show'); });   /* lot R3 */
+  Array.prototype.forEach.call(document.querySelectorAll('.bgt .gsel'),function(q){ q.classList.remove('gsel'); });   /* lot 127 */
 }
 function reopenPanel(where){
   if(!LASTOPEN||LASTOPEN.where!==where||document.querySelector('[data-panel]'))return;
@@ -12370,6 +12470,7 @@ function renderAll(){
   $('rirexpm').value=S.rirExpShow?'1':'';   /* lot 79 (A6) */
   $('showacc').checked=!!S.showAcc; $('accchip').classList.toggle('on',!!S.showAcc);
   $('showpct').checked=!S.planPctOff; $('pctchip').classList.toggle('on',!S.planPctOff);   /* lot 126 */
+  $('showtab').checked=!S.planList; $('tabchip').classList.toggle('on',!S.planList);   /* lot 127 */
   fillSelects(); renderHead(); renderLifts();
   if(CTOUCH)renderCharges(); else fillCharges();
   bestNote(); renderPct(); renderCatPick(); renderCatList(); renderAssign(); renderSim();
@@ -12377,6 +12478,9 @@ function renderAll(){
 }
 $('showacc').addEventListener('change',function(){
   S.showAcc=this.checked; $('accchip').classList.toggle('on',S.showAcc); save(); generate(); applyFolds();
+});
+$('showtab').addEventListener('change',function(){   /* lot 127 : Tableau (défaut) ou Liste */
+  if(this.checked)delete S.planList; else S.planList=1; $('tabchip').classList.toggle('on',this.checked); LASTOPEN=null; closePanel(); save(); generate(); applyFolds();
 });
 $('showpct').addEventListener('change',function(){   /* lot 126 : % du 1RM en vue Bloc, affiché par défaut */
   if(this.checked)delete S.planPctOff; else S.planPctOff=1; $('pctchip').classList.toggle('on',this.checked); save(); generate(); applyFolds();
