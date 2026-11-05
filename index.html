@@ -1341,7 +1341,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v147';   /* lot 74 */
+var APPV='v148';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -5937,6 +5937,16 @@ function varPage(L,x,leger){
   if(x.role!=='var'&&!leger)return '';
   var m=String(x.vmod||L.prog.varMod||''); return m==='hautes'?'hautes':m==='bloquées'?'bloquées':/^stato/.test(m)?'stato':m==='pausées'?'pausées':m==='tempo'?'tempo':'';   /* lot R3 */   /* lot R1 : variante de la ligne */
 }
+/* v148, lot B Vitesse (audit Vitesse, 19) : vos seuils de validite, lus par la page video (meme site).
+   Seulement ceux tires de vos jugements ; par mouvement et par mesure de hauteur (depart / bas). */
+function vSeuilsPage(){
+  var o={};
+  ['tractions','dips'].forEach(function(m){ ['depart','bas'].forEach(function(ref){
+    var x=null; try{ x=veloSeuil(m,ref); }catch(e){}
+    if(x)o[m+'|'+ref]={valide:Math.round(x.valide*10)/10,franche:x.franche!=null?Math.round(x.franche*10)/10:null,n:x.n};
+  });});
+  return o;
+}
 function seancesPage(){
   if(SIM)return null;
   var li=-1; S.lifts.forEach(function(L,i){ if(li<0&&(L.catId==='pullup'||/traction/i.test(L.name||'')))li=i; });
@@ -5959,7 +5969,7 @@ function seancesPage(){
       type:series.some(function(s){return s.type==='top set';})?'principale':'secondaire',
       pdc:pdc!=null?pdc:(date===todayISO()&&S.tbw!=null?+S.tbw:+S.bw),fait:fait,series:series});
   });});
-  var r={v:1,app:APPV,ecrit:todayISO(),mouvement:'tractions',seances:out};
+  var r={v:1,app:APPV,ecrit:todayISO(),mouvement:'tractions',seances:out,seuils:vSeuilsPage()};   /* v148, lot B Vitesse (audit Vitesse, 19) */
   try{ localStorage.setItem(SK('cp-seances-page'),JSON.stringify(r)); }catch(e){}
   return r;
 }
@@ -10866,7 +10876,7 @@ function vLastOk(v){ var o=vOk(v); return o.length?+o[o.length-1].vitesse_moy_ms
 function vLisible(v){ var e=lienEntry(v); return !v.variante&&!isWarm(v)&&!isFixe(v)&&!(e&&e.fin)&&vLastOk(v)!=null; }
 function vEchecs(mv){ return (S.velo||[]).filter(function(v){ return v.mouvement===mv&&vLisible(v)&&vRir(v)===0; }).map(vLastOk); }
 function vEchec(mv){
-  var xs=vEchecs(mv); if(xs.length<2)return {v:0.20,n:xs.length,pub:true};
+  var xs=vEchecs(mv); if(xs.length<5)return {v:0.20,n:xs.length,pub:true};   /* v148, lot B Vitesse (questionnaire du 27/10) : la vôtre dès 5 séries à l'échec */
   var o=xs.slice().sort(function(a,b){return a-b;}), m=o.length>>1;
   return {v:o.length%2?o[m]:(o[m-1]+o[m])/2,n:xs.length,lo:o[0],hi:o[o.length-1]};   /* médiane : une série mal notée ne la tire pas */
 }
@@ -11191,11 +11201,12 @@ function veloRepsSvg(v){
     'au moins une rep ratée et une valide')+'. Couleur = votre jugement ('+VJ.ko.e+' rouge, '+VJ.dt.e+' ocre, '+VJ.ok.e+' bleu, '+VJ.franc.e+' vert), gris = pas encore jugée.</p></details>';
 }
 /* ================= onglet Vitesse (v26) =================
-   Quatre ecrans, un seul affiche a la fois :
-     Seance   — jusqu'ou chaque rep est montee ce jour-la (ecran par defaut)
-     Comparer — a charge egale, series alignees dans le temps, une mesure a la fois
-     Seuil    — d'ou vient le seuil de validite ; import et liste des analyses
-     Serie    — detail d'une serie, ouvert en touchant une ligne
+   Cinq ecrans, un seul affiche a la fois (v148, lot B Vitesse : commentaire remis a jour) :
+     Seance   — vsSeance : reps valides, derniere rep, forme du jour (ecran par defaut)
+     Profil   — vsProfil : droite charge-vitesse
+     Comparer — vScrCmp (Au fil des seances, Series choisies, Bloc)
+     Reglages — vScrSeuil : seuil de validite, analyses refusees, import et liste des analyses
+     Serie    — vScrSerie : detail d'une serie, ouvert en touchant une ligne
    Hauteur : depuis la suspension stable avant la 1re rep (script v7, champ hauteur_cm).
    Les analyses plus anciennes n'ont que la hauteur depuis le point le plus bas : elles
    restent affichees, marquees, et ne se comparent pas en hauteur avec les nouvelles. */
@@ -11291,40 +11302,7 @@ function scaleOf(list,mes){
 /* lot 121 (audit Vitesse, 5) : une tentative ratée n'est ni la dernière rep ni la hauteur mini (elle reste dans les barres, marquée ❌) */
 function vMini(v){ var h=v.reps.filter(function(r){return !r.tentative_ratee;}).map(function(r){return hOf(v,r);}).filter(function(x){return x!=null;}); return h.length?Math.min.apply(null,h):null; }
 function vLast(v){ return vLastOk(v); }
-function serieRow(v,sc,idx){
-  var s=seuilOf(v), mn=vMini(v), vl=vLast(v), m=(s&&mn!=null)?mn-s.valide:null, al=(v.alertes||[]).length;
-  return '<div class="vrow" data-vopen="'+esc(v.id)+'">'+
-    '<div class="vrh"><b>'+serieLab(v)+(idx?' <span class="muted">'+idx+'</span>':'')+'</b>'+
-      '<span>mini <b>'+(mn==null?'—':F(mn))+'</b> cm</span></div>'+
-    barsSvg(v,sc.lo,sc.hi,'h')+
-    '<div class="vrf"><span>dern. rep '+(vl==null?'—':F(vl)+' m/s')+'</span>'+
-      '<span>'+(m==null?'':'<b style="color:'+hCol(mn,s)+'">'+hSig(mn,s)+(m>=0?'+':'−')+F(Math.abs(Math.round(m*10)/10))+' cm</b> vs seuil')+
-      (al?' · ⚠'+al:'')+' ›</span></div></div>';
-}
-function vScrSeance(){
-  var U=vui(), all=vDates(), ds=vFiltre(all);   /* lot 47 (R17) */
-  if(!all.length)return '<div class="card"><p class="note"><b>Aucune analyse vidéo pour l\'instant.</b> Filmez une série, analysez la séance avec le lien ci-dessus, téléchargez le fichier de séance, puis importez-le : <b>Réglages › Importer</b>.</p></div>';
-  var fl=vFiltres();
-  if(!ds.length)return '<div class="card">'+fl+'<p class="note">Aucune séance filmée pour ces filtres.</p></div>';
-  if(ds.indexOf(U.date)<0)U.date=ds[0];
-  var day=S.velo.filter(function(v){return v.date===U.date;});
-  var mvs=[]; day.forEach(function(v){if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement);});
-  if(mvs.indexOf(U.mv)<0)U.mv=mvs[0];
-  var l=day.filter(function(v){return v.mouvement===U.mv;}).sort(vSortN);
-  var work=l.filter(function(v){return !isWarm(v);}), warm=l.filter(isWarm);
-  var sc=scaleOf(U.warm?l:(work.length?work:l),'h');
-  var cnt={}, idx=function(v){ var k=typeLab(v)+v.lest_kg; cnt[k]=(cnt[k]||0)+1; return cnt[k]; };
-  var tot={}; work.forEach(function(v){var k=typeLab(v)+v.lest_kg; tot[k]=(tot[k]||0)+1;});
-  var s0=l.length?seuilOf(work[0]||l[0]):null;
-  var h='<div class="card">'+fl+'<div class="row"><div class="field md"><label>Séance</label>'+vSel('date',ds,U.date,frDate)+'</div>'+
-    (mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('mv',mvs,U.mv)+'</div>':'')+'</div>'+
-    work.map(function(v){var k=typeLab(v)+v.lest_kg, i=idx(v); return serieRow(v,sc,tot[k]>1?i:0);}).join('')+
-    (warm.length?'<button class="vwarm" data-vwarm="1">Échauffements ('+warm.length+') '+(U.warm?'▾':'▸')+'</button>'+
-      (U.warm?warm.map(function(v){return serieRow(v,sc,0);}).join(''):''):'')+
-    '<p class="note">Hauteur de la ceinture '+(l[0]?refLab(l[0]):'')+', en cm. Pointillé : seuil de validité'+
-' — voir l\'écran Seuil. Touchez une série pour le détail.</p></div>';
-  return h;
-}
+/* v148, lot B Vitesse : l'ancien écran Séance (vScrSeance, serieRow) retiré, remplacé depuis le lot 76 par vsSeance */
 /* ---------- charge egale ----------
    Meme mouvement, meme variante, charge systeme (PdC du jour + lest) a 1,25 kg pres d'un
    centre de groupe. Sans PdC, regroupement au lest, signale. */
@@ -11685,7 +11663,7 @@ function vScrSeuil(){
       h+='<div class="vtitle">'+esc(mv)+(ref==='bas'?' <span class="muted">· ancienne mesure</span>':' <span class="muted">· seuil de validité</span>')+'</div>';
       if(sj)h+='<p class="note">Seuil <b>'+F(Math.round(sj.valide*10)/10)+' cm</b> ±'+F(VBANDE)+', tiré de vos jugements : '+
         (hs.ko.length-sj.koLoin)+' 😑, '+hs.ok.length+' 😀, '+hs.franc.length+' 😎.'+
-        (sj.koLoin?' '+sj.koLoin+' 😑 à plus de '+KO_LOIN+' cm sous la plus basse rep valide, ignorée'+(sj.koLoin>1?'s':'')+' : jugez-la plutôt ❌ échec.':'')+(sj.chevauche>0?' <b>Jugements qui se chevauchent de '+F(Math.round(sj.chevauche*10)/10)+' cm</b> : le seuil est flou.':'')+'</p>';
+        (sj.koLoin?' '+sj.koLoin+' 😑 à plus de '+KO_LOIN+' cm sous la plus basse rep valide, ignorée'+(sj.koLoin>1?'s':'')+' : jugez-la plutôt ❌ échec.':'')+(sj.chevauche>0?' <b>Jugements qui se chevauchent de '+F(Math.round(sj.chevauche*10)/10)+' cm</b> : le seuil est flou.':'')+(sj.mixte?' <b>Jugements pris sur des vidéos à échelle vérifiée et non vérifiée</b> : le seuil mélange deux précisions.':'')+'</p>';   /* lot 125 : drapeau calculé depuis longtemps, enfin affiché */
       else if(ref==='bas')h+='<p class="note">Pas de jugement : barème du 19/09 (validée à 44,4 cm, franche à 55 cm, mesurés à 15 kg).</p>';
       else h+='<p class="note">Seuil <b>'+F(BAREME_DEP.seuil)+' cm</b> ±'+F(VBANDE)+', tiré de la vidéo étalon du 19/09 (positions tenues à 15 kg, depuis la suspension de départ) : '+
         'rep invalide '+F(BAREME_DEP.nonvalide)+' cm, validée au minimum '+F(BAREME_DEP.valide)+' cm, franche '+F(BAREME_DEP.franche)+' cm. '+
@@ -11723,8 +11701,9 @@ function vsVerdict(v){
   var vl=vLast(v), le=lienEntry(v);
   if(le&&le.fin)return {t:'pause avant la dernière rep : pas lisible',c:''};
   if(vl==null)return {t:'—',c:''};
-  if(vl<=0.25)return {t:'à l’échec ou presque',c:'vsbad'};
-  if(vl<0.33)return {t:'près de l’échec',c:'vswarn'};
+  var ec=vEchec(v.mouvement), b0=ec.v;   /* v148, lot B Vitesse : seuils comptés depuis votre vitesse d'échec (dès 5 séries notées 0), sinon 0,20 publiée : 0,25 et 0,33 d'avant */
+  if(vl<=b0+0.05)return {t:'à l’échec ou presque',c:'vsbad'};
+  if(vl<b0+0.13)return {t:'près de l’échec',c:'vswarn'};
   return {t:'il restait des reps',c:'vsok'};
 }
 function vsBars(v,hi){
@@ -11747,17 +11726,21 @@ function vsBars(v,hi){
 }
 function vsRow(v,P,hi){
   var s=seuilOf(v), n=v.reps.length, hs=v.reps.map(function(r){return hOf(v,r);}), hasH=hs.some(function(h){return h!=null;});
-  var nv=hs.filter(function(h){return h!=null&&s&&h>=s.valide;}).length, vd=vsVerdict(v), vl=vLast(v);
+  var nj=0, nv=v.reps.filter(function(r,i){ var j=jugeOf(v,r.rep);   /* v148, lot B Vitesse (questionnaire du 27/10) : vos jugements priment sur la hauteur */
+    if(r.tentative_ratee)return false;
+    if(j==='ok'||j==='franc'){ nj++; return true; } if(j==='ko'||j==='ec'||j==='tr'){ nj++; return false; }
+    return hs[i]!=null&&s&&hs[i]>=s.valide; }).length, vd=vsVerdict(v), vl=vLast(v);
+  hasH=hasH||nj>0;
   var v1=v.reps[0]?v.reps[0].vitesse_moy_ms:null, fo='—';
   if(v.variante)fo='<span class="muted">variante : pas de droite de référence</span>';
   else if(P&&v1!=null&&v.charge_systeme_kg!=null){
     var ex=P.a+P.b*(+v.charge_systeme_kg), d=v1-ex, lo=Math.round((ex-0.07)*100)/100, hi2=Math.round((ex+0.07)*100)/100;
     fo=(Math.abs(d)<=0.07?'habituelle':(d>0?'<b class="vsok">meilleure que d’habitude</b>':'<b class="vswarn">en dessous de d’habitude</b>'))+
       ' <span class="muted">(1re rep '+F(v1)+', attendu '+F(lo)+' à '+F(hi2)+')</span>';
-  }else if(!P)fo='<span class="muted">pas encore de droite (Profil)</span>';
+  }else if(!P)fo='<span class="muted">pas encore de droite avec les séances d’avant (6 séries filmées au moins)</span>';
   return '<div class="vsv" data-vopen="'+esc(v.id)+'"><div class="vsvh"><b>'+serieLab(v)+'</b><span class="muted">détail ›</span></div>'+
     '<dl class="vsvl">'+
-      '<dt>Reps valides</dt><dd>'+(hasH?'<b'+(nv<n?' class="vsbad"':'')+'>'+(nv<n?'✗ ':'')+nv+' / '+n+'</b>'+(s&&!s.sure?' <span class="muted">(seuil provisoire)</span>':''):'—')+'</dd>'+
+      '<dt>Reps valides</dt><dd>'+(hasH?'<b'+(nv<n?' class="vsbad"':'')+'>'+(nv<n?'✗ ':'')+nv+' / '+n+'</b>'+(nj?' <span class="muted">('+nj+' d’après vos jugements)</span>':'')+(s&&!s.sure?' <span class="muted">(seuil provisoire)</span>':''):'—')+'</dd>'+
       '<dt>Dernière rep</dt><dd><b class="'+vd.c+'">'+vd.t+'</b>'+(vl!=null?' <span class="muted">('+F(vl)+' m/s)</span>':'')+'</dd>'+
       '<dt>Forme du jour</dt><dd>'+fo+'</dd>'+vsRow82(v)+   /* lot 82 */
       ((v.alertes||[]).length?'<dt>Vidéo</dt><dd><b class="vswarn">⚠ '+v.alertes.length+' alerte'+(v.alertes.length>1?'s':'')+'</b> <span class="muted">: '+v.alertes.map(esc).join(' ; ')+'</span></dd>':'')+   /* lot 121 (audit Vitesse, 6) */
@@ -11789,13 +11772,21 @@ function vsRow82(v){
   if(pe&&pe.p!=null&&!(le&&le.fin))h+='<dt>Perte de vitesse</dt><dd><b>'+F(Math.round(pe.p))+' %</b> <span class="muted">(meilleure rep '+v2(pe.b)+' → dernière '+v2(pe.z)+' m/s)</span></dd>';
   if(vLisible(v)){
     var ec=vEchec(v.mouvement), d=vl-ec.v;
-    var rf=ec.pub?'0,20 m/s (vitesse publiée du 1RM ; la vôtre dès 2 séries notées 0)':'votre vitesse d’échec, '+v2(ec.v)+' m/s ('+ec.n+' séries notées 0)';
+    var rf=ec.pub?'0,20 m/s (vitesse publiée du 1RM ; la vôtre dès 5 séries notées 0, '+ec.n+' pour l’instant)':'votre vitesse d’échec, '+v2(ec.v)+' m/s ('+ec.n+' séries notées 0)';
     h+='<dt>Jusqu’à l’échec</dt><dd>'+(Math.abs(d)<0.005?'<b>0 m/s</b> <span class="muted">: à '+rf:'<b>'+(d>0?'+':'−')+v2(Math.abs(d))+' m/s</b> <span class="muted">'+(d>0?'au-dessus de ':'en dessous de ')+rf)+'</span></dd>';
   }
   h+=vRepos(v);   /* lot 104 */
   var mi=vMiroir(v); if(mi)h+='<dt>Votre réserve</dt><dd>'+mi+'</dd>';
   if(!isWarm(v))h+='<dt>Série</dt><dd>'+vLienTxt(v)+'</dd>';
   return h;
+}
+/* v148, lot B Vitesse (questionnaire du 27/10, audit Vitesse 13) : rattachements « par l'ordre » à vérifier, groupés en une liste repliée */
+function vAVerif(){
+  var a=(S.velo||[]).filter(function(v){ return v.lien&&v.lien.ord; }).sort(function(x,y){ return String(y.date).localeCompare(String(x.date))||vSortN(x,y); });
+  if(!a.length)return '';
+  return '<details class="card chd" data-chd="vaverif"><summary><b>À vérifier</b> · '+a.length+' rattachement'+(a.length>1?'s':'')+' par l’ordre des vidéos</summary>'+
+    '<p class="note">Rien d’autre ne départageait ces vidéos que leur ordre. Touchez « c’est bon » si la série est la bonne, ou la ligne pour la changer.</p>'+
+    a.map(function(v){ return '<div class="line"><span class="nm" data-vopen="'+esc(v.id)+'">'+frDate(v.date)+' · '+serieLab(v)+'<br><span class="note">'+vLienTxt(v)+'</span></span></div>'; }).join('')+'</details>';
 }
 function vsSeance(){
   var U=vui(), all=vDates(), ds=vFiltre(all);
@@ -11807,9 +11798,9 @@ function vsSeance(){
   day.forEach(function(v){ if(mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
   if(mvs.indexOf(U.mv)<0)U.mv=mvs[0];
   var l=day.filter(function(v){return v.mouvement===U.mv;}).sort(vSortN), work=l.filter(function(v){return !isWarm(v)&&!isFixe(v);}), warm=l.filter(isWarm), fx=l.filter(isFixe);   /* lot 82 */
-  var P=vsFit(U.mv), mx=0.6;
+  var P=vsFitPts(vsPts(U.mv).filter(function(o){ return String(o.v.date)<String(U.date); })), mx=0.6;   /* v148, lot B Vitesse (questionnaire du 27/10) : juger une séance sur les séances d'avant seulement */
   l.forEach(function(v){ v.reps.forEach(function(r){ if(r.vitesse_moy_ms!=null&&r.vitesse_moy_ms*1.15>mx)mx=r.vitesse_moy_ms*1.15; }); });
-  return '<div class="card" data-chk="vseance"><div class="vtitle">Mes reps étaient-elles bonnes ?'+chIB('vseance')+'</div>'+
+  return vAVerif()+'<div class="card" data-chk="vseance"><div class="vtitle">Mes reps étaient-elles bonnes ?'+chIB('vseance')+'</div>'+
     '<div class="row"><div class="field md"><label>Séance</label>'+vSel('date',ds,U.date,frDate)+'</div>'+
     (mvs.length>1?'<div class="field md"><label>Mouvement</label>'+vSel('mv',mvs,U.mv)+'</div>':'')+'</div>'+
     '<details class="chd" data-chd="vfilt"><summary>Filtres : bloc, type de séance</summary>'+fl+'</details>'+
@@ -11817,13 +11808,13 @@ function vsSeance(){
     work.map(function(v){ return vsRow(v,P,mx); }).join('')+
     (warm.length?'<button class="vwarm" data-vwarm="1">Échauffements ('+warm.length+') '+(U.warm?'▾':'▸')+'</button>'+
       (U.warm?warm.map(function(v){ return vsRow(v,P,mx); }).join(''):''):'')+
-    '<p class="note chex"><b>Reps valides</b> : montées au-dessus du seuil de hauteur (écran Réglages). '+
-    '<b>Dernière rep</b> : sa vitesse moyenne dit si vous étiez près de l’échec. À 0,25 m/s ou moins, à l’échec ou à une rep : '+
-    'la vitesse du 1RM aux tractions vaut 0,20 ± 0,05 m/s quel que soit le niveau (Sánchez-Moreno 2017). Au-dessus de 0,33 m/s il restait des reps ; '+
-    'combien, la vitesse seule ne le dit pas encore. <b>Forme du jour</b> : vitesse de la 1re rep comparée à votre droite charge-vitesse (écran Profil) ; '+
+    '<p class="note chex"><b>Reps valides</b> : votre jugement quand vous en avez donné un (😀 😎 valide ; 😑 ❌ et trichée non ; 🤔 suit la hauteur), sinon la hauteur au-dessus du seuil (écran Réglages). '+
+    '<b>Dernière rep</b> : sa vitesse moyenne dit si vous étiez près de l’échec. Jusqu’à 0,05 m/s au-dessus de votre vitesse d’échec, à l’échec ou à une rep ; '+
+    'au-delà de 0,13 m/s il restait des reps. Votre vitesse d’échec : la médiane de vos séries notées 0 dès 5 séries, sinon 0,20 m/s, la vitesse du 1RM aux tractions quel que soit le niveau (Sánchez-Moreno 2017) ; '+
+    'combien, la vitesse seule ne le dit pas encore. <b>Forme du jour</b> : vitesse de la 1re rep comparée à votre droite charge-vitesse, tracée sur les séances d’avant celle-ci seulement ; '+
     'un écart de moins de 0,07 m/s n’est pas mesurable (Weakley 2021), d’où la fourchette. Ligne rouge : 0,20 m/s. '+
     '<b>Perte de vitesse</b> : de la meilleure rep à la dernière. <b>Jusqu’à l’échec</b> : vitesse de la dernière rep moins votre vitesse d’échec, '+
-    'la médiane des dernières reps de vos séries notées 0 (0,20 m/s publiée tant qu’il y en a moins de 2) ; les m/s restent affichés. '+
+    'la même vitesse d’échec ; les m/s restent affichés. '+
     '<b>Votre réserve</b> : votre chiffre à côté de la vitesse, pour apprendre ; il n’est jamais corrigé. '+
     '<b>Série</b> : rattachement par date, charge et ordre des vidéos quand rien d’autre ne tranche ; « c’est bon » le confirme, le détail permet de le changer. '+
     '<b>Montée fixe</b> (type choisi dans la page vidéo) : vitesse moyenne de ses reps, comparée à vos montées fixes d’avant au même lest, aux mêmes reps et à la même forme. '+
@@ -11864,7 +11855,11 @@ function vsProfil(){
   var L=S.lifts[pts[pts.length-1].v.li]||null, rr=null;
   if(L&&L.useBw)try{ rr=withBw(dayBw(),function(){ return chSysRM(L); }); }catch(e){}
   var fr=function(x){ return F(Math.round(x)); };
-  if(ext)h+='<div class="vsbig"><b>≈ '+fr(x1)+'</b><span>kg de charge totale à 0,20 m/s</span></div>'+
+  var ec10=ext&&rr&&Math.abs(x1-rr)/rr>0.10;   /* v148, lot B Vitesse (questionnaire du 27/10, audit Vitesse 7) : écart > 10 % → signalé, pas de chiffre */
+  if(ec10)h+='<p class="vssub" style="margin:4px 0 0"><b style="color:var(--warn)">! Pas de 1RM par la vitesse : la droite et vos reps ne sont pas d’accord.</b> '+
+      'Prolongée jusqu’à 0,20 m/s, elle donnerait '+F(Math.round(Math.abs(x1-rr)/rr*100))+' % '+(x1>rr?'de plus':'de moins')+' que le 1RM par les reps (≈ '+fr(rr)+' kg de charge totale, celui de Séance du jour). '+
+      'Au-delà de 10 % d’écart, l’un des deux est faux, le plus souvent la droite : séries trop proches en charge, ou une vidéo à alerte.</p>';
+  else if(ext)h+='<div class="vsbig"><b>≈ '+fr(x1)+'</b><span>kg de charge totale à 0,20 m/s</span></div>'+
     '<div class="vssub">De '+fr(xa)+' à '+fr(xb)+' kg selon que la vitesse du 1RM vaut 0,25 ou 0,15 m/s'+
       (L&&L.useBw?', soit ≈ '+F(rnd(x1-S.bw,0.25))+' kg de lest au PdC courant ('+F(S.bw)+' kg)':'')+'.'+
       (rr?' Par les reps (1RM de Séance du jour) : ≈ '+fr(rr)+' kg.':'')+'</div>';
@@ -11885,6 +11880,7 @@ function vsProfil(){
 }
 function renderVelo(){
   veloAutoAll();
+  try{ seancesPage(); }catch(e){}   /* v148, lot B Vitesse : seuils a jour pour la page video apres un jugement */
   var U=vui();
   if(U.scr==='serie'&&!vById(U.open))U.scr='seance';
   $('veloadd').hidden=U.scr!=='seuil';   /* lot 76 : Importer dans Réglages */

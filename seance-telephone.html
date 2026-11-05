@@ -4596,6 +4596,11 @@ function echanger(a, b) {
 }
 
 function afficher(vs, sortie) {
+  // v148 : seuil personnel lu dans le stockage du site (cp-seances-page, écrit par l'outil)
+  let seuils = null; try { seuils = (JSON.parse(localStorage.getItem('cp-seances-page') || 'null') || {}).seuils || null; } catch (e) { seuils = null; }
+  const hRep = (r) => r.hauteur_cm != null ? r.hauteur_cm : (r.hauteur_sommet_cm != null ? r.hauteur_sommet_cm : null);
+  const seuilPage = (v) => { if (!seuils) return null; const ref = (v.reps || []).some((r) => r.hauteur_cm != null) ? 'depart' : 'bas';
+    return seuils[(sortie.mouvement || 'tractions') + '|' + ref] || null; };
   $('res-titre').textContent = (sortie.mouvement === 'dips' ? 'Dips' : 'Tractions') + ' · ' + (sortie.date || 'sans date') +
     (sortie.semaine ? ' · semaine ' + sortie.semaine : '') + (sortie.seance ? ' · séance ' + sortie.seance : '');
   const tb = $('r-bilan'); tb.textContent = '';
@@ -4617,12 +4622,16 @@ function afficher(vs, sortie) {
     d.appendChild(ul);
     if (v.analysee && v.infos && v.infos.length) d.appendChild(el('p', { class: 'petit' }, 'Pour information : ' + v.infos.join(' ; ') + '.'));
     if (v.analysee) {
-      d.appendChild(el('p', {}, v.nb_reps + ' reps · perte ' + (v.perte_v_moy_pct === null ? '—' : virgule(v.perte_v_moy_pct, 1) + ' %') + ' · hauteur mini ' + virgule(v.hauteur_mini_cm, 1) + ' cm'));
+      // v148, lot B Vitesse (audit Vitesse, 19) : votre seuil (écrit par l'outil), reps sous le seuil marquées dès l'analyse
+      const su = seuilPage(v), sous = su ? v.reps.filter((r) => !r.tentative_ratee && hRep(r) != null && hRep(r) < su.valide).length : 0;
+      d.appendChild(el('p', {}, v.nb_reps + ' reps · perte ' + (v.perte_v_moy_pct === null ? '—' : virgule(v.perte_v_moy_pct, 1) + ' %') + ' · hauteur mini ' + virgule(v.hauteur_mini_cm, 1) + ' cm' +
+        (su ? ' · votre seuil ' + virgule(su.valide, 1) + ' cm : ' + (sous ? sous + ' rep' + (sous > 1 ? 's' : '') + ' sous le seuil' : 'toutes au-dessus') : '')));
+      if (su) d.appendChild(el('p', { class: 'petit' }, 'Seuil tiré de vos jugements (' + su.n + ' reps) dans l\'outil. Une rep à moins de 1,3 cm du seuil est douteuse : à juger dans l\'outil.'));
       const t = el('table'); const th = el('thead'); const h = el('tr');
       const sr = (sortie.series[iv] && sortie.series[iv].reps) || [], du = SR3.durees(sr, va);   // lot R3
       for (const x of ['Rep', 'Hauteur cm', 'V. moy. m/s', 'Pointe m/s'].concat(du.cols.map((c) => c.lab))) h.appendChild(el('th', {}, x));
       th.appendChild(h); t.appendChild(th); const b = el('tbody');
-      for (const r of v.reps) { const l = el('tr'); for (const x of [String(r.rep), virgule(r.hauteur_cm, 1) + (r.tentative_ratee ? ' \u274c non comptée' : ''), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)].concat(du.cols.map((c) => SR3.cellule(sr, r.rep, c.k)))) l.appendChild(el('td', {}, x)); b.appendChild(l); }
+      for (const r of v.reps) { const l = el('tr'); for (const x of [String(r.rep), virgule(r.hauteur_cm, 1) + (r.tentative_ratee ? ' \u274c non comptée' : su && hRep(r) != null && hRep(r) < su.valide ? ' \u26a0 sous le seuil' : ''), virgule(r.vitesse_moy_ms, 3), virgule(r.vitesse_pic_ms, 3)].concat(du.cols.map((c) => SR3.cellule(sr, r.rep, c.k)))) l.appendChild(el('td', {}, x)); b.appendChild(l); }
       t.appendChild(b); d.appendChild(t);
       if (du.resume) d.appendChild(el('p', {}, du.resume));   // lot R3
       d.appendChild(el('p', { class: 'petit' }, 'Charge système ' + virgule(v.charge_systeme_kg, 1) + ' kg · échelle ' + virgule(v.px_par_cm, 3) + ' px/cm · marque suivie sur ' + Math.round(100 * v.taux_detection) + ' % des images.'));
