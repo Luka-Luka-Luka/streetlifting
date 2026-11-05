@@ -199,6 +199,28 @@ details.flag p{margin:6px 0 0}
 .flag.tip{border-left-color:var(--rule)}
 .fask,.rirq{color:var(--warn);margin:0 0 6px}   /* lot 59 */
 .rirask{outline:2px solid var(--warn);outline-offset:3px;border-radius:8px}
+#cardextra textarea{width:100%;box-sizing:border-box;font:400 16px/1.45 var(--txt);padding:10px 12px;border:1px solid var(--rule);border-radius:var(--r);background:var(--softer);color:var(--ink);resize:vertical;margin-top:4px}   /* v149, saisie libre */
+#cardextra textarea::placeholder{color:var(--muted);opacity:.7}
+#cardextra textarea:focus{outline:2px solid var(--a2);outline-offset:1px;background:var(--surface)}
+.xlline{display:grid;gap:8px;padding:12px 0 4px;border-bottom:1px solid var(--rule)}
+.xlh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;min-width:0}
+.xlh[data-xlopen]{cursor:pointer}
+.xlnm{min-width:0;display:flex;align-items:baseline;gap:6px;font:600 15px/1.25 var(--txt)}
+.xlnm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xlmute{color:var(--muted)}
+.xlchg{color:var(--muted);font-size:11px}
+.xltag{flex:none;font:600 10.5px/1 var(--txt);letter-spacing:.06em;text-transform:uppercase;color:var(--a3);border:1px solid currentColor;border-radius:var(--r);padding:3px 5px}
+.xlpres{flex:none;display:flex;align-items:center;gap:6px;font:600 19px/1 var(--num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.xlswap{font:600 14px/1 var(--txt);color:var(--muted);background:transparent;border:1px solid var(--rule);border-radius:var(--r);padding:4px 7px;cursor:pointer}
+.xlerr{margin:0;font:400 13px/1.35 var(--txt);color:var(--bad)}
+.xlpick{margin-top:0}
+.xlpick .pill{font:500 13px/1.1 var(--txt);min-width:0;padding:7px 10px}
+.xlsel{font:400 14px var(--txt);padding:6px 8px;max-width:100%}
+.xlnmin{width:100%;box-sizing:border-box;font:400 15px var(--txt);padding:8px 10px;border:1px solid var(--rule);border-radius:var(--r);background:var(--softer);color:var(--ink)}
+.xlrir{display:flex;align-items:center;gap:8px;padding:2px 0}
+.xlrir>span{flex:none;font:400 12.5px/1 var(--txt);color:var(--muted)}
+.xlrir .pillrow{flex:1 1 auto;flex-wrap:nowrap;gap:4px;margin-top:0;min-width:0}
+.xlrir .pill{flex:1 1 0;min-width:0;padding:8px 0}
 .bedit summary{cursor:pointer}
 .act.mini{padding:7px 10px;font-size:12px}
 .src{color:var(--muted)}
@@ -1341,7 +1363,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v148';   /* lot 74 */
+var APPV='v149';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -8019,7 +8041,10 @@ function warmCard(weeks){
    la conformite (rien n'etait prescrit) ni dans le volume prevu du suivi des main lifts. */
 function extraCard(k){
   var ln=S.lifts.map(function(L,i){return '<option value="'+i+'">'+esc(L.name)+'</option>';}).join('');
-  return '<div class="card mini" id="cardextra"><h2 data-ic="＋">Ajouter<i class="xlong"> un mouvement</i> <em>à cette séance seulement</em></h2>'+
+  return '<div class="card mini" id="cardextra" data-xlk="'+esc(k)+'"><h2 data-ic="＋">Ajouter<i class="xlong"> un mouvement</i> <em>à cette séance seulement</em></h2>'+
+    '<textarea id="xltxt" data-xltxt rows="'+Math.max(2,Math.min(8,XLT.split('\n').length))+'" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Ce que vous avez fait, une ligne par mouvement" placeholder="wide grip pull ups 1 set de 14 reps&#10;rowing 3x8 @70 kg">'+esc(XLT)+'</textarea>'+   /* v149, saisie libre */
+    '<div id="xlprev">'+xlPrevHTML()+'</div>'+
+    '<details class="chd"><summary>Saisie détaillée</summary>'+
     '<div class="row"><div class="field w"><label>Mouvement</label><select data-xli>'+ln+'</select></div></div>'+
     '<div class="row" style="margin-top:8px">'+
       '<div class="field sm"><label>Lest</label><input data-xf="load" class="numin" type="text" inputmode="decimal"></div>'+
@@ -8029,8 +8054,258 @@ function extraCard(k){
     '<div data-xtp style="margin-top:8px"></div>'+   /* lot 118 */
     '<div class="btnrow"><button class="act" data-xadd="'+esc(k)+'">Ajouter à la séance</button></div>'+
     '<p class="note">La ligne s\'ajoute à cette séance, dans Séance du jour et dans Programme, marquée « ajout ponctuel ». '+
-    'Elle s\'enregistre comme les autres mais ne compte ni dans la conformité, ni dans le volume prévu du bloc.</p></div>';
+    'Elle s\'enregistre comme les autres mais ne compte ni dans la conformité, ni dans le volume prévu du bloc.</p></details></div>';
 }
+/* ===== v149, saisie libre : ajout ponctuel en texte libre =====
+   Une ligne = un mouvement. Lecture locale (aucun réseau), français et anglais :
+   « wide grip pull ups 1 set de 14 reps », « rowing 3x8 @70 kg », « dips +20 x 6, 6, 5 rir 1 »,
+   « dead hang 2 x 30 s ». Le reste de la phrase, une fois les chiffres retirés, est le nom du mouvement. */
+var XLDICT={pull:'pull',pullup:'traction',pullups:'traction',traction:'traction',tractions:'traction',chin:'traction|supination',chinup:'traction|supination',chinups:'traction|supination',
+  dip:'dip',dips:'dip',wide:'large',large:'large',larges:'large',close:'serree',narrow:'serree',serree:'serree',serre:'serree',serrees:'serree',
+  neutral:'neutre',neutre:'neutre',hammer:'neutre',marteau:'neutre',ring:'anneau',rings:'anneau',anneau:'anneau',anneaux:'anneau',
+  supination:'supination',supine:'supination',underhand:'supination',pronation:'pronation',overhand:'pronation',
+  row:'rowing',rows:'rowing',rowing:'rowing',rowings:'rowing',bench:'bench',couche:'bench',developpe:'press',press:'press',
+  lunge:'fente',lunges:'fente',fente:'fente',fentes:'fente',split:'fente',bulgarian:'bulgare',bulgare:'bulgare',bulgares:'bulgare',
+  raise:'raise',raises:'raise',releve:'raise',releves:'raise',leg:'leg',legs:'leg',jambe:'leg',jambes:'leg',
+  hang:'hang',suspension:'hang',hold:'hold',tenue:'hold',curl:'curl',curls:'curl',shrug:'shrug',shrugs:'shrug',
+  rdl:'rdl',romanian:'rdl',deadlift:'deadlift',souleve:'deadlift',terre:'',ohp:'ohp',military:'ohp',militaire:'ohp',overhead:'ohp',
+  muscle:'muscleup',muscleup:'muscleup',muscleups:'muscleup',pushup:'pompe',pushups:'pompe',pompe:'pompe',pompes:'pompe',
+  pause:'pause',paused:'pause',pausee:'pause',pausees:'pause',tempo:'tempo',haute:'haut',hautes:'haut',high:'haut',
+  archer:'archer',explosive:'explosif',explosif:'explosif',explosives:'explosif',unilateral:'unilateral',australian:'australien',australien:'australien',
+  barre:'',bar:'',barbell:'barre',dumbbell:'haltere',dumbbells:'haltere',haltere:'haltere',halteres:'haltere',db:'haltere',bb:'barre',
+  cable:'poulie',poulie:'poulie',grip:'',prise:'',up:'',ups:'',de:'',du:'',des:'',la:'',le:'',les:'',a:'',au:'',en:'',the:'',of:'',with:'',avec:'',
+  weighted:'',leste:'',lestee:'',lestees:'',lestes:'',et:'',and:'',buste:'',penche:'',bent:'',over:''};
+/* mots de variante : présents dans la phrase mais absents d'un mouvement, ils empêchent de ranger la ligne dans ce mouvement */
+var XLQUAL={large:1,serree:1,neutre:1,anneau:1,supination:1,pronation:1,pause:1,tempo:1,haut:1,archer:1,explosif:1,unilateral:1,australien:1,haltere:1,poulie:1,bulgare:1};
+function xlNorm(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[×*]/g,'x').replace(/[’']/g,' '); }
+function xlToks(name){
+  var s=xlNorm(name).replace(/pull[\s-]*ups?/g,'pullup').replace(/chin[\s-]*ups?/g,'chinup').replace(/push[\s-]*ups?/g,'pushup').replace(/muscle[\s-]*ups?/g,'muscleup')
+    .replace(/[^a-z0-9]+/g,' ').trim(), o=[];
+  s.split(' ').forEach(function(w){ if(!w)return; var d=XLDICT[w];
+    if(d===undefined&&w.length>4&&/s$/.test(w))d=XLDICT[w.slice(0,-1)];
+    if(d===undefined)d=w.length>4&&/s$/.test(w)?w.slice(0,-1):w;
+    d.split('|').forEach(function(q){ if(q&&o.indexOf(q)<0)o.push(q); }); });
+  return o;
+}
+function xlLev(a,b){ if(a===b)return 0; var m=a.length,n=b.length,p=[],i,j; for(j=0;j<=n;j++)p[j]=j;
+  for(i=1;i<=m;i++){ var c=[i]; for(j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; } return p[n]; }
+function xlTokEq(a,b){ if(a===b)return true; var n=Math.min(a.length,b.length); return n>=4&&xlLev(a,b)<=(n>=7?2:1); }
+/* candidats : vos mouvements d'abord, puis le catalogue (sans ceux déjà dans votre liste) */
+function xlMatch(name){
+  var tt=xlToks(name), out=[];
+  if(!tt.length)return {toks:tt,list:[]};
+  var score=function(nm){ var tc=xlToks(nm), m=0;
+    tt.forEach(function(t){ if(tc.some(function(c){return xlTokEq(t,c);}))m++; });
+    var miss=tt.filter(function(t){ return XLQUAL[t]&&!tc.some(function(c){return xlTokEq(t,c);}); }),
+        extra=tc.filter(function(c){ return XLQUAL[c]&&!tt.some(function(t){return xlTokEq(t,c);}); });
+    return {s:m?2*m/(tt.length+tc.length):0,m:m,miss:miss,extra:extra}; };
+  S.lifts.forEach(function(L,i){ var r=score(L.name); if(r.m)out.push({li:i,n:L.name,s:r.s,miss:r.miss,extra:r.extra}); });
+  allCat().forEach(function(c){
+    if(S.lifts.some(function(L){return L.catId===c.id||xlNorm(L.name)===xlNorm(c.n);}))return;
+    var r=score(c.n); (c.a||[]).forEach(function(a){ var q=score(a); if(q.s>r.s&&!q.miss.length)r=q; });
+    if(r.m)out.push({cat:c.id,n:c.n,s:r.s*0.95,miss:r.miss,extra:r.extra});
+  });
+  out.forEach(function(c){ c.ok=!c.miss.length&&!c.extra.length; c.r=c.s*(c.extra.length?0.6:c.miss.length?0.85:1); });
+  out=out.filter(function(c){return c.r>=0.45;}).sort(function(a,b){ return b.r-a.r; });
+  return {toks:tt,list:out.slice(0,3)};
+}
+var XLRE={
+  num:'(-?\\d+(?:[.,]\\d+)?)',
+  unitS:'(?:s|sec|secs|seconde|secondes|second|seconds)\\b',
+  unitM:'(?:m|metre|metres|meter|meters)\\b',
+  setW:'(?:series|serie|sets|set|tours|tour|rounds|round)',
+  repW:'(?:reps|rep|repetitions|repetition|fois)'
+};
+function xlNum(s){ return +String(s).replace(',','.'); }
+function xlParse(line){
+  var raw=String(line||''), s=' '+xlNorm(raw)+' ', r={raw:raw.trim(),load:null,bwl:false,sets:null,rir:undefined,unit:null,amb:false,warn:[],err:[]};
+  var cut=function(re,f){ s=s.replace(re,function(){ f.apply(null,arguments); return ' '; }); };
+  /* réserve */
+  cut(/\b(?:rpe)\s*(\d+(?:[.,]5)?)\b/g,function(m,v){ r.rir=Math.max(0,10-xlNum(v)); });
+  cut(/\b(?:rir|reserve|res|reste|il en reste|left)\s*:?\s*(\d(?:[.,]5)?)\b/g,function(m,v){ r.rir=xlNum(v); });
+  cut(/\b(\d(?:[.,]5)?)\s*(?:en reserve|in reserve|in the tank|de reserve)\b/g,function(m,v){ r.rir=xlNum(v); });
+  cut(/(?:^|\s)r(\d)(?=\s)/g,function(m,v){ r.rir=+v; });
+  cut(/\b(?:a l echec|jusqu a l echec|echec|to failure|failure)\b/g,function(){ r.rir=0; });
+  /* durée : 1:30 et minutes en secondes */
+  var add='';
+  cut(/\b(\d+):([0-5]\d)\b/g,function(m,a,b){ add+=' '+(+a*60+ +b)+'s '; });
+  cut(/\b(\d+)\s*(?:min|mn|minutes?)\b/g,function(m,a){ add+=' '+(+a*60)+'s '; });
+  s+=add;
+  /* charge */
+  cut(/\b(?:pdc|poids du corps|poids de corps|bodyweight|body weight|bw|sans lest|unweighted|au pdc)\b/g,function(){ r.load=0; r.bwl=true; });
+  cut(new RegExp('(?:@|\\+|\\blest(?:e|ee)?\\s*(?:de|a)?\\s*|\\bweighted\\s*|\\bwith\\s*|\\bavec\\s*|\\ba\\s+)?\\s*'+XLRE.num+'\\s*(?:kg|kgs|kilos?)\\b','g'),function(m,v){ r.load=xlNum(v); });
+  cut(/(?:@|\+)\s*(\d+(?:[.,]\d+)?)/g,function(m,v){ r.load=xlNum(v); });
+  cut(/\b(?:lest(?:e|ee)?|weighted)\s*(?:de|a)?\s*(\d+(?:[.,]\d+)?)\b/g,function(m,v){ r.load=xlNum(v); });
+  cut(/(?:^|\s)-\s?(\d+(?:[.,]\d+)?)\b/g,function(m,v){ r.load=-xlNum(v); r.warn.push('Charge négative (élastique) : '+F(-xlNum(v))+' kg.'); });
+  var setsN=null, reps=null, list=null, unitOf=function(u){ if(!u)return; var k=/^m/.test(u)?'m':'s'; if(r.unit&&r.unit!==k)r.err.push('Secondes et mètres mélangés.'); r.unit=k; };
+  /* A x B (x C) */
+  cut(new RegExp('\\b(\\d+)\\s*x\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:x\\s*(\\d+)\\s*)?(?:'+XLRE.repW+'\\s*)?('+XLRE.unitS.slice(0,-2)+'|'+XLRE.unitM.slice(0,-2)+')?\\b','g'),function(m,a,b,c,u){
+    if(c!=null){ if(r.load==null)r.load=xlNum(a); else r.warn.push('Deux charges écrites : '+F(r.load)+' kg gardé.'); reps=+b; setsN=+c; }
+    else { setsN=+a; reps=xlNum(b); r.amb=true; }
+    unitOf(u); });
+  /* 3 séries de 8 (reps), 1 set of 14 */
+  cut(new RegExp('\\b(\\d+)\\s*'+XLRE.setW+'\\s*(?:de|of|a|x|:)?\\s*(\\d+)\\s*(?:'+XLRE.repW+'|('+XLRE.unitS.slice(0,-2)+'|'+XLRE.unitM.slice(0,-2)+'))?\\b','g'),function(m,a,b,u){ setsN=+a; reps=+b; unitOf(u); });
+  /* listes : 10, 9, 8 ou 10/9/8 ou 10-9-8 */
+  cut(/\b(\d+)(?:\s*(?:,|\/|-|;)\s*(\d+))+\b/g,function(m){ list=m.split(/\s*[,\/;-]\s*/).map(Number); });
+  cut(new RegExp('\\b(\\d+)\\s*'+XLRE.setW+'\\b','g'),function(m,a){ setsN=+a; });
+  cut(new RegExp('\\b'+XLRE.setW+'\\s*:?\\s*(\\d+)\\b','g'),function(m,a){ setsN=+a; });
+  cut(new RegExp('\\b(\\d+)\\s*'+XLRE.repW+'\\b','g'),function(m,a){ reps=+a; });
+  cut(new RegExp('\\b'+XLRE.repW+'\\s*:?\\s*(\\d+)\\b','g'),function(m,a){ reps=+a; });
+  cut(new RegExp('\\b(\\d+)\\s*('+XLRE.unitS.slice(0,-2)+'|'+XLRE.unitM.slice(0,-2)+')\\b','g'),function(m,a,u){ if(reps==null)reps=+a; else if(list)list.push(+a); else r.warn.push('« '+a+' » non compris.'); unitOf(u); });
+  /* nombres restants : le premier = reps s'il en manque */
+  var lone=[];
+  cut(/(?:^|\s)(\d+(?:[.,]\d+)?)(?=\s|$)/g,function(m,a){ lone.push(xlNum(a)); });
+  lone.forEach(function(v){ if(list)r.warn.push('« '+F(v)+' » non compris.'); else if(reps==null)reps=v; else if(setsN==null&&reps!=null)r.warn.push('« '+F(v)+' » non compris : écrivez « séries » ou « kg ».'); else r.warn.push('« '+F(v)+' » non compris.'); });
+  if(list){ if(setsN!=null&&setsN!==list.length)r.warn.push(setsN+' séries annoncées, '+list.length+' valeurs écrites : les valeurs comptent.'); r.sets=list; r.amb=false; }
+  else if(reps!=null)r.sets=Array.apply(null,Array(setsN==null?1:setsN)).map(function(){return reps;});
+  r.name=s.replace(/[^a-z0-9\s]/g,' ').replace(/\b(?:de|of|a|with|avec|et|and|en|x|reps?|series?|sets?|kg)\b/g,' ').replace(/\s+/g,' ').trim();
+  /* le nom tel qu'écrit (accents gardés) : mots de la phrase dont la forme normalisée reste dans le nom */
+  var keep=r.name.split(' ');
+  r.nameRaw=raw.split(/\s+/).filter(function(w){ var n=xlNorm(w).replace(/[^a-z0-9]/g,''); return n&&keep.indexOf(n)>=0&&!/^\d/.test(n); }).join(' ');
+  if(!r.nameRaw)r.nameRaw=r.name;
+  if(!r.name)r.err.push('Mouvement non écrit.');
+  if(!r.sets||!r.sets.length)r.err.push('Reps non écrites : par exemple « 3x8 », « 14 reps » ou « 10, 9, 8 ».');
+  else if(r.sets.some(function(v){return !(v>=1)||Math.round(v)!==v;}))r.err.push('Reps : des nombres entiers, 1 ou plus.');
+  else if(r.sets.length>20)r.err.push(r.sets.length+' séries : au-delà de 20, c\'est sans doute une faute de frappe.');
+  if(r.load!=null&&Math.abs(r.load)>500)r.err.push('Charge : au-delà de 500 kg, c\'est une faute de frappe.');
+  if(r.rir!=null&&(r.rir<0||r.rir>10))r.rir=undefined;
+  return r;
+}
+
+/* ----- la case, l'aperçu, l'enregistrement ----- */
+var XLT='', XLS={};   /* texte en cours (survit au rafraîchissement de la séance) ; choix par ligne, indexés par le texte de la ligne */
+function xlBw(toks){ return toks.some(function(t){ return t==='traction'||t==='dip'||t==='muscleup'||t==='pompe'; }); }
+var XLQFR={large:'prise large',serree:'prise serrée',neutre:'prise neutre',anneau:'anneaux',supination:'supination',pronation:'pronation',pause:'pausées',tempo:'tempo',haut:'hautes',archer:'archer',explosif:'explosives',unilateral:'unilatérales',australien:'australiennes',haltere:'haltères',poulie:'poulie',bulgare:'bulgares'};
+/* variante d'un de vos mouvements : nommée en français à partir du sien (« wide grip pull ups » → « Tractions prise large ») */
+function xlVarName(c,toks){ return c.n+' '+toks.filter(function(q){return c.miss.indexOf(q)>=0;}).map(function(q){return XLQFR[q]||q;}).join(' '); }
+function xlNice(n){ n=String(n||'').trim(); return n.charAt(0).toUpperCase()+n.slice(1); }
+function xlLines(){
+  return XLT.split(/\n+/).map(function(l){return l.trim();}).filter(Boolean).slice(0,12).map(function(l){
+    var r=xlParse(l), m=xlMatch(r.name), st=XLS[l]||(XLS[l]={});
+    if(st.pick==null){ var b=m.list[0];
+      if(b&&b.ok&&b.s>=0.75){ st.pick=b.li!=null?'l'+b.li:'c'+b.cat; st.auto=b.li!=null; }
+      else if(!b||(!b.ok&&b.miss.length))st.pick='new';   /* rien d'approchant : création proposée d'office (rien n'est enregistré sans « Ajouter ») */   /* variante d'un mouvement connu : mouvement à part par défaut (votre choix du 05/11) */
+      else st.pick=''; }
+    if(st.nm==null)st.nm=(st.pick==='new'&&m.list[0]&&m.list[0].miss.length)?xlVarName(m.list[0],m.toks):xlNice(r.nameRaw);
+    if(st.rir===undefined&&r.rir!==undefined)st.rir=r.rir;
+    var sets=r.sets?r.sets.slice():null;
+    if(st.swap&&r.amb&&sets&&sets.length){ var n=sets.length, v=sets[0]; sets=Array.apply(null,Array(v)).map(function(){return n;}); }
+    var L=null, nw=null, err=r.err.slice();
+    if(/^l\d+$/.test(st.pick))L=S.lifts[+st.pick.slice(1)];
+    else if(/^c/.test(st.pick)){ var c=catOf(st.pick.slice(1)); if(c)nw={cat:c,name:c.n,bw:!!c.bw,unit:c.unit||r.unit}; }
+    else if(st.pick==='new')nw={name:String(st.nm||'').trim(),bw:xlBw(m.toks),unit:r.unit};
+    if(!L&&!nw)err.push('Choisissez le mouvement.');
+    if(nw&&!nw.name)err.push('Donnez un nom au nouveau mouvement.');
+    if(L&&fmtOf(L))err.push('EMOM ou Tabata : passez par la saisie détaillée.');
+    var unit=L?(isU(L)?L.unit:null):(nw?nw.unit||null:null), bw=L?!!L.useBw:(nw?nw.bw:false);
+    if(L&&r.unit&&r.unit!==unit)err.push(L.name+' se mesure en '+uW(L,'mètres','secondes','reps')+', pas en '+(r.unit==='s'?'secondes':'mètres')+'.');
+    if(sets&&unit&&sets.some(function(v){return v>ACCMMAX;}))err.push('Au-delà de '+ACCMMAX+(unit==='s'?' s':' m')+'.');
+    if(sets&&!unit&&sets.some(function(v){return v>100;}))err.push('Reps : au-delà de 100, c\'est une faute de frappe.');
+    var load=r.load;
+    if(load==null&&(bw||unit))load=0;
+    if(load==null&&!err.length)err.push('Charge non écrite : par exemple « @70 kg » (ou « PdC »).');
+    return {txt:l,r:r,m:m,st:st,L:L,nw:nw,sets:sets,load:load,bw:bw,unit:unit,err:err};
+  });
+}
+function xlPres(x){   /* même écriture que les lignes de la séance : 70×8×3, PdC×14, 20×6, 6, 5 */
+  var u=x.unit==='s'?' s':x.unit==='m'?' m':'', s=x.sets||[], same=s.length&&s.every(function(v){return v===s[0];});
+  var ld=x.load==null?'?':(Math.abs(x.load)<0.01&&(x.bw||x.unit)?'PdC':F(x.load));
+  return ld+S.sep+(same?s[0]+u+(s.length>1?S.sep+s.length:''):s.join(', ')+u);
+}
+function xlPrevHTML(){
+  var ls=xlLines();
+  if(!ls.length)return '';
+  return ls.map(function(x,i){
+    var st=x.st, pill=function(v,t){ return '<button class="pill" data-xlpick="'+esc(v)+'" data-xlj="'+i+'" aria-pressed="'+(st.pick===v)+'">'+esc(t)+'</button>'; };
+    var opts=x.m.list.map(function(c){ return pill(c.li!=null?'l'+c.li:'c'+c.cat,c.n); });
+    if(/^l\d+$/.test(st.pick)&&x.L&&!x.m.list.some(function(c){return 'l'+c.li===st.pick;}))opts.unshift(pill(st.pick,x.L.name));
+    var choice=(st.pick==='new'?[pill('new','＋ Nouveau')].concat(opts):opts.concat([pill('new','＋ Nouveau')]))
+      .concat([st.other?'<select class="xlsel" data-xlsel="'+i+'"><option value="">vos mouvements…</option>'+S.lifts.map(function(L,k){return '<option value="l'+k+'">'+esc(L.name)+'</option>';}).join('')+'</select>':'<button class="pill" data-xlother="'+i+'">Autre…</button>']);
+    var li=x.L?S.lifts.indexOf(x.L):-1;
+    var name=x.L?'<b class="n'+col(li)+'">'+esc(x.L.name)+'</b>':x.nw?'<b>'+esc(x.nw.name||'…')+'</b><span class="xltag">nouveau</span>':'<b class="xlmute">Quel mouvement ?</b>';
+    var pick=!(st.auto&&!st.open);
+    var showRir=x.L?!fmtOf(x.L):true;
+    return '<div class="xlline">'+
+      '<div class="xlh"'+(pick?'':' data-xlopen="'+i+'" title="Changer de mouvement"')+'><span class="xlnm">'+name+(pick?'':'<span class="xlchg" aria-hidden="true">▾</span>')+'</span>'+
+        (x.err.length?'':'<span class="xlpres">'+esc(xlPres(x))+(x.r.amb?'<button class="xlswap" data-xlswap="'+i+'" title="Inverser séries et reps" aria-label="Inverser séries et reps">⇄</button>':'')+'</span>')+'</div>'+
+      (x.err.length||x.r.warn.length?'<p class="xlerr">'+esc(x.err.concat(x.r.warn).join(' '))+'</p>':'')+
+      (pick?'<div class="pillrow xlpick">'+choice.join('')+'</div>'+
+        (st.pick==='new'?'<input class="xlnmin" data-xlnm="'+i+'" type="text" aria-label="Nom du nouveau mouvement" placeholder="Nom du mouvement" value="'+esc(st.nm||'')+'">':''):'')+
+      (showRir?'<div class="xlrir'+(st.ask?' rirask':'')+'"><span>Réserve</span><div class="pillrow" data-rirrow="xl'+i+'">'+rirPills(st.rir===undefined?undefined:st.rir)+'</div></div>':'')+
+    '</div>';
+  }).join('')+
+  '<div class="btnrow"><button class="act" data-xladd="1">'+(ls.length>1?'Ajouter les '+ls.length:'Ajouter')+'</button></div>'+
+  '<p class="note" data-xlmsg></p>';
+}
+function xlRefresh(){ var w=$('xlprev'); if(w)w.innerHTML=xlPrevHTML(); }
+/* enregistrement : la ligne s'ajoute à la séance (ajout ponctuel) et elle est enregistrée faite, d'un geste */
+function xlAdd(k){
+  var ls=xlLines(), msg=document.querySelector('#cardextra [data-xlmsg]');
+  var bad=ls.filter(function(x){return x.err.length;});
+  if(bad.length){ if(msg)msg.textContent='Rien n\'est enregistré : à corriger en rouge.'; return; }
+  var noR=ls.filter(function(x){ return (x.L?!fmtOf(x.L):true)&&x.st.rir===undefined&&!x.st.asked; });
+  if(noR.length){ noR.forEach(function(x){ x.st.ask=1; x.st.asked=1; }); xlRefresh();
+    var m2=document.querySelector('#cardextra [data-xlmsg]'); if(m2)m2.innerHTML='<b>Réserve de la dernière série ?</b> « ? » si vous ne savez pas ; « Ajouter » de nouveau : non notée.';
+    var a=document.querySelector('#cardextra .xlrir.rirask'); if(a&&a.scrollIntoView)a.scrollIntoView({block:'center',behavior:'smooth'}); return; }
+  undoKeep(ls.length>1?ls.length+' ajouts enregistrés.':'Ajout enregistré.');
+  var q=k.split('|'), w=+q[0], lab=q[1], sk=k+BK(), first=null, bw0=num($('tbw')?$('tbw').value:'',(S.tbw!=null?S.tbw:S.bw));
+  ls.forEach(function(x,j){
+    var li;
+    if(x.L)li=S.lifts.indexOf(x.L);
+    else { var nw=x.nw, step=nw.bw?1.25:2.5, L;
+      if(nw.cat){ var c=nw.cat; L={name:c.n,catId:c.id,main:false,useBw:!!c.bw,step:step,k:kDefault(!!c.bw),ref:{load:c.bw?10:40,reps:5,rir:0,est:true,bw:S.bw},prog:newProg(step)}; }
+      else { L={name:nw.name,catId:null,useBw:nw.bw,step:step,k:kDefault(nw.bw),ref:{load:nw.bw?10:40,reps:5,rir:0,est:true},prog:newProg(step)};
+        var id='u'+Date.now()+j; if(!S.cat)S.cat=[]; S.cat.push({id:id,g:'mine',r:null,bw:nw.bw?1:0,n:nw.name,unit:nw.unit||undefined}); L.catId=id; }
+      if(nw.unit)mInit(L,nw.unit);
+      if(!isU(L))L.noRef=true;
+      L.prog.tpl='off'; L.xlNew=todayISO();
+      S.lifts.push(L); li=S.lifts.length-1;
+      /* même texte, même mouvement : les lignes suivantes qui visaient la création le reprennent */
+      ls.forEach(function(y,yj){ if(yj>j&&!y.L&&y.nw&&!y.nw.cat&&!nw.cat&&xlNorm(y.nw.name)===xlNorm(nw.name)){ y.L=L; y.nw=null; } });
+      x.L=L;
+    }
+    var L2=S.lifts[li], id2='t'+Date.now().toString(36)+j, mn=Math.min.apply(null,x.sets), mx=Math.max.apply(null,x.sets), reps=mn===mx?String(mn):mn+'-'+mx;   /* prescrit = ce qui est fait (6, 6, 5 → 5-6) : une ligne libre n'est jamais « ratée » */
+    if(!S.extra[sk])S.extra[sk]=[];
+    S.extra[sk].push({id:id2,li:li,load:x.load,reps:reps,sets:x.sets.length});
+    var key='x|'+li+'|'+w+'|'+lab+'|'+id2+BK(), rir=x.st.rir===undefined?null:x.st.rir;
+    var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:li,lift:L2.name,tpl:L2.prog.tpl,week:w+1,day:lab,role:'extra',
+      presLoad:x.load,presReps:reps,presSets:x.sets.length,load:x.load,sets:x.sets.slice(),rir:rir,bw:bw0,
+      note:'',setNotes:[],state:null,xl:x.txt};
+    if(rir===null&&x.st.rir===null)e.rirq=1;   /* « ? » choisi */
+    e.tries=e.sets.slice(); recount(e); e.state=stateOf(e);
+    S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
+    if(!first)first=key;
+  });
+  bwFollow(); autoDone(k);
+  XLT=''; XLS={};
+  save(); uiVib(); refreshPlans(); undoShow();
+  var el=first&&document.querySelector('#todayout .line[data-key="'+first+'"]'); if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});
+}
+function xlSt(i){ var x=xlLines()[+i]; return x?x.st:null; }
+$('todayout').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset)return;
+  if(t.dataset.xltxt!=null){ XLT=t.value; t.rows=Math.max(2,Math.min(8,XLT.split('\n').length)); xlRefresh(); return; }
+  if(t.dataset.xlnm!=null){ var st=xlSt(t.dataset.xlnm); if(st)st.nm=t.value; }
+});
+$('todayout').addEventListener('change',function(ev){ var t=ev.target; if(!t||!t.dataset)return;
+  if(t.dataset.xlnm!=null){ xlRefresh(); return; }
+  if(t.dataset.xlsel!=null&&t.value){ var st=xlSt(t.dataset.xlsel); if(st)st.pick=t.value; xlRefresh(); }
+});
+$('todayout').addEventListener('click',function(ev){
+  var c=ev.target.closest&&ev.target.closest('#cardextra'); if(!c)return;
+  var hd=ev.target.closest('[data-xlopen]'), st;
+  if(hd&&!ev.target.closest('button')){ st=xlSt(hd.dataset.xlopen); if(st)st.open=1; xlRefresh(); return; }
+  var b=ev.target.closest('button'); if(!b)return;
+  if(b.dataset.xlpick!=null){ st=xlSt(b.dataset.xlj); if(st)st.pick=b.dataset.xlpick; xlRefresh(); return; }
+  if(b.dataset.xlother!=null){ st=xlSt(b.dataset.xlother); if(st)st.other=1; xlRefresh(); var se=document.querySelector('#cardextra [data-xlsel="'+b.dataset.xlother+'"]'); if(se&&se.focus)se.focus(); return; }
+  if(b.dataset.xlswap!=null){ st=xlSt(b.dataset.xlswap); if(st)st.swap=!st.swap; xlRefresh(); return; }
+  if(b.dataset.xladd){ xlAdd(c.dataset.xlk); return; }
+  var row=b.closest('[data-rirrow^="xl"]');
+  if(row&&b.dataset.rir!=null){ var dr=b.dataset.rir;
+    if(dr==='h'){ b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true'); var xb=row.querySelector('[data-rir=x]'); if(xb)xb.setAttribute('aria-pressed','false'); }
+    else Array.prototype.forEach.call(row.querySelectorAll('[data-rir]'),function(x){ if(x.dataset.rir==='h'){ if(dr==='x')x.setAttribute('aria-pressed','false'); return; } x.setAttribute('aria-pressed',x===b); });
+    st=xlSt(row.dataset.rirrow.slice(2)); if(st){ st.rir=readRir(row); if(st.rir!==undefined){ st.ask=0; var w=row.closest('.xlrir'); if(w)w.classList.remove('rirask'); } }
+  }
+});
 /* pre-remplissage : ce que le programme prevoit pour ce mouvement la meme semaine,
    sinon la semaine la plus proche, sinon la derniere serie enregistree */
 function xGuess(li){
