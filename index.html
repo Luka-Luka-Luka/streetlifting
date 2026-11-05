@@ -1341,7 +1341,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v146';   /* lot 74 */
+var APPV='v147';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -9277,7 +9277,7 @@ function mdBlock(bid){
   if(gh){ p(''); p('### Objectifs'); p(mdLi(gh)); }
   var bx=bxHTML(cur?bilanX(bid):b.bx);
   if(bx){ p(''); p('### Records, top sets du run et suggestions des livres'); p(mdLi(bx)); }
-  var chg=chgHTML(bid,cur?null:b).replace(/<summary[\s\S]*?<\/summary>/,'').replace(/<table[\s\S]*?<\/table>/g,function(t){   /* lot 126 */
+  RTMD=1; var chg=chgHTML(bid,cur?null:b); RTMD=0; chg=chg.replace(/<summary[\s\S]*?<\/summary>/,'').replace(/<table[\s\S]*?<\/table>/g,function(t){   /* lot 126 */
     return t.replace(/<\/tr>/g,'</p>').replace(/<tr>/g,'<p>').replace(/<\/t[hd]><t[hd][^>]*>/g,' | ').replace(/<small>/g,' (').replace(/<\/small>/g,')'); });
   if(chg){ p(''); p('### Ce qui a changé dans le bloc'); p(mdTxt(chg).map(function(l){return '- '+l;}).join('\n')); }
   p('');
@@ -9377,15 +9377,16 @@ function apprHTML(bid){
 var FQ=[
   {k:'lim',t:'Ce qui a le plus limité vos top sets',m:['grip','technique','force','fatigue','gêne ou douleur','rien de particulier']},
   {k:'conf',t:'Confiance technique',lift:1,s:['1 hésitante','2','3','4','5 sûre']},
-  {k:'fat',t:'Fatigue générale sur le bloc',s:['1 frais','2','3','4','5 épuisé']},
-  {k:'rec',t:'Récupération d’une séance à l’autre',s:['1 jamais','2','3','4','5 toujours']},
+  {k:'fat',old:1,t:'Fatigue générale sur le bloc',s:['1 frais','2','3','4','5 épuisé']},
+  {k:'rec',old:1,t:'Récupération d’une séance à l’autre',s:['1 jamais','2','3','4','5 toujours']},
   {k:'mot',t:'Motivation',s:['1 très basse','2','3','4','5 très haute']},
   {k:'pla',t:'Plaisir à vous entraîner',s:['1 aucun','2','3','4','5 beaucoup']},
-  {k:'vie',t:'Charge de vie (travail, sommeil, stress)',s:['1 légère','2','3','4','5 très lourde']},
-  {k:'rir',t:'Votre estimation de la réserve, par rapport au bloc d’avant',o:['plus sûre','pareille','moins sûre','pas de bloc d’avant']},
+  {k:'vie',old:1,t:'Charge de vie (travail, sommeil, stress)',s:['1 légère','2','3','4','5 très lourde']},
+  {k:'rir',old:1,t:'Votre estimation de la réserve, par rapport au bloc d’avant',o:['plus sûre','pareille','moins sûre','pas de bloc d’avant']},
   {k:'ref',t:'Ce que vous referiez',x:1},
   {k:'chg',t:'Ce que vous changeriez',x:1}
 ];
+function fqVis(bid){ var a=fqA(bid); return FQ.filter(function(q){ return !q.old||(a[q.k]!=null&&a[q.k]!==''&&!(typeof a[q.k]==='object'&&!Object.keys(a[q.k]).length)); }); }   /* lot 146 : fatigue, récupération, charge de vie et réserve remplacées (SRSS, retour détaillé) ; gardées là où elles ont une réponse */
 function fqMain(){ var o=[]; S.lifts.forEach(function(L,li){ if(L.main&&!isM(L))o.push(L.name); }); return o; }
 function fqB(bid){ return (S.blocks||[]).filter(function(b){return +b.id===+bid;})[0]||null; }
 function fqA(bid){ var b=fqB(bid); return b&&b.fq&&b.fq.a?b.fq.a:{}; }
@@ -9410,7 +9411,7 @@ function fqHTML(b){
   var bid=+b.id, a=fqA(bid), a0=fqA(bid-1), n=fqN(bid), pv=fqB(bid-1)&&fqB(bid-1).fq;
   var pill=function(q,val,lab,on,sub){ return '<button type="button" class="pill" data-fq="'+bid+'|'+q.k+'|'+esc(String(val))+(sub?'|'+esc(sub):'')+'" aria-pressed="'+(on?'true':'false')+'">'+esc(lab)+'</button>'; };
   var avt=function(q,sub){ if(!pv)return ''; var t=fqVal(q,a0[q.k],sub); return t?' <span class="muted" style="font-weight:400">(bloc d’avant : '+esc(t)+')</span>':''; };
-  var h=FQ.map(function(q){
+  var h=fqVis(bid).map(function(q){
     if(q.lift)return fqMain().map(function(nm){ var cur=a[q.k]&&a[q.k][nm];
       return '<fieldset><legend>'+esc(q.t)+', '+esc(nm)+avt(q,nm)+'</legend><div class="pillrow">'+q.s.map(function(l,i){ return pill(q,i+1,l,cur===i+1,nm); }).join('')+'</div></fieldset>'; }).join('');
     if(q.x)return '<fieldset><legend>'+esc(q.t)+avt(q)+'</legend><textarea rows="2" data-fqt="'+bid+'|'+q.k+'" aria-label="'+esc(q.t)+'">'+esc(a[q.k]||'')+'</textarea></fieldset>';
@@ -9418,8 +9419,9 @@ function fqHTML(b){
     return '<fieldset><legend>'+esc(q.t)+(q.m?' <span class="muted" style="font-weight:400">(plusieurs possibles)</span>':'')+avt(q)+'</legend><div class="pillrow">'+opts.map(function(l,i){
       var val=q.s?i+1:l, on=q.m?(Array.isArray(a[q.k])&&a[q.k].indexOf(l)>=0):a[q.k]===val; return pill(q,val,l,on); }).join('')+'</div></fieldset>';
   }).join('');
-  return '<details class="chd" data-chd="fq'+bid+'"><summary>Questionnaire de fin de bloc : <b>'+n+'/'+FQ.length+'</b>'+(n?'':' · 2 minutes')+'</summary>'+
+  return '<details class="chd" data-chd="fq'+bid+'"><summary>Questionnaire de fin de bloc : <b>'+n+'/'+fqVis(bid).length+'</b>'+(n?'':' · 2 minutes')+'</summary>'+
     '<p class="note">Les mêmes questions à chaque bloc : les blocs se comparent. Ce qui se vit au jour le jour (sommeil, gêne) reste noté en séance. '+
+    'Fatigue, récupération et charge de vie viennent maintenant de vos SRSS, et la réserve du retour détaillé (sous « Ce qui a changé dans le bloc »). '+
     'Un ressenti, à lire avec prudence. Toucher une réponse choisie l’enlève. Tout est gardé avec le bloc et va dans l’Export pour Claude.</p><div class="fq">'+h+'</div></details>';
 }
 function fqMd(bid){
@@ -9434,8 +9436,10 @@ function fqMd(bid){
 function mdAll(){ return S.mdAll!==false; }
 function claudeExport(bid){
   bid=+bid; var o=[mdBlock(bid).replace(/\n+$/,'')];
+  var cq=rtA(bid).cq; if(cq&&String(cq).trim())o.unshift('## Questions de Luka pour Claude\n\n'+String(cq).trim()+'\n');   /* lot 146 */
   var ap=fqB(bid)?apprLines(bid):[];
   if(ap.length){ o.push(''); o.push('## Bilan d’apprentissage'); ap.forEach(function(x){ o.push('- '+x.b+' : '+x.s.replace(/<[^>]+>/g,'')); }); }
+  if(fqB(bid)){ var rm=rtMd(bid); if(rm.length){ o.push(''); o.push('## Retour détaillé de fin de bloc (ressenti, à lire avec prudence)'); rm.forEach(function(x){o.push(x);}); } }   /* lot 146 */
   if(fqB(bid)){ var f=fqMd(bid); o.push(''); o.push('## Questionnaire de fin de bloc (ressenti, à lire avec prudence)'); if(f.length)f.forEach(function(x){o.push(x);}); else o.push('- Pas rempli.'); }
   if(mdAll()){ o.push(''); o.push('## Données complètes (sauvegarde de l’outil, JSON)'); o.push(''); o.push('\u0060\u0060\u0060json'); o.push(JSON.stringify(S)); o.push('\u0060\u0060\u0060'); }
   return o.join('\n')+'\n';
@@ -9532,7 +9536,161 @@ function chgVit(bid){   /* résumé Vitesse des top sets du bloc, à côté du b
       '<p class="note">Vitesses en m/s. « vs droite » : écart moyen de la 1re rep à la vitesse attendue à sa charge (droite des séances d’avant), la seule ligne qui se compare quand les charges changent ; sous 0,07 m/s, c’est dans la marge de mesure. Détail : Données › Vitesse › Comparer › Bloc.</p>';
   }).join('');
 }
-function retourBlocHTML(bid,b){ return ''; }   /* lot 126 : place gardée pour le questionnaire détaillé de retour post-bloc (autre fil) */
+/* ===== lot 146 : questionnaire détaillé de retour post-bloc (réponses de Luka du 05/11, toutes en recommandé).
+   Rempli à tête reposée après lecture du bilan, bloc clos seulement. Réponses dans b.rt ; ressenti, à lire avec prudence :
+   rien n'agit sur les charges. Sources : revue après action (prévu, arrivé, pourquoi, la suite) ; OSTRC (Clarsen 2013) déjà
+   noté en séance ; règle d'un essai par bloc jugé contre l'erreur de mesure (Swinton et al. 2018 ; manuel OFSPO :
+   seuil ≈ 2√2 × erreur typique ; erreur typique de l'e1RM du top set ≈ 2 %, estimée le 05/11 sur les blocs 1-2). ===== */
+var RTF=['sommeil','travail','grip','technique','poids','gêne ou douleur','programme','forme du jour','je ne sais pas','autre'];
+var RTV=['maladie','voyage','travail chargé','mauvais sommeil','jeûne ou carême','autre'];
+var RTM=[['j1','e1RM du top set J1'],['j3','e1RM du top set J3'],['d31','écart J3 − J1'],['vit','vitesse à charge égale'],['or','SRSS récupération'],['autre','autre']];
+var RTE=0.02;   /* erreur typique de l'e1RM d'un top set, en part de l'e1RM (analyse du 05/11) */
+var RTMD=0;   /* export : le contexte seulement, pas les boutons */
+function rtId(id){ return String(id).replace(/[^A-Za-z0-9]/g,'_'); }
+function rtA(bid){ var b=fqB(bid); return b&&b.rt?b.rt:{}; }
+function rtGet(o,p){ p=p.split('.'); for(var i=0;i<p.length;i++){ if(o==null)return undefined; o=o[p[i]]; } return o; }
+function rtPut(o,p,v){ p=p.split('.'); for(var i=0;i<p.length-1;i++){ if(!o[p[i]]||typeof o[p[i]]!=='object')o[p[i]]={}; o=o[p[i]]; }
+  if(v===undefined)delete o[p[p.length-1]]; else o[p[p.length-1]]=v; }
+function rtSet(bid,p,v,m){
+  var b=fqB(bid); if(!b)return; if(!b.rt)b.rt={}; var a=b.rt, cur=rtGet(a,p);
+  if(m==='m'){ var l=Array.isArray(cur)?cur.slice():[], i=l.indexOf(v); if(i>=0)l.splice(i,1); else l.push(v); rtPut(a,p,l.length?l:undefined); }
+  else if(m==='s'){ var x=/^\d+$/.test(v)?+v:v; rtPut(a,p,cur===x?undefined:x); }
+  else rtPut(a,p,String(v).trim()?String(v):undefined);
+  b.rt.d=todayISO();
+}
+function rtForms(bid){ if(+bid===(+S.blockId||1))return S.form||{}; var b=fqB(bid); return b&&b.formData||{}; }
+function rtSrss(bid){   /* moyennes SRSS du bloc, item par item */
+  var fo=rtForms(bid), l=[]; for(var k in fo){ var s=fo[k]&&fo[k].srss; if(s&&srssN(s)===8)l.push(s); }
+  if(!l.length)return null; var o={n:l.length};
+  SRSS.forEach(function(q){ o[q.k]=l.reduce(function(a,s){return a+s[q.k];},0)/l.length; }); return o;
+}
+function rtSrssHTML(bid){
+  var a=rtSrss(bid), p=rtSrss(bid-1);
+  if(!a)return '<p class="note">Fatigue, récupération et charge de vie viennent désormais de vos SRSS, notées séance par séance : aucune SRSS complète dans ce bloc.</p>';
+  var f=function(x){return F(Math.round(x*10)/10);};
+  return '<p class="note"><b>Votre état sur le bloc (SRSS, '+a.n+' séance'+(a.n>1?'s':'')+', moyennes sur 6)</b>, à la place des anciennes notes fatigue, récupération et charge de vie. '+
+    ['r','s'].map(function(g){ return (g==='r'?'Récupération (6 = au mieux) : ':'Stress (6 = au pire) : ')+SRSS.filter(function(q){return q.g===g;}).map(function(q){
+      return (srssFr()?q.fr:q.en)+' '+f(a[q.k])+(p?' <span class="muted">(bloc d’avant '+f(p[q.k])+')</span>':''); }).join(' ; '); }).join('. ')+'. Un écart de moins de 1 point est un repère faible, pas un changement établi.</p>';
+}
+function rtOstrc(bid){   /* réponses OSTRC du bloc, par semaine */
+  var o=[]; Object.keys(S.ostrc||{}).forEach(function(k){ var q=k.split('|'); if(q[0]!==String(bid))return; var a=S.ostrc[k];
+    var t=[0,1,2,3].map(function(i){ var j=a['q'+(i+1)]; return j==null?null:j; });
+    o.push({w:+q[1],t:t}); });
+  return o.sort(function(a,b){return a.w-b.w;});
+}
+function rtZones(bid){ var z=[]; Object.keys(S.pain||{}).forEach(function(k){ if(k.split('|')[0]!==String(bid))return; Object.keys(S.pain[k]).forEach(function(l){ if(z.indexOf(l)<0)z.push(l); }); });
+  return PLOCS.map(function(q){return q[0];}).filter(function(l){return z.indexOf(l)>=0;}); }
+function rtFacts(bid,b){   /* les faits marquants du bilan (mêmes règles que « Ce qui a changé ») */
+  var es=(S.log||[]).filter(function(e){ return blockOfEntry(e)===bid&&mdPK(e); }), f=[], sec=0;
+  es.sort(function(x,y){ return String(x.date||'').localeCompare(String(y.date||''))||String(x.key).localeCompare(String(y.key)); });
+  var bw=es.filter(function(e){return e.bw!=null&&e.state!=='skip';}).map(function(e){return +e.bw;});
+  var rb=chgRb(bid,b);
+  if(bw.length&&(Math.max.apply(null,bw)-Math.min.apply(null,bw)>=0.5||(rb&&rb.length)))f.push({id:'pdc',t:'PdC : '+F(Math.min.apply(null,bw))+' à '+F(Math.max.apply(null,bw))+' kg'+(rb&&rb.length?', charges recalculées':'')});
+  S.lifts.forEach(function(L,li){
+    var el=es.filter(function(e){return e.li===li;}); if(!el.length)return; var main=L.main&&!isM(L);
+    var tops=el.filter(function(e){ return (e.role==='top'||e.role==='amrap')&&e.state!=='skip'&&(e.sets||[]).some(function(v){return v!=null;}); });
+    tops.forEach(function(e,i){
+      var r=(e.sets||[]).filter(function(v){return v!=null;});
+      if(e.state==='miss'||e.state==='fail')f.push({id:'r|'+e.key,t:L.name+', top set raté : '+chgLab(e)+' '+loadLab(L,e.load)+' × '+r.join('-')});
+      if(tops.slice(0,i).some(function(x){return Math.abs((+x.load||0)-(+e.load||0))<1e-9;}))f.push({id:'p|'+e.key,t:L.name+', top set répété : '+chgLab(e)+' '+loadLab(L,e.load)});
+    });
+    el.forEach(function(e){
+      var r=(e.sets||[]).filter(function(v){return v!=null;});
+      var mod=e.state!=='skip'&&e.presLoad!=null&&e.role!=='pr'&&((e.load!=null&&Math.abs((+e.load||0)-(+e.presLoad||0))>1e-9)||(e.presSets!=null&&r.length!==+e.presSets));
+      if(e.state!=='skip'&&!mod)return;
+      if(!main){ sec++; return; }
+      f.push({id:(e.state==='skip'?'s|':'m|')+e.key,t:L.name+(e.state==='skip'?', séance sautée : ':', prévu ≠ fait : ')+chgLab(e)+(e.role==='deload'?'':' '+roleLab(e.role,e.key))});
+    });
+  });
+  if(sec)f.push({id:'sec',t:'Exercices secondaires : '+sec+' séries sautées ou modifiées'});
+  return f;
+}
+function rtMeas(bid,m){   /* mesure d'un essai pour un bloc : [{lab, v, unit, seuil}] */
+  var o=[];
+  if(m==='j1'||m==='j3'||m==='d31')S.lifts.forEach(function(L,li){
+    if(!L.main||isM(L))return; var rows=progRows(li).filter(function(r){return r.blk===bid&&r.sys!=null;});
+    var mean=function(d){ var x=rows.filter(function(r){return r.day===d;}).map(function(r){return r.sys;}); return x.length?x.reduce(function(a,b){return a+b;},0)/x.length:null; };
+    var j1=mean('J1'), j3=mean('J3');
+    if(m==='d31'){ if(j1!=null&&j3!=null)o.push({lab:L.name,v:j3-j1,u:' kg',s:4*RTE*j1}); }
+    else { var v=m==='j1'?j1:j3; if(v!=null)o.push({lab:L.name,v:v,u:' kg',s:2*Math.SQRT2*RTE*v}); }
+  });
+  if(m==='vit'){ var mvs=[]; (S.velo||[]).forEach(function(v){ if(typeLab(v)==='Top set'&&!vIsDl(v)&&mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
+    mvs.forEach(function(mv){ var st=S.velo.filter(function(v){return v.mouvement===mv&&typeLab(v)==='Top set'&&!vIsDl(v)&&vBloc(v)===bid;}).map(vbStats), x=st.length?vbMoy(st,'dw'):null;
+      if(x!=null)o.push({lab:mv,v:x,u:' m/s',s:0.07}); }); }
+  if(m==='or'){ var s=rtSrss(bid); if(s)o.push({lab:'Overall Recovery',v:s.or,u:' sur 6',s:1,rep:1}); }
+  return o;
+}
+function rtEssaiRes(bid){   /* l'essai décidé au bloc d'avant, et ce que disent les données */
+  var p=rtA(bid-1).es; if(!p||!p.chg)return '';
+  var att={'monte':'monte','baisse':'baisse','stable':'ne bouge pas'}[p.att]||'';
+  var h='<p class="note"><b>Essai décidé au bloc '+(bid-1)+'</b> : « '+esc(p.chg)+' »'+(p.mes?', mesure : '+esc((RTM.filter(function(q){return q[0]===p.mes;})[0]||['',p.mes])[1]):'')+(att?', attendu : '+att:'')+'.';
+  if(!p.mes||p.mes==='autre')return h+' Pas de mesure chiffrée choisie : à juger d’après le bilan.</p>';
+  var A=rtMeas(bid-1,p.mes), B=rtMeas(bid,p.mes);
+  var r=B.map(function(x){ var y=A.filter(function(z){return z.lab===x.lab;})[0]; if(!y)return null;
+    var d=x.v-y.v, dg=p.mes==='vit'?2:1, fm=function(v){ return (v>=0?'+':'−')+(dg===2?v2(Math.abs(v)):F(Math.round(Math.abs(v)*10)/10)); };
+    var ok=Math.abs(d)>=x.s;
+    return '<b>'+esc(x.lab)+'</b> '+fm(d)+x.u+' ('+(ok?'au-dessus':'sous')+' '+(x.rep?'le repère':'le seuil')+' de '+(dg===2?v2(x.s):F(Math.round(x.s*10)/10))+x.u+(ok?'':' : on ne peut pas conclure')+')'; }).filter(Boolean);
+  return h+(r.length?' Bloc '+bid+' contre bloc '+(bid-1)+' : '+r.join(' ; ')+'. Un seul bloc par essai reste fragile : répéter l’essai avant de conclure.':' Pas assez de données dans les deux blocs pour comparer.')+'</p>';
+}
+function retourBlocHTML(bid,b){
+  if(!b||RTMD)return rtSrssHTML(bid)+rtEssaiRes(bid);   /* bloc en cours : le contexte seulement, le questionnaire vient à la clôture */
+  var a=b.rt||{}, n=0;
+  var pill=function(p,v,lab,m){ var c=rtGet(a,p), on=m==='m'?(Array.isArray(c)&&c.indexOf(v)>=0):c===v;
+    return '<button type="button" class="pill" data-rt="'+bid+'|'+p+'|'+esc(String(v))+'|'+(m||'s')+'" aria-pressed="'+(on?'true':'false')+'">'+esc(lab)+'</button>'; };
+  var pills=function(p,l,m){ return '<div class="pillrow">'+l.map(function(x,i){ return Array.isArray(x)?pill(p,x[0],x[1],m):pill(p,x,x,m); }).join('')+'</div>'; };
+  var ta=function(p,lab,ph){ return '<textarea rows="2" data-rtt="'+bid+'|'+p+'" aria-label="'+esc(lab)+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>'+esc(rtGet(a,p)||'')+'</textarea>'; };
+  var fs=function(lab,body){ return '<fieldset><legend>'+lab+'</legend>'+body+'</fieldset>'; };
+  var has=function(k){ var v=a[k]; return v!=null&&(typeof v!=='object'||(Array.isArray(v)?v.length:Object.keys(v).some(function(x){ var y=v[x]; return y!=null&&(typeof y!=='object'||Object.keys(y).length); }))); };
+  var rub=function(k,t,body){ var on=has(k); if(on)n++; return '<details class="chd" data-chd="rt'+bid+k+'"'+(cui().open['rt'+bid+k]?' open':'')+'><summary>'+(on?'✓ ':'')+t+'</summary><div class="fq">'+body+'</div></details>'; };
+  var mains=fqMain(), h='';
+  h+=rub('aar','Prévu, arrivé, pourquoi',
+    fs('Quel était votre objectif pour ce bloc ?',ta('aar.obj','Objectif du bloc','Rappelé au bloc suivant'))+
+    fs('Atteint ?',pills('aar.att',['Oui','En partie','Non','Pas d’objectif']))+
+    fs('Pourquoi, selon vous ?',ta('aar.pq','Pourquoi')));
+  var fa=rtFacts(bid,b);
+  h+=rub('f','Les faits marquants du bloc',fa.length?fa.map(function(x){ var p='f.'+rtId(x.id);
+      return fs(esc(x.t),pills(p+'.t',RTF,'m')+'<input type="text" data-rtt="'+bid+'|'+p+'.x" aria-label="Un mot" placeholder="Un mot (facultatif)" value="'+esc(rtGet(a,p+'.x')||'')+'">'); }).join(''):
+    '<p class="note">Aucun top set raté ou répété, aucune séance sautée ou modifiée sur les mouvements principaux.</p>');
+  var zs=rtZones(bid), os=rtOstrc(bid), osl=['participation','volume réduit','performance','douleur'];
+  h+=rub('g','Gêne et douleur',
+    (os.length?'<p class="note">OSTRC noté pendant le bloc : '+os.map(function(o){ return 'S'+(o.w+1)+' '+o.t.map(function(j,i){ return j==null?null:osl[i]+' '+(OSTRC[i].o[j]||j); }).filter(Boolean).join(', '); }).join(' ; ')+'.</p>':'<p class="note">Aucune réponse OSTRC dans ce bloc.</p>')+
+    (zs.length?zs.map(function(z){ return fs('En fin de bloc, '+esc(plocName(z))+' : c’est…',pills('g.z.'+z,['Disparu','Mieux','Pareil','Pire'])); }).join(''):'<p class="note">Aucune gêne notée en séance.</p>')+
+    fs('Ce qui a aidé ou aggravé',ta('g.x','Ce qui a aidé ou aggravé')));
+  var ev=Array.isArray(a.v)?a.v:[];
+  h+=rub('v','Vie hors entraînement',ev.map(function(e,i){ var p='v.'+i;
+      return '<fieldset><legend>Événement '+(i+1)+' <button type="button" class="linkbtn" data-rtdel="'+bid+'|'+i+'">retirer</button></legend>'+pills(p+'.t',RTV)+
+        '<div class="btnrow"><label class="note">du <input type="date" data-rtt="'+bid+'|'+p+'.d1" value="'+esc(e.d1||'')+'"></label><label class="note">au <input type="date" data-rtt="'+bid+'|'+p+'.d2" value="'+esc(e.d2||'')+'"></label></div>'+
+        '<input type="text" data-rtt="'+bid+'|'+p+'.x" aria-label="Un mot" placeholder="Un mot (facultatif)" value="'+esc(e.x||'')+'"></fieldset>'; }).join('')+
+    '<div class="btnrow"><button type="button" class="act ghost mini" data-rtadd="'+bid+'">＋ Ajouter un événement</button></div>');
+  h+=rub('al','Poids et alimentation',
+    fs('Énergie sur le bloc',pills('al.ene',[[1,'1 très basse'],[2,'2'],[3,'3'],[4,'4'],[5,'5 très haute']]))+
+    fs('Faim',pills('al.faim',[[1,'1 aucune'],[2,'2'],[3,'3'],[4,'4'],[5,'5 forte']]))+
+    fs('Alimentation',pills('al.al',['Déficit','Maintien','Surplus','Je ne sais pas'])));
+  h+=rub('tech','Technique',mains.map(function(nm,i){ return fs(esc(nm)+' : ce qui a changé, ce que les vidéos ont montré',ta('tech.'+i,'Technique '+nm)); }).join(''));
+  h+=rub('res','Réserve',
+    fs('Selon vous, votre réserve annoncée était…',pills('res.dir',['Trop prudente','Juste','Trop optimiste','Je ne sais pas']))+
+    fs('Surtout sur <span class="muted" style="font-weight:400">(plusieurs possibles)</span>',pills('res.ou',['Top sets','Back-offs','Dernières séries','Partout'],'m')));
+  h+=rub('es','Un essai pour le bloc suivant',
+    '<p class="note">Une seule chose à changer, et ce que vous regarderez. Au bilan suivant, l’outil compare les deux blocs à l’erreur de mesure. Le choix du changement est le vôtre.</p>'+
+    fs('Ce que je change au bloc suivant',ta('es.chg','Ce que je change','Ex. sommeil, J2 plus léger, volume des back-offs'))+
+    fs('Ce que je regarderai',pills('es.mes',RTM))+
+    fs('Ce que j’attends',pills('es.att',[['monte','Monte'],['baisse','Baisse'],['stable','Ne bouge pas']])));
+  h+=rub('cq','Questions pour Claude',fs('Ajoutées en tête de l’Export pour Claude',ta('cq','Questions pour Claude')));
+  return rtSrssHTML(bid)+rtEssaiRes(bid)+'<details class="chd" data-chd="rt'+bid+'"'+(cui().open['rt'+bid]?' open':'')+'><summary>Retour détaillé : <b>'+n+'/9</b> rubriques'+(n?'':' · 10 à 15 minutes')+'</summary>'+
+    '<p class="note">À remplir après lecture du bilan. Un ressenti, à lire avec prudence : rien n’agit sur les charges. Toucher une réponse choisie l’enlève. Tout va dans l’Export pour Claude.</p>'+h+'</details>';
+}
+function rtMd(bid){
+  var a=rtA(bid), o=[], t=function(x){return String(x).replace(/\s+/g,' ').trim();};
+  if(a.aar){ if(a.aar.obj)o.push('- Objectif du bloc : '+t(a.aar.obj)); if(a.aar.att)o.push('- Atteint : '+a.aar.att); if(a.aar.pq)o.push('- Pourquoi : '+t(a.aar.pq)); }
+  if(a.f){ var b=fqB(bid); rtFacts(bid,b).forEach(function(x){ var r=a.f[rtId(x.id)]; if(r&&(r.t||r.x))o.push('- '+x.t+' : '+[(r.t||[]).join(', '),r.x?t(r.x):''].filter(Boolean).join(' — ')); }); }
+  if(a.g){ Object.keys(a.g.z||{}).forEach(function(z){ o.push('- Gêne '+plocName(z)+' en fin de bloc : '+a.g.z[z]); }); if(a.g.x)o.push('- Gêne, ce qui a aidé ou aggravé : '+t(a.g.x)); }
+  (Array.isArray(a.v)?a.v:[]).forEach(function(e){ if(e.t||e.x||e.d1)o.push('- Vie : '+[e.t||'',e.d1?(e.d2?e.d1+' → '+e.d2:e.d1):'',e.x?t(e.x):''].filter(Boolean).join(', ')); });
+  if(a.al){ if(a.al.ene)o.push('- Énergie : '+a.al.ene+' sur 5'); if(a.al.faim)o.push('- Faim : '+a.al.faim+' sur 5'); if(a.al.al)o.push('- Alimentation : '+a.al.al); }
+  if(a.tech){ fqMain().forEach(function(nm,i){ if(a.tech[i])o.push('- Technique '+nm+' : '+t(a.tech[i])); }); }
+  if(a.res){ if(a.res.dir)o.push('- Réserve annoncée : '+a.res.dir+(a.res.ou?' (surtout : '+a.res.ou.join(', ')+')':'')); }
+  if(a.es&&a.es.chg){ o.push('- Essai pour le bloc suivant : '+t(a.es.chg)+(a.es.mes?' ; mesure : '+(RTM.filter(function(q){return q[0]===a.es.mes;})[0]||['',a.es.mes])[1]:'')+(a.es.att?' ; attendu : '+a.es.att:'')); }
+  return o;
+}
 /* lot 69 (Q28) : pente de l'e1RM système des top sets d'un même jour sur un bloc (moindres carrés, kg par semaine),
    fourchette de Student à 90 % dès 3 séances. Une description du bloc, pas une prévision. */
 function bilanPente(bid){
@@ -9899,13 +10057,22 @@ $('bilan').addEventListener('click',function(ev){
   try{ navigator.clipboard.writeText(txt).then(ok,fb); }catch(e){ fb(); }
 });
 $('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdall')){ S.mdAll=!!t.checked; save(); } });   /* lot 83 */
+$('bilan').addEventListener('click',function(ev){   /* lot 146 : retour détaillé */
+  var b=ev.target&&ev.target.closest?ev.target.closest('button[data-rt],button[data-rtadd],button[data-rtdel]'):null; if(!b)return;
+  if(b.dataset.rt){ var p=b.dataset.rt.split('|'); rtSet(+p[0],p[1],p.slice(2,-1).join('|'),p[p.length-1]); }
+  else if(b.dataset.rtadd){ var B=fqB(+b.dataset.rtadd); if(!B)return; if(!B.rt)B.rt={}; if(!Array.isArray(B.rt.v))B.rt.v=[]; B.rt.v.push({}); B.rt.d=todayISO(); }
+  else { var q=b.dataset.rtdel.split('|'), B2=fqB(+q[0]); if(!B2||!B2.rt||!Array.isArray(B2.rt.v))return; B2.rt.v.splice(+q[1],1); if(!B2.rt.v.length)delete B2.rt.v; }
+  ev.preventDefault(); save(); renderBilan();
+});
+$('bilan').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset||!t.dataset.rtt)return;   /* lot 146 */
+  var p=t.dataset.rtt.split('|'); rtSet(+p[0],p[1],t.value,'t'); save(); });
 $('bilan').addEventListener('click',function(ev){   /* lot 83 (A12-A13) */
   var b=ev.target&&ev.target.closest?ev.target.closest('[data-fq]'):null; if(!b||!b.dataset||!b.dataset.fq)return;
   var p=b.dataset.fq.split('|'); fqSet(+p[0],p[1],p[2],p[3]); save(); renderBilan(); chInfo();
 });
 $('bilan').addEventListener('input',function(ev){ var t=ev.target; if(!t||!t.dataset||!t.dataset.fqt)return;   /* lot 83 */
   var p=t.dataset.fqt.split('|'); fqSet(+p[0],p[1],t.value); save();
-  var d=t.closest?t.closest('details'):null, s=d&&d.querySelector('summary b'); if(s)s.textContent=fqN(+p[0])+'/'+FQ.length; });
+  var d=t.closest?t.closest('details'):null, s=d&&d.querySelector('summary b'); if(s)s.textContent=fqN(+p[0])+'/'+fqVis(+p[0]).length; });
 $('bilan').addEventListener('change',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdon')){ S.mdOn=!!t.checked; save(); }
   if(t&&t.dataset&&t.dataset.ben)blockEdit(t); });   /* lot 59 */
 $('bilan').addEventListener('input',function(ev){ var t=ev.target; if(t&&t.hasAttribute&&t.hasAttribute('data-mdpr')){ S.mdPrompt=t.value; save(); } });
