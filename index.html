@@ -1341,7 +1341,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v144';   /* lot 74 */
+var APPV='v145';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -9256,6 +9256,9 @@ function mdBlock(bid){
   if(gh){ p(''); p('### Objectifs'); p(mdLi(gh)); }
   var bx=bxHTML(cur?bilanX(bid):b.bx);
   if(bx){ p(''); p('### Records, top sets du run et suggestions des livres'); p(mdLi(bx)); }
+  var chg=chgHTML(bid,cur?null:b).replace(/<summary[\s\S]*?<\/summary>/,'').replace(/<table[\s\S]*?<\/table>/g,function(t){   /* lot 126 */
+    return t.replace(/<\/tr>/g,'</p>').replace(/<tr>/g,'<p>').replace(/<\/t[hd]><t[hd][^>]*>/g,' | ').replace(/<small>/g,' (').replace(/<\/small>/g,')'); });
+  if(chg){ p(''); p('### Ce qui a changé dans le bloc'); p(mdTxt(chg).map(function(l){return '- '+l;}).join('\n')); }
   p('');
   p('## Séances');
   var miss=[], nS=0;
@@ -9428,6 +9431,87 @@ function mdBtn(id){
     '<div class="btnrow"><button class="act mini" data-mdc>Copier</button><button class="act ghost mini" data-mdd>Télécharger (.md)</button></div>'+
     '<textarea data-mdfb rows="10" readonly style="display:none;width:100%;margin-top:6px" aria-label="Export à copier"></textarea></div>';
 }
+/* lot 126 (règle de Luka du 24/10, réponses du 05/11) : « Ce qui a changé dans le bloc », dans le bilan et dans l'export.
+   PdC du bloc (séries saisies) et charges recalculées au PdC du jour (P.fz.rb ; archivé à la clôture dans b.rb depuis
+   cette version) ; top sets ratés ou répétés ; prévu ≠ fait (presLoad, état « mod ») et séries sautées ; résumé Vitesse
+   des top sets, à côté du bloc d'avant. Rien n'est jugé : ce sont les faits du bloc. */
+function chgLab(e){ var q=mdPK(e); if(!q)return frDate(e.date); var w=+q[2]; return (w<0?'Deload':'S'+(w+1)+' '+q[3]); }
+function chgRb(bid,b){   /* recalculs au PdC du jour : bloc en cours (ou clos sans série depuis) dans P.fz, sinon archive */
+  if(b&&b.rb)return b.rb;
+  var out=[];
+  S.lifts.forEach(function(L){ var z=L.prog&&L.prog.fz; if(!z||+z.b!==+bid||!(z.rb||[]).length)return;
+    out.push({n:L.name,bw0:z.bw,s0:z.s0!=null?z.s0:null,rb:JSON.parse(JSON.stringify(z.rb))}); });
+  return b?null:out;
+}
+function chgHTML(bid,b){
+  var es=(S.log||[]).filter(function(e){ return blockOfEntry(e)===bid&&mdPK(e); }), h=[];
+  var ord=function(x,y){ return String(x.date||'').localeCompare(String(y.date||''))||String(x.key).localeCompare(String(y.key)); };
+  es.sort(ord);
+  /* PdC */
+  var bw=es.filter(function(e){return e.bw!=null&&e.state!=='skip';}).map(function(e){return {d:e.date,v:+e.bw};});
+  if(bw.length){ var vs=bw.map(function(x){return x.v;}), a=bw[0], z=bw[bw.length-1];
+    h.push('<p class="note"><b>PdC</b> : '+F(a.v)+' kg au début ('+perDs(a.d)+'), '+F(z.v)+' kg à la fin ('+perDs(z.d)+'), entre '+F(Math.min.apply(null,vs))+' et '+F(Math.max.apply(null,vs))+' kg.</p>'); }
+  var rb=chgRb(bid,b);
+  if(rb&&rb.length)rb.forEach(function(x){
+    var s0=x.s0;
+    h.push('<p class="note"><b>'+esc(x.n)+'</b> : charges recalculées au PdC du jour, '+x.rb.map(function(r){
+      var t='au PdC de '+F(r.bw)+' kg à partir de S'+(Math.floor(r.o/100)+1)+' '+(DORDER[r.o%100]||'')+' (PdC de départ '+F(x.bw0)+' kg';
+      if(r.s0!=null&&s0!=null){ t+=', départ '+F(s0)+' → '+F(r.s0)+' kg de lest'; s0=r.s0; }
+      return t+')'; }).join(' ; ')+'.</p>'); });
+  else if(rb===null)h.push('<p class="note"><b>Charges recalculées au PdC du jour</b> : non gardées pour ce bloc (clos avant la v'+APPV.slice(1)+').</p>');
+  /* par mouvement principal : top sets ratés ou répétés, prévu ≠ fait, sautées */
+  S.lifts.forEach(function(L,li){
+    var el=es.filter(function(e){return e.li===li;}); if(!el.length)return;
+    var tops=el.filter(function(e){ return (e.role==='top'||e.role==='amrap')&&e.state!=='skip'&&(e.sets||[]).some(function(v){return v!=null;}); });
+    var rat=[], rpt=[];
+    tops.forEach(function(e,i){
+      var r=(e.sets||[]).filter(function(v){return v!=null;}), pr=e.presReps!=null?parseInt(e.presReps,10):null;
+      if(e.state==='miss'||e.state==='fail')rat.push(chgLab(e)+' '+loadLab(L,e.load)+' × '+r.join('-')+(pr?' ('+pr+' prévues)':''));
+      var pv=tops.slice(0,i).filter(function(x){return Math.abs((+x.load||0)-(+e.load||0))<1e-9;}).pop();
+      if(pv)rpt.push(chgLab(e)+' '+loadLab(L,e.load)+' (comme '+chgLab(pv)+')');
+    });
+    var mod=[], sk=[];
+    el.forEach(function(e){
+      var rl=function(e){ return e.role==='deload'?'':' '+roleLab(e.role,e.key); };
+      if(e.state==='skip'){ sk.push(chgLab(e)+rl(e)); return; }
+      if(e.presLoad==null||e.role==='pr')return;
+      var r=(e.sets||[]).filter(function(v){return v!=null;}), t=[];
+      if(e.load!=null&&Math.abs((+e.load||0)-(+e.presLoad||0))>1e-9)t.push(loadLab(L,e.load)+' au lieu de '+loadLab(L,e.presLoad));
+      if(e.presSets!=null&&r.length!==+e.presSets)t.push(r.length+' séries au lieu de '+e.presSets);
+      if(t.length)mod.push(chgLab(e)+rl(e)+' : '+t.join(', '));
+    });
+    if(!rat.length&&!rpt.length&&!mod.length&&!sk.length)return;
+    var main=L.main&&!isM(L);
+    h.push('<p class="note"><b>'+esc(L.name)+'</b> : '+[
+      rat.length?'top sets ratés : '+rat.join(' ; '):(main&&tops.length?'aucun top set raté':''),
+      rpt.length?'répétés : '+rpt.join(' ; '):'',
+      mod.length?'prévu ≠ fait ('+mod.length+') : '+(main||mod.length<=3?mod.join(' ; '):mod.slice(0,3).join(' ; ')+' ; …'):'',
+      sk.length?'sautées ('+sk.length+') : '+(main||sk.length<=3?sk.join(' ; '):sk.slice(0,3).join(' ; ')+' ; …'):''
+    ].filter(Boolean).join(' · ')+'.</p>');
+  });
+  h.push(chgVit(bid));
+  h.push(retourBlocHTML(bid,b));
+  h=h.filter(Boolean);
+  return h.length?'<details class="chgb" data-chgb="'+bid+'"'+(cui().open['chg'+bid]?' open':'')+'><summary class="note"><b>Ce qui a changé dans le bloc</b> — PdC, charges recalculées, ratés, prévu ≠ fait, vitesse</summary>'+h.join('')+'</details>':'';
+}
+function chgVit(bid){   /* résumé Vitesse des top sets du bloc, à côté du bloc d'avant (mêmes chiffres : moyennes) */
+  var mvs=[]; (S.velo||[]).forEach(function(v){ if(typeLab(v)==='Top set'&&!vIsDl(v)&&mvs.indexOf(v.mouvement)<0)mvs.push(v.mouvement); });
+  var byD=function(a,c){return String(a.date).localeCompare(String(c.date))||vSortN(a,c);};
+  return mvs.map(function(mv){
+    var of=function(b){ return S.velo.filter(function(v){return v.mouvement===mv&&typeLab(v)==='Top set'&&!vIsDl(v)&&vBloc(v)===b;}).sort(byD).map(vbStats); };
+    var A=of(bid), P=of(bid-1); if(!A.length)return '';
+    var col=function(st){ if(!st.length)return null; var le=st.map(function(o){return +o.v.lest_kg||0;});
+      return {n:st.length,le:F(Math.min.apply(null,le))+'–'+F(Math.max.apply(null,le)),v1:vbMoy(st,'v1'),mv:vbMoy(st,'mv'),vl:vbMoy(st,'vl'),pe:vbMoy(st,'pe'),dw:vbMoy(st,'dw')}; };
+    var a=col(A), p=col(P), fm=function(x,k){ return x==null?'—':(k==='pe'?F(Math.round(x))+' %':k==='dw'?(x>=0?'+':'−')+v2(Math.abs(x)):v2(x)); };
+    var row=function(lab,k){ return '<tr><th scope="row">'+lab+'</th>'+(p?'<td>'+(k==='le'?p.le:fm(p[k],k))+'</td>':'')+'<td>'+(k==='le'?a.le:fm(a[k],k))+'</td></tr>'; };
+    var f=A[0], z=A[A.length-1];
+    return '<p class="note"><b>Vitesse, '+esc(mv)+'</b> : '+a.n+' top sets filmés'+(A.length>=2?' ; du premier au dernier ('+perDs(f.v.date)+' → '+perDs(z.v.date)+') : lest '+F(+f.v.lest_kg||0)+' → '+F(+z.v.lest_kg||0)+' kg, 1re rep '+fm(f.v1)+' → '+fm(z.v1)+', moyenne '+fm(f.mv)+' → '+fm(z.mv)+', dernière rep '+fm(f.vl)+' → '+fm(z.vl)+' m/s, perte '+fm(f.pe,'pe')+' → '+fm(z.pe,'pe'):'')+'.</p>'+
+      '<div class="vctw"><table class="vct"><thead><tr><th>Moyennes</th>'+(p?'<th>bloc '+(bid-1)+'<small>'+p.n+' top sets</small></th>':'')+'<th>bloc '+bid+'<small>'+a.n+' top sets</small></th></tr></thead><tbody>'+
+        row('Lest (kg)','le')+row('1re rep','v1')+row('Moyenne','mv')+row('Dern. rep','vl')+row('Perte','pe')+row('vs droite','dw')+'</tbody></table></div>'+
+      '<p class="note">Vitesses en m/s. « vs droite » : écart moyen de la 1re rep à la vitesse attendue à sa charge (droite des séances d’avant), la seule ligne qui se compare quand les charges changent ; sous 0,07 m/s, c’est dans la marge de mesure. Détail : Données › Vitesse › Comparer › Bloc.</p>';
+  }).join('');
+}
+function retourBlocHTML(bid,b){ return ''; }   /* lot 126 : place gardée pour le questionnaire détaillé de retour post-bloc (autre fil) */
 /* lot 69 (Q28) : pente de l'e1RM système des top sets d'un même jour sur un bloc (moindres carrés, kg par semaine),
    fourchette de Student à 90 % dès 3 séances. Une description du bloc, pas une prévision. */
 function bilanPente(bid){
@@ -9492,13 +9576,13 @@ function renderBilan(){
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   var h=blocCmp()+'<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
     (S.start?'depuis le '+frDate(S.start):'aucune date de d\u00e9but')+' \u00b7 '+nd+'/'+sess.length+' s\u00e9ances marqu\u00e9es faites'+formLine()+'.</p>'+
-    statsHTML(blockStats(S.start||null,null))+bilanPente(+S.blockId||1)+painBilan(+S.blockId||1,nd)+bxHTML(bilanX(+S.blockId||1))+mdBtn(+S.blockId||1);   /* lot 55 */   /* lot 54 */
+    statsHTML(blockStats(S.start||null,null))+bilanPente(+S.blockId||1)+painBilan(+S.blockId||1,nd)+bxHTML(bilanX(+S.blockId||1))+chgHTML(+S.blockId||1,null)+mdBtn(+S.blockId||1);   /* lot 126 */   /* lot 55 */   /* lot 54 */
   if(S.blocks.length){
     h+=S.blocks.slice().reverse().map(function(b){
       return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b>'+(b.learn?' <span class="lrn">bloc d’apprentissage</span>':'')+' <button class="linkbtn" data-learn="'+b.id+'">'+(b.learn?'retirer ce signal':'bloc d’apprentissage ?')+'</button> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
         ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+bilanPente(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+apprHTML(+b.id)+fqHTML(b)+mdBtn(b.id)+'</div>';   /* lot 83 */   /* lot 59 */   /* lot 55 */
+        statsHTML(b.stats)+bilanPente(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+chgHTML(+b.id,b)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+apprHTML(+b.id)+fqHTML(b)+mdBtn(b.id)+'</div>';   /* lot 83 */   /* lot 59 */   /* lot 55 */
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -9754,6 +9838,7 @@ function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} de
     dayTags:JSON.parse(JSON.stringify(S.dayTags||{})), undo:snap});   /* lot 59 */
   var bgA=goalArch(); if(bgA)S.blocks[S.blocks.length-1].goal=bgA;
   S.blocks[S.blocks.length-1].bx=bilanX(+S.blockId||1);
+  S.blocks[S.blocks.length-1].rb=chgRb(+S.blockId||1,null);   /* lot 126 : recalculs au PdC du jour, avant que P.fz ne change de bloc */
   S.blocks[S.blocks.length-1].plan=mdPlan();   /* lot 55 : séances faites ou non, lignes prévues, échauffement proposé */   /* lot 54 : records, run, suggestions figés */   /* lot 53 : objectifs jugés et archivés */
   cui().open['fq'+S.blockId]=1;   /* lot 83 : le questionnaire de fin de bloc s'ouvre dans le Bilan */
   var bd=blockDescs(); if(bd.length)S.blocks[S.blocks.length-1].desc=bd;   /* lot 46 (R5) */   /* B21 */
@@ -11273,6 +11358,7 @@ function vScrChoix(){
 /* lot 125 (demande de Luka 04/11) : vue Bloc. Les top sets d'un bloc à la suite, filtrables par jour (J1, J3 : conditions
    différentes), ce qui change d'un top set à l'autre, rep par rep, et un bloc après l'autre. Rien de nouveau n'est mesuré :
    1re rep, moyenne, dernière rep, perte (meilleure rep → dernière), écart à la droite des séances d'avant (vfDw). */
+function vIsDl(v){ return /^d\|/.test(String(v.lien&&v.lien.key||'')); }   /* lot 126 : série du deload entre deux blocs */
 function vbStats(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); o.v=v; return o; }
 function vbMoy(a,k){ return vMoyA(a.map(function(o){return o[k];}).filter(function(x){return x!=null;})); }
 function vScrBloc(){
@@ -11281,7 +11367,7 @@ function vScrBloc(){
   if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
   var byD=function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);};
-  var tops=S.velo.filter(function(v){return v.mouvement===U.cmv&&typeLab(v)==='Top set';}).sort(byD);
+  var tops=S.velo.filter(function(v){return v.mouvement===U.cmv&&typeLab(v)==='Top set'&&!vIsDl(v);}).sort(byD);   /* lot 126 : sans le deload */
   var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(!tops.length)return h+'<p class="note">Aucun top set filmé pour ce mouvement.</p></div>';
   var bl=[]; tops.forEach(function(v){ var b=String(vBloc(v)); if(bl.indexOf(b)<0)bl.push(b); });
