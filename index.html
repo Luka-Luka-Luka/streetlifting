@@ -1309,7 +1309,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v141';   /* lot 74 */
+var APPV='v142';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -7677,7 +7677,7 @@ function srssHelp(){
 function arssHTML(){
   if(S.arss||srssAll(null).length)return '';
   var a=S.arssP||{}, n=Object.keys(a).length;
-  var h='<details class="fmore" data-arss'+(ARSSO?' open':'')+'><summary class="note"><b>Une fois avant la 1re SRSS</b> : 32 mots notés un par un (ARSS), environ 3 minutes, pour vous familiariser'+(n?' · '+n+'/32':'')+'</summary>';
+  var h='<details class="fmore" data-arsswrap'+(ARSSO?' open':'')+'><summary class="note"><b>Une fois avant la 1re SRSS</b> : 32 mots notés un par un (ARSS), environ 3 minutes, pour vous familiariser'+(n?' · '+n+'/32':'')+'</summary>';
   SRSS.forEach(function(q){ q.w.forEach(function(x){
     h+='<p class="note" style="margin:6px 0 2px">'+x[0]+(x[2]?'':'<sup title="non vérifié">*</sup>')+' <span class="src">'+x[1]+'</span></p><div class="pillrow fdemi">'+[0,1,2,3,4,5,6].map(function(v){
       return '<button class="pill" data-arss="'+x[0]+'|'+v+'" aria-pressed="'+(a[x[0]]===v)+'">'+v+'</button>'; }).join('')+'</div>'; }); });
@@ -7714,7 +7714,7 @@ function ostrcHTML(k){
   return h;
 }
 function srssClick(ev){
-  var b=ev.target.closest?ev.target.closest('[data-srss],[data-arss],[data-arssact],[data-ostrc]'):null; if(!b)return false;
+  var b=ev.target.closest?ev.target.closest('button[data-srss],button[data-arss],button[data-arssact],button[data-ostrc]'):null; if(!b)return false;
   var k=S.tsel; if(!k)return true;
   if(b.dataset.srss){ var p=b.dataset.srss.split('|'), v=+p[1]; if(!S.form[k])S.form[k]={}; var s=S.form[k].srss||(S.form[k].srss={});
     if(s[p[0]]===v)delete s[p[0]]; else s[p[0]]=v; if(!srssN(s))delete S.form[k].srss; S.form[k].d=todayISO(); }
@@ -7766,7 +7766,7 @@ function renderForm(){
   renderFin();   /* lot 44 (R9) */
 }
 var FMORE=false;   /* lot 73 : le repli de la forme reste ouvert d'un rendu à l'autre */
-$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-arss'))ARSSO=!!d.open; },true);
+$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-arsswrap'))ARSSO=!!d.open; },true);
 function fmoreSum(k,tg){
   var pp=(S.pain||{})[painKey(k)], n=tg.length+(pp?Object.keys(pp).length:0), t=String((S.dayNotes||{})[k]||'').trim();
   var a=[]; if(n)a.push(n+' noté'+(n>1?'s':'')); if(t)a.push('texte');
