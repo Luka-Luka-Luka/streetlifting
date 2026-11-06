@@ -1387,7 +1387,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v151';   /* lot 74 */
+var APPV='v152';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -2450,18 +2450,18 @@ function zTopReps(t,P){return P.pair?+P.pair.split('/')[0]:((t.sq===2&&P.sqTop==
 function zBar(r){return r>=7?2.5:(r>=5?1.25:0.5);}
 /* lot 128 : bac à sable de l'intermediate. P.zSim (brouillon seulement) = {m:'pdf'|'calc'|'man', g:% de niveau par semaine,
    L:{semaine:lest des lignes à 100 %}}. 'pdf' : projeté à 7 reps (+2,5), comme avant. 'calc' : reps du max out prévues
-   par le calcul de l'outil (1RM de référence du brouillon, + g % par semaine), barème du PDF appliqué. 'man' : lest des
-   lignes à 100 % tapé semaine par semaine ; semaine laissée vide : comme 'calc'. */
+   par le calcul de l'outil (1RM de référence du brouillon, + g % par semaine), barème du PDF appliqué. 'man' (choix de
+   Luka, 06/11) : reps du max out tapées semaine par semaine (z.R), la charge en découle par le barème ; vide : comme 'calc'. */
 var ZSDEF={m:'calc'};   /* mode du bac à sable par défaut : niveau calculé */
 function zs0(z){return z?{r:z.r,m:z.m}:null;}
 function zSimInc(L,t,q,s){
   var P=L.prog, z=BRSWAP?(P.zSim||ZSDEF):null; if(!z||!q||z.m==='pdf'||!zBarOn(t))return null;
-  var fa=fzAt(L,q.w,q.lab), s0=fa?fa.s0:startLoad(L,t), bw=fa?fa.bw:S.bw, cur=s0+s, nx=z.L&&z.L[q.w+1];
+  var fa=fzAt(L,q.w,q.lab), s0=fa?fa.s0:startLoad(L,t), bw=fa?fa.bw:S.bw, cur=s0+s;
   var r=zSimReps(L,q.w,cur,bw);
-  if(z.m==='man'&&nx!=null&&nx!=='')return {inc:+nx-cur,r:r,m:1};
-  return {inc:zBar(r),r:r,m:0};
+  return {inc:zBar(r),r:r,m:zManR(L,q.w)!=null?1:0};
 }
-function zSimReps(L,w,lest,bw){ var z=L.prog.zSim||ZSDEF, rm=rmOf(L)*(1+(+z.g||0)/100*w);
+function zManR(L,w){ var z=L.prog.zSim||ZSDEF, v=z.m==='man'&&z.R?z.R[w]:null; return (v==null||v==='')?null:+v; }   /* 06/11 (choix de Luka) : en manuel, reps du max out tapées */
+function zSimReps(L,w,lest,bw){ var mr=zManR(L,w); if(mr!=null)return mr; var z=L.prog.zSim||ZSDEF, rm=rmOf(L)*(1+(+z.g||0)/100*w);
   return Math.max(0,Math.floor((rm/(eff(L,bw)+lest)-1)/L.k+1+1e-9)); }
 function zUnitSess(t,k,P){
   var res=null;
@@ -3036,7 +3036,7 @@ var ZLAT={
         "Les pourcentages sont fixés une fois, puis translatés chaque semaine selon les reps du max out de la semaine d'avant (PDF p. 4) : 7 et plus → +2,5 kg ; 5-6 → +1,25 ; 4 ou moins → +0,5. Semaines pas encore faites : projetées à 7 reps (+2,5). Le réglage « Incrément » n'y sert pas.",
         "Les lignes à 100 % (max out, 3 × 3 du J1) sont arrondies au 0,25 kg pour garder les +0,5 ; les autres, au pas du mouvement.",
         "Séance du jour : une fois les reps du max out enregistrées, la charge du J1 suivant s'affiche sous la ligne : « Confirmer », ou tapez une autre charge (toute la semaine suit). Corriger les reps du max out annule la confirmation.",
-        "Bac à sable : max out simulé au niveau calculé par l'outil (reps prévues, puis barème), aux charges que vous saisissez, ou à 7 reps chaque semaine."],
+        "Bac à sable : max out simulé au niveau calculé par l'outil (reps prévues, puis barème), aux reps que vous saisissez, ou à 7 reps chaque semaine."],
   days:[{label:'J1',lines:[Z(95,3,'5',''),Z(100,3,'3','')]},
         {label:'J2',lines:[Z(85,2,'4','',1)]},
         {label:'J3',lines:[Z(100,1,'max','amrap')]}]},
@@ -5294,7 +5294,7 @@ function brGrid(prm){   /* lot 127 : prm = records à venir */
     });
   }); });
   var tx=function(x){ var zr=(x.role==='amrap'&&x.load!=null&&zsOn(S.lifts[x.li]))?zSimReps(S.lifts[x.li],+String(x.key).split('|')[2],x.load,S.bw):null;   /* lot 128 */
-    return x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+(zr!=null?'</b><br><span class="bgs">≈ '+zr+' reps</span><b>':''); };
+    return x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?sep+x.sets:'')+(zr!=null?'</b><br><span class="bgs">'+(zManR(S.lifts[x.li],+String(x.key).split('|')[2])!=null?zr+' reps (saisies)':'≈ '+zr+' reps')+'</span><b>':''); };
   var h=Object.keys(by).map(Number).sort(function(a,b){return a-b;}).map(function(li){
     var L=S.lifts[li], g=by[li]; g.days.sort(function(a,b){return ord.indexOf(a)-ord.indexOf(b);});
     if(g.days.length>4){ many=true; return ''; }
@@ -5325,13 +5325,13 @@ function zSimCtl(li,g){
   Object.keys(am).map(Number).sort(function(a,b){return a-b;}).forEach(function(w){
     ws.push(w); if(m==='pdf')return; var n=zSimReps(L,w,am[w],S.bw); low=n<=4?low+1:0; if(low===3&&warn==null)warn=w; });
   var o=function(v,t){return '<option value="'+v+'"'+(m===v?' selected':'')+'>'+t+'</option>';};
-  var h='<div class="zsim" data-zsi="'+li+'"><label>Max out simulé <select data-zs="m">'+o('calc','niveau calculé')+o('man','charges saisies')+o('pdf','7 reps chaque semaine (PDF)')+'</select></label>';
+  var h='<div class="zsim" data-zsi="'+li+'"><label>Max out simulé <select data-zs="m">'+o('calc','niveau calculé')+o('man','reps saisies')+o('pdf','7 reps chaque semaine (PDF)')+'</select></label>';
   if(m!=='pdf')h+=' <label>niveau <input class="numin" data-zs="g" type="text" inputmode="decimal" value="'+F(+z.g||0)+'" style="width:3.5em"> % par semaine</label>';
-  if(m==='man')h+='<div class="zsl">'+ws.slice(1).map(function(w){ var v=z.L&&z.L[w];
-    return '<label>S'+(w+1)+' <input class="numin" data-zs="L" data-w="'+w+'" type="text" inputmode="decimal" value="'+(v==null?'':F(v))+'" placeholder="'+F(am[w])+'"></label>'; }).join('')+'</div>';
+  if(m==='man')h+='<div class="zsl">'+ws.slice(0,-1).map(function(w){ var v=z.R&&z.R[w];
+    return '<label>S'+(w+1)+' <input class="numin" data-zs="R" data-w="'+w+'" type="text" inputmode="numeric" value="'+(v==null?'':v)+'" placeholder="'+zSimReps(L,w,am[w],S.bw)+'"></label>'; }).join('')+'</div>';
   h+='<p class="bgn">'+(m==='pdf'?'Chaque max out compté à 7 reps : +2,5 kg par semaine (optimiste).'
     :'≈ : reps prévues au max out par le calcul de l’outil (1RM de référence'+((+z.g||0)?', +'+F(+z.g)+' % par semaine':', niveau constant')+'), barème du PDF appliqué (7+ : +2,5 ; 5-6 : +1,25 ; 4 ou moins : +0,5).'+
-      (m==='man'?' Charges : lest des lignes à 100 % (J1 3 × 3 et max out) ; case vide = niveau calculé ; tout le reste de la semaine suit.':''))+
+      (m==='man'?' Cases : reps du max out de chaque semaine ; la semaine suivante en découle par le barème ; case vide = niveau calculé.':''))+
     (warn!=null?' <b>S'+(warn+1)+' : 3e max out d’affilée à 4 reps ou moins prévu ; le PDF arrêterait le run (test du 7-8RM), le brouillon ne le simule pas.</b>':'')+'</p></div>';
   return h;
 }
@@ -5713,7 +5713,7 @@ function buildPlan(){
           var u0_=fa&&fa.u0||0, zb=(zBarOn(t)||t.s36||t.sq)?zIncs(L,o.i,t,u,u0_):null, ztag='', sqS=t.sq===2&&P.sqTop==='1';   /* lot 52 (Z1, 3x6) */
           if(t.s36||t.sq){ refAdd=s0+P.inc*u0_+zb.s+dOff; refSys=bz+refAdd; }
           if(zb&&zb.last&&zb.last.k===u-1)ztag=t.sq?' · +'+F(zb.last.inc)+' kg'+(zb.last.inc===2.5?' (après un échec du run)':''):t.s36?(zb.last.inc===0.5?' · +0,5 kg (séance d\'avant à la limite)':'')
-            :(zb.last.sim?' · max out S'+(zb.last.w+1)+' simulé : '+(zb.last.sim.m?'charge saisie, ':'')+zb.last.sim.r+' reps prévues'+(zb.last.sim.m?'':' → +'+F(zb.last.inc)+' kg')
+            :(zb.last.sim?' · max out S'+(zb.last.w+1)+' simulé : '+zb.last.sim.r+(zb.last.sim.m?' reps saisies':' reps prévues')+' → +'+F(zb.last.inc)+' kg'
               :(zb.last.m?' · max out S'+(zb.last.w+1)+' : '+zb.last.r+' reps ; charge saisie : '+(zb.last.inc<0?'':'+')+F(zb.last.inc)+' kg':' · barème max out S'+(zb.last.w+1)+' : '+(zb.last.r!=null?zb.last.r+' reps':'pas encore fait, projeté à 7')+' → +'+F(zb.last.inc)+' kg')+(zb.last.r!=null&&!zb.last.c?' · à confirmer':''));   /* lot 128 */
           if(P.tpl==='interPeak'&&w>=6)ztag+=' · au-delà de 6 semaines (PDF : risque de régression)';   /* lot 52 (Z2) */
           day0.lines.forEach(function(li,li_i){
@@ -6431,7 +6431,7 @@ $('simout').addEventListener('change',function(ev){   /* lot 128 : max out simul
   var p=brSync().lifts[+box.dataset.zsi].prog, z=p.zSim||(p.zSim={m:ZSDEF.m}), v=num(String(t.value||'').replace(',','.'),null);
   if(t.dataset.zs==='m')z.m=t.value;
   else if(t.dataset.zs==='g')z.g=v==null?0:Math.max(-5,Math.min(5,v));
-  else if(t.dataset.zs==='L'){ z.L=z.L||{}; if(v==null)delete z.L[t.dataset.w]; else z.L[t.dataset.w]=v; }
+  else if(t.dataset.zs==='R'){ z.R=z.R||{}; if(v==null)delete z.R[t.dataset.w]; else z.R[t.dataset.w]=Math.max(0,Math.round(v)); }
   brStore(); brPlan();
 });
 $('simreset').addEventListener('click',function(){
