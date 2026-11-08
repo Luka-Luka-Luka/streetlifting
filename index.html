@@ -894,6 +894,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 <!-- ======================= SÉANCE DU JOUR ======================= -->
 <section class="page on" id="p-today">
   <div id="bkban"></div>
+  <div id="cpprop"></div>   <!-- v159 : propositions de Claude -->
   <div class="sesshead">
     <button class="iconbtn sq big44" id="tprev" title="Séance précédente" aria-label="Séance précédente">‹</button>
     <div class="sessmid">
@@ -1332,6 +1333,13 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <p class="note" id="ghst"></p>
       <div id="cofbox" style="margin-top:10px;border-top:1px solid var(--rule);padding-top:10px"></div>   <!-- lot S2 -->
     </div>
+    <div id="cppbox" style="margin-top:12px;border-top:1px solid var(--rule);padding-top:10px">   <!-- v159 -->
+      <h3 style="margin:0 0 6px;font-size:15px">Propositions de Claude</h3>
+      <p class="note" style="margin:0 0 8px">Claude dépose ses propositions de réglages dans le dépôt de sauvegardes ; elles apparaissent en haut de Séance du jour, avec Appliquer ou Refuser. Sans GitHub, collez ici le texte qu'il vous envoie.</p>
+      <textarea id="cpppaste" rows="3" style="width:100%;box-sizing:border-box" placeholder="Coller la proposition de Claude"></textarea>
+      <div class="btnrow" style="margin-top:6px"><button class="act ghost mini" id="cppread">Lire la proposition</button></div>
+      <p class="note" id="cppst"></p>
+    </div>
   </div>
 </section>
 
@@ -1401,7 +1409,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v157';   /* lot 74 */
+var APPV='v159';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1459,7 +1467,7 @@ document.addEventListener('input',function(ev){
 /* lot 109 (P1) : plusieurs personnes dans le même navigateur. Registre localStorage['cp-profiles'] = {cur, list:[{id,name}]}.
    SK(base) donne la clé de la personne courante : pour 'luka', exactement l'ancienne (aucune migration) ; sinon base+':'+id.
    cp-inbox (page vidéo) n'est pas par personne : il n'est lu que chez Luka. Changer de personne = enregistrer puis recharger. */
-var PKEYS=['cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page','cp-state-illisible'];   /* lot 119 : + copie illisible */
+var PKEYS=['cp-prop','cp-state','cp-state-backup','cp-drafts','cp-prog-brouillon','cp-seances-page','cp-state-illisible'];   /* lot 119 : + copie illisible */
 /* lot S2 : appareil prêté. La clé n'est qu'en sessionStorage (perdue à la fermeture de l'onglet) ; si le site s'ouvre avec
    la marque cp-guest mais sans clé de session, l'onglet a été fermé sans « Terminer » : on efface tout avant de charger. */
 function cpWipe(){
@@ -7544,6 +7552,7 @@ function ghHead(c){   /* {cs, at} du dernier commit du fichier ; cs '' s'il n'ex
 }
 function ghSync(mode){   /* mode : 'key' (clé enregistrée), 'now' (Envoyer maintenant), sinon automatique */
   return ghPull().then(function(){
+    cppFetch();   /* v159 */
     if(GHCONF)return;
     var s=ghSt();
     if(mode==='now'||(mode==='key'&&!s.sha))return ghPush(true);
@@ -7629,6 +7638,171 @@ $('ghconf').addEventListener('click',function(e){
     if(!confirm('Remplacer la version de GitHub par celle de cet appareil ?\n\nCe que l\'autre appareil a envoyé disparaît de l\'outil. GitHub en garde une copie dans l\'historique du dépôt.'))return;
     GHCONF=null; renderGhConf(); ghPush(true,true);
   } else { r.later=true; renderGhConf(); renderBackup(); }
+});
+
+/* v159 (08/11, choix de Luka) : propositions de Claude. Claude dépose propositions/<personne>.json dans le dépôt de
+   sauvegardes (ou Luka colle le même texte dans Sauvegarde). Carte « Claude propose » en haut de Séance du jour : une case
+   par ligne (avant → après, raison), « Appliquer la sélection » ou « Refuser ». Liste blanche : référence 1RM et son
+   origine ; réglages du bloc par mouvement (gabarit, départ, réserve, top set, incrément) ; début, semaines, objectif du
+   bloc ; date et charges du deload. Jamais séries, pesées, mouvements, personnes ni clé. Une ligne dont l'« avant » ne
+   correspond plus est décochée et signalée. Bloc en cours : 2e confirmation. Réponse notée dans S.claudeProps (part avec
+   la sauvegarde). Format : {id, date, titre, motif, lignes:[{quoi:'ref'|'refMode'|'prog'|'bloc'|'deload', mvt, champ,
+   avant, apres, pourquoi, libelle}]} ; ref : apres = {load, reps, rir, bw, date}. */
+var CPPF={prog:['tpl','startMode','rir','top','inc','repMode','prWeek','prDay','prLoad','prInc','hStart','hMan'],
+  bloc:['start','nwk','blockGoal'], deload:['d','load','sets','reps']};
+var CPPLAB={tpl:'gabarit',startMode:'charge de départ',rir:'réserve au 1er top set',top:'top set de départ (lest)',inc:'incrément',
+  repMode:'méthode du run',prWeek:'semaine de l\'objectif',prDay:'jour de l\'objectif',prLoad:'charge de l\'objectif',prInc:'objectif',
+  hStart:'départ',hMan:'départ manuel',start:'début du bloc',nwk:'nombre de semaines',blockGoal:'objectif du bloc',
+  d:'date du deload',load:'charge du deload',sets:'séries du deload',reps:'reps du deload'};
+var CPPV={startMode:{rir:'par réserve visée',pr:'par objectif',libre:'libre'},refMode:{fixe:'saisie, jamais corrigée',bloc:'reprise à la clôture du bloc',jour:'dernière série enregistrée'}};
+function cppGet(){ try{ return JSON.parse(localStorage.getItem(SK('cp-prop'))||'null'); }catch(e){ return null; } }
+function cppPut(o){ try{ if(o)localStorage.setItem(SK('cp-prop'),JSON.stringify(o)); else localStorage.removeItem(SK('cp-prop')); }catch(e){} }
+function cppDone(id){ return (S.claudeProps||[]).filter(function(x){ return x&&x.id===id; })[0]||null; }
+function cppLi(n){ var nm=String(n==null?'':n).trim().toLowerCase(), i=-1;
+  S.lifts.forEach(function(L,k){ if(i<0&&L&&(String(L.name).trim().toLowerCase()===nm||(L.catId&&L.catId===n)))i=k; }); return i; }
+function cppRef(q){ q=q||{}; var bw=+q.bw>0?+q.bw:null;
+  return {load:+q.load||0,reps:Math.max(1,+q.reps||1),rir:+q.rir||0,bw:bw==null?refBw(q):bw,bwe:bw==null,date:q.date||null}; }
+function cppVal(f,v){
+  if(v==null||v==='')return '—';
+  if(f==='tpl'){ var t=tplOf(v); return t?t.name:String(v); }
+  if(CPPV[f]&&CPPV[f][v])return CPPV[f][v];
+  if(f==='start'||f==='d')return frDate(String(v));
+  if(typeof v==='number')return F(v)+(['top','inc','prLoad','load'].indexOf(f)>=0?' kg':'');
+  return String(v);
+}
+function cppCur(x,L){   /* valeur actuelle, ou undefined si introuvable */
+  if(x.quoi==='ref')return L.ref?cppRef(L.ref):null;
+  if(x.quoi==='refMode')return L.refMode||'fixe';
+  if(x.quoi==='prog')return L.prog[x.champ];
+  if(x.quoi==='bloc')return S[x.champ];
+  if(x.quoi==='deload'){ var D=S.dload; if(!D||+D.b!==+S.blockId)return undefined;
+    if(x.champ==='d')return D.d; var q=(D.lines||[]).filter(function(y){ return +y.li===S.lifts.indexOf(L); })[0]; return q?q[x.champ]:undefined; }
+}
+function cppEq(x,a,b){
+  if(x.quoi==='ref')return !!a&&!!b&&+a.load===+b.load&&+a.reps===+b.reps&&+a.rir===+b.rir&&(a.date||null)===(b.date||null);
+  if(a==null||b==null)return (a==null||a==='')&&(b==null||b==='');
+  return (isFinite(+a)&&isFinite(+b)&&String(a).trim()!==''&&String(b).trim()!=='')?+a===+b:String(a)===String(b);
+}
+function cppCheck(o){   /* {err} ou {lines:[{x, L, li, bad, same, warn, cur}]} */
+  if(!o||typeof o!=='object'||!o.id||!Array.isArray(o.lignes)||!o.lignes.length)return {err:'il manque « id » ou « lignes »'};
+  return {lines:o.lignes.map(function(x){
+    var r={x:x||{}}; x=r.x;
+    var needL=x.quoi==='ref'||x.quoi==='refMode'||x.quoi==='prog'||(x.quoi==='deload'&&x.champ!=='d');
+    if(['ref','refMode','prog','bloc','deload'].indexOf(x.quoi)<0){ r.bad='réglage non permis ('+esc(x.quoi)+')'; return r; }
+    if(x.quoi==='prog'&&CPPF.prog.indexOf(x.champ)<0||x.quoi==='bloc'&&CPPF.bloc.indexOf(x.champ)<0||x.quoi==='deload'&&CPPF.deload.indexOf(x.champ)<0){ r.bad='réglage non permis ('+esc(x.champ)+')'; return r; }
+    if(needL){ r.li=cppLi(x.mvt); r.L=S.lifts[r.li]; if(!r.L){ r.bad='mouvement introuvable ('+esc(x.mvt)+')'; return r; } }
+    if(x.quoi==='ref'&&!(x.apres&&+x.apres.load>=0&&+x.apres.reps>=1)){ r.bad='référence incomplète'; return r; }
+    if(x.quoi==='refMode'&&!CPPV.refMode[x.apres]){ r.bad='origine inconnue'; return r; }
+    if(x.quoi==='prog'&&x.champ==='tpl'&&!tplOf(x.apres)&&x.apres!=='off'){ r.bad='gabarit inconnu ('+esc(x.apres)+')'; return r; }
+    if(x.quoi==='prog'&&x.champ==='startMode'&&!CPPV.startMode[x.apres]){ r.bad='charge de départ inconnue'; return r; }
+    if(x.quoi==='bloc'&&x.champ==='nwk'&&!(+x.apres>=1&&+x.apres<=24)){ r.bad='nombre de semaines impossible'; return r; }
+    if((x.champ==='start'||x.champ==='d')&&!/^\d{4}-\d\d-\d\d$/.test(String(x.apres))){ r.bad='date illisible (AAAA-MM-JJ)'; return r; }
+    r.cur=cppCur(x,r.L);
+    if(r.cur===undefined&&x.quoi==='deload'){ r.bad='pas de deload prévu'+(x.champ==='d'?'':' pour ce mouvement'); return r; }
+    var ap=x.quoi==='ref'?cppRef(x.apres):x.apres;
+    r.same=cppEq(x,r.cur,ap);
+    if(!r.same&&x.avant!==undefined&&!cppEq(x,r.cur,x.quoi==='ref'?cppRef(x.avant):x.avant))r.warn=1;
+    return r;
+  })};
+}
+function cppTxt(r){
+  var x=r.x, L=r.L, who=L?'<b>'+esc(L.name)+'</b>, ':'';
+  if(x.quoi==='ref')return who+'référence 1RM : '+(r.cur?cRefLab(L,r.cur):'aucune')+' → <b>'+cRefLab(L,cppRef(x.apres))+'</b>';
+  var lab=x.libelle?esc(x.libelle):(x.quoi==='refMode'?'origine du 1RM':CPPLAB[x.champ]||esc(x.champ));
+  var f=x.quoi==='refMode'?'refMode':x.champ;
+  if(!L)lab=lab.charAt(0).toUpperCase()+lab.slice(1);
+  return who+lab+' : '+esc(cppVal(f,r.cur))+' → <b>'+esc(cppVal(f,x.apres))+'</b>';
+}
+function renderCpp(){
+  var el=$('cpprop'); if(!el||!CPPF)return;   /* appelée avant la définition pendant le chargement */
+  var o=cppGet(); if(!o||!o.id||cppDone(o.id)){ el.innerHTML=''; renderCppBox(); return; }
+  var c=cppCheck(o); if(c.err){ el.innerHTML=''; renderCppBox(); return; }
+  var run=asgStarted();
+  el.innerHTML='<div class="bkban cpp"><b>Claude propose'+(o.titre?' : '+esc(o.titre):'')+'</b>'+(o.date?' <span class="muted">('+frDate(String(o.date))+')</span>':'')+
+    (o.motif?'<p class="note" style="margin:6px 0 0">'+esc(o.motif)+'</p>':'')+
+    c.lines.map(function(r,n){
+      var dis=r.bad||r.same, ck=!dis&&!r.warn;
+      return '<label class="chk cppl" style="margin:8px 0 0;align-items:flex-start"><input type="checkbox" data-cpl="'+n+'"'+(ck?' checked':'')+(dis?' disabled':'')+'><span>'+
+        (r.bad?'<s>'+esc(r.x.mvt||'')+' '+esc(r.x.champ||r.x.quoi||'')+'</s> <span class="muted">ignorée : '+r.bad+'</span>':cppTxt(r)+
+          (r.same?' <span class="muted">(déjà en place)</span>':'')+
+          (r.warn?'<br><span style="color:var(--warn)">⚠ La valeur a changé depuis que Claude l\'a lue. Cochez seulement si vous voulez quand même la remplacer.</span>':'')+
+          (r.x.pourquoi?'<br><span class="muted">'+esc(r.x.pourquoi)+'</span>':''))+'</span></label>';
+    }).join('')+
+    (run?'<p class="note" style="margin:8px 0 0">🔒 Bloc en cours : appliquer change les charges des séances à venir (confirmation demandée).</p>':'')+
+    '<div class="btnrow"><button class="act" data-cpp="ok">Appliquer la sélection</button><button class="act ghost" data-cpp="non">Refuser</button></div></div>';
+  renderCppBox();
+}
+function cppLog(o,res,st){
+  S.claudeProps=(S.claudeProps||[]).concat([{id:o.id,titre:o.titre||'',at:new Date().toISOString(),res:res,l:st,src:o.src||''}]).slice(-50);
+}
+function cppApply(){
+  var o=cppGet(), c=o&&cppCheck(o); if(!c||c.err||cppDone(o.id)||LOADBAD||STALE||BRSWAP)return;
+  var sel=[].slice.call(document.querySelectorAll('#cpprop [data-cpl]')).filter(function(b){ return b.checked&&!b.disabled; }).map(function(b){ return +b.dataset.cpl; });
+  if(!sel.length){ alert('Aucune ligne cochée. Pour ne rien changer, touchez « Refuser ».'); return; }
+  if(asgStarted()&&!confirm('Bloc en cours.\n\nAppliquer '+sel.length+' ligne'+(sel.length>1?'s':'')+' change le programme en cours : les charges des séances à venir seront recalculées. Les séries déjà notées ne bougent pas.\n\nAppliquer ?'))return;
+  undoKeep('Propositions de Claude appliquées.');
+  try{ localStorage.setItem(SK('cp-state-backup'),JSON.stringify(S)); }catch(e){}
+  /* le gabarit d'abord : le changer remet le top set et la réserve aux valeurs du gabarit */
+  var ord=sel.slice().sort(function(a,b){ var ta=c.lines[a].x.champ==='tpl'?0:1, tb=c.lines[b].x.champ==='tpl'?0:1; return ta-tb||a-b; });
+  var st=c.lines.map(function(r,n){ return r.bad?'ignoree':r.same?'deja':'non'; });
+  ord.forEach(function(n){
+    var r=c.lines[n], x=r.x, L=r.L;
+    if(x.quoi==='ref'){ var a=x.apres; L.ref=L.ref||{}; L.ref.load=+a.load; L.ref.reps=Math.max(1,+a.reps); L.ref.rir=+a.rir||0;
+      L.ref.bw=+a.bw>0?+a.bw:null; L.ref.date=a.date||null; L.ref.est=false; }
+    else if(x.quoi==='refMode')L.refMode=x.apres;
+    else if(x.quoi==='prog'){ if(x.champ==='tpl'&&x.apres==='off')L.prog.tpl='off';
+      else if(asgSet({dataset:{i:String(r.li),f:x.champ},value:String(x.apres==null?'':x.apres),checked:!!x.apres})===null){ st[n]='refusee'; return; } }
+    else if(x.quoi==='bloc'){ if(x.champ==='nwk')S.nwk=+x.apres; else S[x.champ]=x.champ==='blockGoal'?String(x.apres||''):x.apres; }
+    else if(x.quoi==='deload'){ var D=S.dload;
+      if(x.champ==='d')D.d=x.apres;
+      else (D.lines||[]).forEach(function(q){ if(+q.li===r.li)q[x.champ]=x.champ==='reps'?String(x.apres):+x.apres; }); }
+    st[n]='ok';
+  });
+  var nOk=st.filter(function(s){ return s==='ok'; }).length;
+  cppLog(o,st.indexOf('non')<0&&st.indexOf('refusee')<0?'ok':'part',st);   /* déjà en place et ignorées ne comptent pas */
+  save(); renderAll(); renderBackup();
+  msgBar('Claude : '+nOk+' réglage'+(nOk>1?'s':'')+' appliqué'+(nOk>1?'s':'')+'. Sauvegarde › Annuler l\'import pour revenir en arrière.',1);
+}
+function cppRefuse(){
+  var o=cppGet(); if(!o||cppDone(o.id))return;
+  if(!confirm('Refuser toute la proposition ? Rien ne change ; Claude verra votre refus dans la sauvegarde.'))return;
+  cppLog(o,'non',(o.lignes||[]).map(function(){ return 'non'; })); save(); renderCpp();
+}
+$('cpprop').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-cpp]'):null; if(!b)return;
+  if(b.dataset.cpp==='ok')cppApply(); else cppRefuse();
+});
+function cppTake(o,src){   /* garde une proposition à montrer ; false si déjà répondue */
+  if(!o||!o.id)return false;
+  if(cppDone(o.id))return false;
+  var cur=cppGet(); if(cur&&cur.id===o.id&&JSON.stringify(cur.lignes)===JSON.stringify(o.lignes))return true;
+  o.src=src; cppPut(o); renderCpp(); return true;
+}
+function cppFetch(){
+  var c=ghCfg(); if(!c||LOADBAD||STALE)return Promise.resolve();
+  var prof=PROF.cur;
+  return fetch('https://api.github.com/repos/'+c.repo+'/contents/propositions/'+encodeURIComponent(prof)+'.json',{cache:'no-store',
+    headers:{'Authorization':'Bearer '+c.tok,'Accept':'application/vnd.github.raw','X-GitHub-Api-Version':'2022-11-28'}})
+    .then(function(r){ return r.ok?r.text():null; })
+    .then(function(t){ if(t==null||PROF.cur!==prof)return; var o=null; try{ o=JSON.parse(t); }catch(e){ return; } cppTake(o,'github'); })
+    .catch(function(){});
+}
+function renderCppBox(){
+  var el=$('cppst'); if(!el)return;
+  var o=cppGet(), h=(S.claudeProps||[]).slice(-3).reverse();
+  var R={ok:'appliquée',part:'appliquée en partie',non:'refusée'};
+  el.innerHTML=(o&&o.id&&!cppDone(o.id)?'Une proposition attend votre réponse en haut de Séance du jour. ':'')+
+    (h.length?'Dernières réponses : '+h.map(function(x){ return frDate(String(x.at).slice(0,10))+(x.titre?' « '+esc(x.titre)+' »':'')+' : '+(R[x.res]||x.res); }).join(' ; ')+'.':'Aucune proposition reçue pour l\'instant.');
+}
+$('cppread').addEventListener('click',function(){
+  var t=String($('cpppaste').value||''), a=t.indexOf('{'), z=t.lastIndexOf('}'), o=null;
+  if(a>=0&&z>a){ try{ o=JSON.parse(t.slice(a,z+1)); }catch(e){} }
+  if(!o){ alert('Texte illisible : collez tout le bloc envoyé par Claude, des accolades { … } comprises.'); return; }
+  var c=cppCheck(o); if(c.err){ alert('Ce n\'est pas une proposition de Claude : '+c.err+'.'); return; }
+  var d=cppDone(o.id); if(d){ alert('Vous avez déjà répondu à cette proposition le '+frDate(String(d.at).slice(0,10))+'.'); return; }
+  cppTake(o,'colle'); $('cpppaste').value='';
+  var nb=document.querySelector('#nav [data-p="today"]'); if(nb)nb.click();
+  window.scrollTo(0,0);
 });
 
 
@@ -12770,6 +12944,7 @@ function renderAll(){
   if(CTOUCH)renderCharges(); else fillCharges();
   bestNote(); renderPct(); renderCatPick(); renderCatList(); renderAssign(); renderSim();
   generate(); renderToday(); renderData(); renderBilan(); renderVelo(); applyFolds(); chInfo();   /* lot 75 */
+  renderCpp();   /* v159 */
 }
 $('showacc').addEventListener('change',function(){
   S.showAcc=this.checked; $('accchip').classList.toggle('on',S.showAcc); save(); generate(); applyFolds();
