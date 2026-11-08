@@ -1401,7 +1401,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v156';   /* lot 74 */
+var APPV='v157';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -8077,6 +8077,51 @@ function srssClick(ev){
   save(); renderForm(); return true;
 }
 
+/* v157 (réponses de Luka du 08/11) : bilan de la semaine écoulée, au J1 (le dimanche), avant la 1re série, en volet
+   repliable. « Rien à signaler » en premier ; trois puces (sommeil, nutrition, charge de vie et travail physique) ; trois
+   champs libres facultatifs. S.wkb['bloc|semaine du J1'] = {ok, som, nut, vie, bien, coin, tech, d}. Luka seulement. */
+var WKBQ=[{k:'som',t:'Sommeil',o:['bon','moyen','mauvais']},{k:'nut',t:'Nutrition',o:['suivie','écarts','plus de déficit que prévu']},
+  {k:'vie',t:'Charge de vie et travail physique',o:['léger','moyen','lourd']}];
+var WKBT=[{k:'bien',t:'Ce qui a bien marché'},{k:'coin',t:'Ce qui a coincé'},{k:'tech',t:'Repère technique travaillé (dips, tractions)'}];
+var WKBO=false;
+function wkbOn(k){ return srssOn()&&!!k&&String(k).split('|')[1]==='J1'&&+String(k).split('|')[0]>=0; }
+function wkbKey(k,bid){ return (bid==null?(+S.blockId||1):+bid)+'|'+String(k).split('|')[0]; }
+function wkbN(a){ if(!a)return 0; var n=WKBQ.filter(function(q){return a[q.k];}).length+WKBT.filter(function(q){return String(a[q.k]||'').trim();}).length; return n+(a.ok?1:0); }
+function wkbHTML(k){
+  if(!wkbOn(k))return '';
+  var a=(S.wkb||{})[wkbKey(k)]||{}, w=+String(k).split('|')[0];
+  var sum=a.ok?'<b>rien à signaler</b>':wkbN(a)?'<b>'+WKBQ.filter(function(q){return a[q.k];}).map(function(q){return q.t.split(' ')[0].toLowerCase()+' '+a[q.k];}).join(' · ')+'</b>':(S.done[k]?'':'à faire');
+  var h='<details class="fmore" data-wkbo'+(WKBO?' open':'')+' style="margin-top:8px"><summary class="note">Bilan de la semaine '+(w?'S'+w:'d’avant')+(sum?' : '+sum:'')+'</summary>'+
+    '<div class="pillrow" style="margin-top:6px"><button class="pill" data-wkb="ok|1" aria-pressed="'+(!!a.ok)+'">Rien à signaler</button></div>'+
+    WKBQ.map(function(q){ return '<p class="note" style="margin:6px 0 2px;color:var(--ink)">'+q.t+'</p><div class="pillrow">'+q.o.map(function(o){
+      return '<button class="pill sub" data-wkb="'+q.k+'|'+esc(o)+'" aria-pressed="'+(a[q.k]===o)+'">'+esc(o)+'</button>'; }).join('')+'</div>'; }).join('')+
+    WKBT.map(function(q){ return '<div class="field w" style="margin-top:6px"><label>'+q.t+' <span class="muted">(facultatif)</span></label><textarea rows="2" data-wkbt="'+q.k+'">'+esc(a[q.k]||'')+'</textarea></div>'; }).join('')+
+    '</details>';
+  return h;
+}
+function wkbGet(k){ if(!S.wkb)S.wkb={}; var kk=wkbKey(k); return S.wkb[kk]||(S.wkb[kk]={}); }
+function wkbClean(k){ var kk=wkbKey(k), a=S.wkb&&S.wkb[kk]; if(!a)return; if(!wkbN(a))delete S.wkb[kk]; else a.d=todayISO(); }
+function wkbClick(ev){
+  var b=ev.target.closest?ev.target.closest('button[data-wkb]'):null; if(!b)return false;
+  var k=S.tsel; if(!k)return true; var p=b.dataset.wkb.split('|'), a=wkbGet(k);
+  if(p[0]==='ok'){ if(a.ok)delete a.ok; else a.ok=1; } else { if(a[p[0]]===p[1])delete a[p[0]]; else { a[p[0]]=p[1]; delete a.ok; } }
+  wkbClean(k); WKBO=true; save(); renderForm(); return true;
+}
+function wkbList(bid){   /* [{w, a}] du bloc bid, par semaine */
+  return Object.keys(S.wkb||{}).filter(function(x){return x.split('|')[0]===String(bid);}).map(function(x){return {w:+x.split('|')[1],a:S.wkb[x]};})
+    .sort(function(x,y){return x.w-y.w;});
+}
+function wkbLine(x){
+  var a=x.a, t=[]; if(a.ok)t.push('rien à signaler');
+  WKBQ.forEach(function(q){ if(a[q.k])t.push(q.t.toLowerCase()+' '+a[q.k]); });
+  WKBT.forEach(function(q){ var v=String(a[q.k]||'').trim(); if(v)t.push(q.t+' : '+v); });
+  return {lab:x.w?'Semaine S'+x.w+' (notée au S'+(x.w+1)+' J1)':'Semaine d’avant le bloc (notée au S1 J1)',t:t.join(' ; ')};
+}
+function wkbBilan(bid){
+  var l=wkbList(bid); if(!l.length)return '';
+  return '<details class="chd" data-chd="wkb'+bid+'"><summary>Bilans de semaine : <b>'+l.length+'</b></summary>'+l.map(function(x){ var r=wkbLine(x);
+    return '<p class="note"><b>'+r.lab+'</b> : '+esc(r.t)+'</p>'; }).join('')+'</details>';
+}
 function renderForm(){
   var k=S.tsel;
   if(!k){$('formrows').innerHTML='';$('formnote').textContent='';var hd0=$('formhd'); if(hd0)hd0.innerHTML='';return;}
@@ -8088,6 +8133,7 @@ function renderForm(){
       return '<button class="pill'+(v%1?' demi':'')+'" data-fq="gen" data-fv="'+v+'" aria-pressed="'+(f.gen===v)+'">'+F(v)+'</button>';
     }).join('')+'</div>')+
     (us?'':f.gen?'<p class="note" style="margin:6px 0 0;color:var(--ink)"><b>'+formAnch(f.gen)+'</b></p>':'')+
+    wkbHTML(k)+   /* v157 : bilan de la semaine, au J1 */
     '<details class="fmore" data-fmore'+(FMORE?' open':'')+'><summary class="note">'+fmoreSum(k,tg)+'</summary>'+   /* lot 73 */
     '<div class="pillrow dtags" style="margin-top:6px">'+DTAGS.map(function(q){   /* lot 59 */
       return '<button class="pill" data-dtag="'+q[0]+'" aria-pressed="'+(tg.indexOf(q[0])>=0)+'">'+q[1]+'</button>';}).join('')+'</div>'+painHTML(k);   /* lot 70 (Q31) */
@@ -8117,7 +8163,11 @@ function renderForm(){
   renderFin();   /* lot 44 (R9) */
 }
 var FMORE=false;   /* lot 73 : le repli de la forme reste ouvert d'un rendu à l'autre */
-$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-arsswrap'))ARSSO=!!d.open; },true);
+$('formrows').addEventListener('toggle',function(ev){ var d=ev.target; if(d&&d.hasAttribute&&d.hasAttribute('data-fmore'))FMORE=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-arsswrap'))ARSSO=!!d.open; if(d&&d.hasAttribute&&d.hasAttribute('data-wkbo'))WKBO=!!d.open; },true);
+$('formrows').addEventListener('input',function(ev){   /* v157 : champs libres du bilan de la semaine */
+  var t=ev.target; if(!t||!t.dataset||!t.dataset.wkbt||!S.tsel)return; var a=wkbGet(S.tsel), v=String(t.value);
+  if(v.trim())a[t.dataset.wkbt]=v; else delete a[t.dataset.wkbt]; wkbClean(S.tsel); save();
+});
 function fmoreSum(k,tg){
   var pp=(S.pain||{})[painKey(k)], n=tg.length+(pp?Object.keys(pp).length:0), t=String((S.dayNotes||{})[k]||'').trim();
   var a=[]; if(n)a.push(n+' noté'+(n>1?'s':'')); if(t)a.push('texte');
@@ -8128,6 +8178,7 @@ $('formtxt').addEventListener('input',function(){
   var t=document.querySelector('#todayout [data-note="day"]'); if(t&&t.dataset.k===k)t.value=this.value;
 });
 $('formrows').addEventListener('click',function(ev){
+  if(wkbClick(ev))return;   /* v157 */
   if(srssClick(ev))return;   /* lot 141 */
   var md=ev.target.closest?ev.target.closest('[data-fmode]'):null;
   if(md){ S.formMode=md.dataset.fmode; save(); renderForm(); return; }
@@ -9568,9 +9619,9 @@ function blockStats(from,to){
       bw0:bws.length?+bws[0].bw:null, bw1:bws.length?+bws[bws.length-1].bw:null};
   })};
 }
-function statsHTML(st){
-  return st.lifts.map(function(b){
-    if(!b.n&&!b.nEx)return '<p class="note"><b class="n'+col(b.i)+'">'+esc(b.name)+'</b> \u2014 rien d\'enregistr\u00e9.</p>';
+function statsHTML(st){   /* v157 : les mouvements sans rien tiennent sur une ligne */
+  var nil=st.lifts.filter(function(b){return !b.n&&!b.nEx;}).map(function(b){return esc(b.name);});
+  return st.lifts.filter(function(b){return b.n||b.nEx;}).map(function(b){
     var d=(b.best!=null&&b.first!=null)?(b.best-b.first):null;
     return '<p class="note"><b class="n'+col(b.i)+'">'+esc(b.name)+'</b> \u2014 '+
       b.n+' s\u00e9rie'+(b.n>1?'s':'')+' valid\u00e9e'+(b.n>1?'s':'')+
@@ -9582,7 +9633,7 @@ function statsHTML(st){
         :' \u00b7 aucune s\u00e9rie exploitable : pas de progression mesurable')+
       (b.bw0!=null&&b.bw1!=null&&Math.abs(b.bw1-b.bw0)>=0.3?' \u00b7 poids de corps '+F(b.bw0)+' \u2192 '+F(b.bw1)+' kg':'')+
       '.</p>';
-  }).join('');
+  }).join('')+(nil.length?'<p class="note muted">Rien d\'enregistr\u00e9 : '+nil.join(', ')+'.</p>':'');
 }
 function formStats(src){
   var fo=src||S.form||{}, v=[]; for(var k in fo){ var t=formSum(fo[k]); if(t!=null)v.push(t); }
@@ -9591,11 +9642,14 @@ function formStats(src){
   return {n:v.length,avg:v.reduce(function(a,b){return a+b;},0)/v.length,mx:mx,
           lo:Math.min.apply(null,v),hi:Math.max.apply(null,v)};
 }
-function formLine(st){
-  var f=(st===undefined)?formStats():st;
-  if(!f)return '';
-  return ' \u00b7 forme moyenne ' + F(Math.round(f.avg*10)/10) + '/' + (f.mx||20) + ' sur ' + f.n +
+function srssCount(fo){ var n=0; fo=fo||{}; for(var k in fo){ if(fo[k]&&srssN(fo[k].srss))n++; } return n; }   /* v157 */
+function formLine(st,fo){   /* v157 : fo = formes du bloc, pour compter les séances notées en SRSS */
+  var f=(st===undefined)?formStats():st, h='';
+  if(f)h=' \u00b7 forme moyenne ' + F(Math.round(f.avg*10)/10) + '/' + (f.mx||20) + ' sur ' + f.n +
     ' s\u00e9ance' + (f.n>1?'s':'') + ' not\u00e9e' + (f.n>1?'s':'') + ' (de ' + F(f.lo) + ' \u00e0 ' + F(f.hi) + ')';
+  var n=srssCount(fo===undefined?(st===undefined?S.form:null):fo);
+  if(n)h+=' \u00b7 SRSS not\u00e9e sur '+n+' s\u00e9ance'+(n>1?'s':'');
+  return h;
 }
 function blockNotesHTML(b){   /* B21 : notes archivées à la clôture */
   var dn=b.dayNotes||{}, nb=String(b.note||'').trim();
@@ -9768,7 +9822,11 @@ function mdSub(L,e){   /* détails d'une série : forme, validité, heures, reco
 function mdForm(f){
   if(!f)return '';
   var qs=formQ().concat(FORMALL);
-  return qs.filter(function(q){return typeof f[q.k]==='number';}).map(function(q){return q.n+' '+F(f[q.k])+'/5';}).join(', ');
+  var t=qs.filter(function(q){return typeof f[q.k]==='number';}).map(function(q){return q.n+' '+F(f[q.k])+'/5';}).join(', ');
+  if(srssN(f.srss)){ var s=f.srss;   /* v157 : la SRSS manquait dans l'export */
+    t+=(t?' ; ':'')+'SRSS ('+srssN(s)+'/8, de 0 à 6) : '+['r','s'].map(function(g){ return (g==='r'?'récupération ':'stress ')+
+      SRSS.filter(function(q){return q.g===g&&s[q.k]!=null;}).map(function(q){return (srssFr()?q.fr:q.en)+' '+s[q.k];}).join(', '); }).join(' ; '); }
+  return t;
 }
 function mdBlock(bid){
   bid=+bid; var cur=(bid===(+S.blockId||1)), b=cur?null:(S.blocks||[]).filter(function(x){return +x.id===bid;})[0];
@@ -9799,7 +9857,7 @@ function mdBlock(bid){
   p('- Forme : T = training (par défaut), C = clean (jambes gainées). Validité des reps : valide, franche, douteuse, trichée, ratée de peu, échec.');
   p('- Vidéo : montée en s, vitesses en m/s, hauteur en cm.');
   p('- Échauffement « non saisi » : il n’a pas été retouché dans la séance ; le modèle proposé est indiqué, rien ne dit qu’il a été suivi.');
-  p('- Forme du jour : notée de 1 à 5 (5 = au mieux).');
+  p('- Forme du jour : notée de 1 à 5 (5 = au mieux), ou SRSS : 8 notes de 0 à 6, par rapport à votre meilleur état (récupération : 6 = au mieux ; stress : 6 = au pire).');
   p('- « 1RM prédit » : courbe ajustée sur les séries à réserve connue. « 1RM estimé » des records : formule appliquée série par série. Les deux peuvent différer.');
   p('');
   p('## Contexte du bloc');
@@ -9808,7 +9866,7 @@ function mdBlock(bid){
   var tp=cur?S.lifts.map(function(L){var t=tplOf(L.prog.tpl); return L.name+' : '+(t?t.name:L.prog.tpl)+', +'+F(L.prog.inc)+' kg';}):(b.tpl||[]);
   if(tp.length)p('- Gabarits : '+tp.join(' ; '));
   if(cur)p('- PdC actuel : '+F(S.bw)+' kg');
-  var fl=mdTxt(formLine(cur?undefined:(b.form||null))).join(' ').replace(/^·\s*/,''); if(fl)p('- '+fl.charAt(0).toUpperCase()+fl.slice(1));
+  var fl=mdTxt(formLine(cur?undefined:(b.form||null),cur?S.form:(b.formData||{}))).join(' ').replace(/^·\s*/,''); if(fl)p('- '+fl.charAt(0).toUpperCase()+fl.slice(1));
   var ds=cur?blockDescs():(b.desc||[]); if(ds.length)p('- Exécution : '+ds.map(function(x){return x.n+' : '+x.d;}).join(' ; '));
   var nb=String(cur?S.blockNote||'':b.note||'').trim(); if(nb)p('- Note de bloc : '+nb);
   p('');
@@ -9982,6 +10040,7 @@ function mdAll(){ return S.mdAll!==false; }
 function claudeExport(bid){
   bid=+bid; var o=[mdBlock(bid).replace(/\n+$/,'')];
   var cq=rtA(bid).cq; if(cq&&String(cq).trim())o.unshift('## Questions de Luka pour Claude\n\n'+String(cq).trim()+'\n');   /* lot 146 */
+  var wl=wkbList(bid); if(wl.length){ o.push(''); o.push('## Bilans de semaine (ressenti noté au J1, sur la semaine écoulée)'); wl.forEach(function(x){ var r=wkbLine(x); o.push('- '+r.lab+' : '+r.t); }); }   /* v157 */
   var ap=fqB(bid)?apprLines(bid):[];
   if(ap.length){ o.push(''); o.push('## Bilan d’apprentissage'); ap.forEach(function(x){ o.push('- '+x.b+' : '+x.s.replace(/<[^>]+>/g,'')); }); }
   if(fqB(bid)){ var rm=rtMd(bid); if(rm.length){ o.push(''); o.push('## Retour détaillé de fin de bloc (ressenti, à lire avec prudence)'); rm.forEach(function(x){o.push(x);}); } }   /* lot 146 */
@@ -10291,22 +10350,39 @@ function blocCmp(){
     }).filter(Boolean);
     if(rows.length)h+='<h3 class="rkh">'+esc(L.name)+'</h3><div class="scroll"><table class="bcmp" data-bcmp><thead><tr><th>bloc</th><th>meilleure</th><th>1RM est.</th><th>écart</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
   });
-  return h?'<p class="ctitle" style="margin-top:0">Les blocs comparés</p>'+h+
-    '<p class="note">Meilleure : la série la plus lourde du bloc. 1RM est. : le 1RM estimé, le meilleur de vos séries à réserve notée, en PdC + lest pour les mouvements au poids du corps. Écart : avec le bloc précédent. Le détail de chaque bloc suit.</p>'+
-    '<div style="border-top:1px solid var(--rule);margin:12px 0 8px"></div>':'';
+  return h?h+
+    '<p class="note">Meilleure : la série la plus lourde du bloc. 1RM est. : le 1RM estimé, le meilleur de vos séries à réserve notée, en PdC + lest pour les mouvements au poids du corps. Écart : avec le bloc précédent.</p>':'';
+}
+/* v157 : un bloc à la fois, choisi par les boutons du haut (BSEL, non enregistré). Par défaut, le bloc en cours ; tant
+   qu'il n'a aucune séance faite, le dernier bloc clos. La clôture montre le bloc clos, questionnaire en tête s'il reste à remplir. */
+var BSEL=null;
+function bselOf(nd){
+  var cur=+S.blockId||1, ids=[cur].concat((S.blocks||[]).map(function(b){return +b.id;}));
+  if(BSEL!=null&&ids.indexOf(+BSEL)>=0)return +BSEL;
+  var bs=S.blocks||[], lb=bs[bs.length-1];
+  return (!nd&&lb)?+lb.id:cur;
 }
 function renderBilan(){
   buildPlan();
   var sess=sessions(), nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
-  var h=blocCmp()+'<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
+  var cur=+S.blockId||1, sel=bselOf(nd), bc=blocCmp();
+  var h='<div class="pillrow" style="margin:0 0 8px">'+[cur].concat((S.blocks||[]).slice().reverse().map(function(b){return +b.id;})).map(function(id){
+      return '<button type="button" class="pill" data-bsel="'+id+'" aria-pressed="'+(id===sel)+'">Bloc '+id+(id===cur?' · en cours':'')+'</button>'; }).join('')+'</div>'+
+    (bc?'<details class="chd" data-chd="bcmp"><summary>Les blocs comparés : meilleure série et 1RM estimé, bloc par bloc</summary>'+bc+'</details>':'');
+  if(sel===cur){
+    h+='<p class="note" style="margin-top:0"><b>Bloc '+S.blockId+', en cours</b> \u2014 '+
     (S.start?'depuis le '+frDate(S.start):'aucune date de d\u00e9but')+' \u00b7 '+nd+'/'+sess.length+' s\u00e9ances marqu\u00e9es faites'+formLine()+'.</p>'+
-    statsHTML(blockStats(S.start||null,null))+bilanPente(+S.blockId||1)+painBilan(+S.blockId||1,nd)+bxHTML(bilanX(+S.blockId||1))+chgHTML(+S.blockId||1,null)+mdBtn(+S.blockId||1);   /* lot 126 */   /* lot 55 */   /* lot 54 */
-  if(S.blocks.length){
-    h+=S.blocks.slice().reverse().map(function(b){
-      return '<div style="border-top:1px solid var(--rule);margin-top:12px;padding-top:8px">'+
+    statsHTML(blockStats(S.start||null,null))+bilanPente(+S.blockId||1)+wkbBilan(+S.blockId||1)+painBilan(+S.blockId||1,nd)+bxHTML(bilanX(+S.blockId||1))+chgHTML(+S.blockId||1,null)+mdBtn(+S.blockId||1);   /* lot 126 */   /* lot 55 */   /* lot 54 */
+  }else{
+    h+=(S.blocks||[]).filter(function(b){return +b.id===sel;}).map(function(b){
+      var bs=S.blocks||[], fqd=fqN(+b.id)>=fqVis(+b.id).length||b!==bs[bs.length-1], fq=fqHTML(b);   /* « À faire » : dernier bloc clos seulement */
+      return '<div>'+
         '<p class="note" style="margin-top:0"><b>Bloc '+b.id+'</b>'+(b.learn?' <span class="lrn">bloc d’apprentissage</span>':'')+' <button class="linkbtn" data-learn="'+b.id+'">'+(b.learn?'retirer ce signal':'bloc d’apprentissage ?')+'</button> \u2014 '+frDate(b.from)+' \u2192 '+frDate(b.to)+
-        ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+(b.form?formLine(b.form):'')+' \u00b7 '+(b.tpl||[]).map(esc).join(' \u00b7 ')+'</p>'+
-        statsHTML(b.stats)+bilanPente(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+chgHTML(+b.id,b)+blockNotesHTML(b)+blockDescHTML(b)+blockEditHTML(b)+apprHTML(+b.id)+fqHTML(b)+mdBtn(b.id)+'</div>';   /* lot 83 */   /* lot 59 */   /* lot 55 */
+        ' \u00b7 '+b.doneN+'/'+b.sess+' s\u00e9ances faites'+formLine(b.form||null,b.formData||{})+'.</p>'+
+        (fqd?'':'<p class="ctitle">À faire</p>'+fq)+
+        statsHTML(b.stats)+bilanPente(+b.id)+wkbBilan(+b.id)+bilanNext(+b.id)+painBilan(+b.id,b.doneN)+blockGoalHTML(b)+bxHTML(b.bx)+chgHTML(+b.id,b)+blockNotesHTML(b)+blockDescHTML(b)+
+        ((b.tpl||[]).length?'<details class="chd" data-chd="btpl"><summary>Gabarits du bloc</summary><p class="note">'+(b.tpl||[]).map(esc).join('<br>')+'</p></details>':'')+
+        blockEditHTML(b)+apprHTML(+b.id)+(fqd?fq:'')+mdBtn(b.id)+'</div>';   /* lot 83 */   /* lot 59 */   /* lot 55 */
     }).join('');
   }
   h+='<p class="note" style="margin-top:12px">Le 1RM pr\u00e9dit vient de vos s\u00e9ries \u00e0 r\u00e9serve connue, pas de la r\u00e9f\u00e9rence '+
@@ -10329,6 +10405,44 @@ function askRefTake(L,e){
     'Meilleure série du bloc :\n  '+refTxt(L,r)+'\n\nRéférence actuelle :\n  '+refTxt(L,cu)+
     '\n\nLa reprendre comme référence ?'))return;
   L.ref.load=r.load; L.ref.reps=r.reps; L.ref.rir=r.rir; L.ref.bw=r.bwe?null:r.bw; L.ref.date=r.date; L.ref.est=false;
+}
+/* v157 (choix 9 de Luka, 08/11) : à la clôture, la référence du bloc suivant se choisit dans le panneau, mouvement par
+   mouvement : dernière série à réserve 0 à 1 du bloc (proposée d'office : la meilleure série est souvent à réserve 2-3,
+   donc plus extrapolée), meilleure série du bloc, ou référence actuelle. */
+function lastHard(L,bid){
+  var i=S.lifts.indexOf(L); if(isM(L))return null;
+  var es=S.log.filter(function(e){ return e.li===i&&['top','amrap','pr'].indexOf(e.role)>=0&&e.rir!=null&&+e.rir<=1&&!e.doubt&&!tpOutE(e)&&
+    e.sets&&e.sets.length&&e.sets[e.sets.length-1]&&blockOfEntry(e)===bid&&!serieTrichee(e); });
+  if(!es.length)return null;
+  es.sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||''))||((+a.load||0)-(+b.load||0)); });
+  return es[es.length-1];
+}
+function refSame(a,b){ return a&&b&&+a.load===+b.load&&+a.reps===+b.reps&&+a.rir===+b.rir&&(a.date||null)===(b.date||null); }
+function refCands(bid){   /* [{li, h, b, k, def}] : h = dernière à réserve 0-1, b = meilleure, k = actuelle */
+  var o=[];
+  S.lifts.forEach(function(L,li){
+    var eb=lastExploitable(L,true,bid); if(!eb)return;
+    var eh=lastHard(L,bid), h=eh?entryToRef(eh):null, b=entryToRef(eb), fx=(L.refMode||'fixe')==='fixe';
+    var q=fx?(L.ref||{}):(L.refBlock||null), k=q?{load:+q.load||0,reps:+q.reps||1,rir:+q.rir||0,bw:refBw(q),bwe:!hasBw(q),date:q.date||null}:null;
+    if(h&&refSame(h,b))b=null;
+    if(k&&(refSame(k,h)||refSame(k,b)))k=null;
+    if(!h&&!b)return;
+    o.push({li:li,h:h,b:b,k:k,def:h?'h':(fx&&k?'k':'b')});
+  });
+  return o;
+}
+function cRefLab(L,r){
+  var sys=e1rm(L,r.load,r.reps,r.rir,r.bw)-eff(L,r.bw)+bwZ(L,r.bw);
+  return loadKg(L,r.load)+' '+S.sep+' '+r.reps+', réserve '+F(r.rir)+', PdC '+F(r.bw)+(r.bwe?' (estimé)':'')+(r.date?', le '+frDate(r.date):'')+
+    ' <span class="muted">(1RM système '+F(Math.round(sys*10)/10)+' kg)</span>';
+}
+function refBoxHTML(c){
+  if(!c.refs||!c.refs.length)return '';
+  return '<p class="note" style="margin-top:10px"><b>Référence 1RM du bloc suivant</b> : les charges du bloc suivant partent de cette série.</p>'+
+    c.refs.map(function(x){ var L=S.lifts[x.li], ch=c.ref[x.li]||x.def;
+      var opt=function(v,t,r){ return r?'<label class="chk" style="margin:2px 0"><input type="radio" name="cref'+x.li+'" data-cref="'+x.li+'|'+v+'"'+(ch===v?' checked':'')+'><span>'+t+' : '+cRefLab(L,r)+'</span></label>':''; };
+      return '<fieldset style="margin-top:6px"><legend>'+esc(L.name)+'</legend>'+
+        opt('h','Dernière série à réserve 0 à 1',x.h)+opt('b','Meilleure série du bloc',x.b)+opt('k','Garder la référence actuelle',x.k)+'</fieldset>'; }).join('');
 }
 /* Lot 59 (réponses 1-5) : deload entre deux blocs. Clôturer le bloc démarre le deload : une séance, le J3 (le jeudi)
    suivant, mouvements principaux seulement, règle du gabarit (2 × 5 ; Zlat : 50 % du lest du dernier top set ; squat :
@@ -10425,7 +10539,7 @@ function closeChecks(){
     var q=k.split('|'), w=+q[0], wk=PLAN.filter(function(x){return x.w===w;})[0], dd=wk&&wk.days.filter(function(d){return d.label===q[1];})[0]; if(!dd)return;
     var es=dd.lines.map(function(x){return entryOf(x.key);}).filter(Boolean), did=es.some(function(e){return e.state!=='skip';});
     if(did&&!S.done[k])nd.push(k);
-    var fo=formOf(k); if((did||S.done[k])&&!Object.keys(fo).some(function(q){return q!=='d'&&typeof fo[q]==='number';}))nf.push(k);   /* repères détaillés d'avant le lot 44 compris */
+    var fo=formOf(k); if((did||S.done[k])&&!srssN(fo.srss)&&!Object.keys(fo).some(function(q){return q!=='d'&&typeof fo[q]==='number';}))nf.push(k);   /* v157 : une SRSS compte comme forme notée */   /* repères détaillés d'avant le lot 44 compris */
     es.forEach(function(e){
       if(e.state==='skip'||e.role==='deload'||e.role==='acc'||e.role==='extra'||!(e.sets||[]).some(function(v){return v!=null;}))return;
       if(e.rir!=null||e.rirq||(e.rirs&&e.rirs.some(function(v){return v!=null;}))||(e.fin&&e.fin.ch))return;
@@ -10445,6 +10559,7 @@ function closeOpen(m){
   var bid=m==='close'?+S.blockId:+S.blockId-1, dd=dlDates(), D=S.dload&&+S.dload.b===+S.blockId?S.dload:null;
   var ls=(m==='dl'&&D)?JSON.parse(JSON.stringify(D.lines)):dlPropose(bid);
   CLOSEP={m:m,on:!!ls.length,d:(m==='dl'&&D)?D.d:dd.d,s:(m==='dl'&&S.start&&D)?S.start:(ls.length?dd.s:todayISO()),lines:ls};
+  if(m==='close'){ CLOSEP.refs=refCands(+S.blockId||1); CLOSEP.ref={}; }   /* v157 */
   renderCloseBox();
 }
 function closeDo(){
@@ -10456,7 +10571,8 @@ function closeDo(){
     S.tsel=null; CLOSEP=null; save(); renderAll(); return;
   }
   CLOSEP=null;
-  closeBlock(null,null,{noAsk:1,dload:dl,start:c.s||null});
+  var rc={}; (c.refs||[]).forEach(function(x){ var v=c.ref[x.li]||x.def; rc[x.li]=v==='h'?x.h:v==='b'?x.b:null; });   /* v157 : null = garder */
+  closeBlock(null,null,{noAsk:1,dload:dl,start:c.s||null,ref:rc});
 }
 function closeGo(g){
   if(g.charAt(0)==='f'){ failGo(g.slice(1)); }
@@ -10484,6 +10600,7 @@ function renderCloseBox(){
           '<p class="note" style="flex:1 1 60%;margin:auto 0 4px">'+esc(String(q.info||'').replace(/^deload entre deux blocs : /,''))+'</p></div>'; }).join('')+
         '<p class="note">Une seule séance, mouvements principaux seulement ; les accessoires reprennent avec le bloc.</p>';
     }
+    if(c.m==='close')h+=refBoxHTML(c);   /* v157 */
     h+='<div class="row" style="margin-top:6px"><div class="field md"><label>'+(c.m==='close'?'Début du bloc suivant':'Début du bloc (semaine 1)')+'</label><input type="date" data-cl="s" value="'+esc(c.s||'')+'"></div></div>'+
       (c.m==='close'?'<p class="note">Le bilan est archivé et reste consultable dans Données ; il se complète ensuite depuis le bilan. Vous y trouverez le questionnaire de fin de bloc (2 minutes), le bilan d’apprentissage et l’Export pour Claude. Le programme du bloc suivant reste modifiable. '+
         '« Rouvrir le bloc '+S.blockId+' » reste possible tant que rien n\'est noté dans le nouveau bloc.</p>':'')+
@@ -10510,6 +10627,7 @@ $('closebox').addEventListener('change',function(ev){
   if(t.dataset.cl==='on'){ c.on=!!t.checked; if(c.m==='close'){ c.s=c.on?dlDates().s:todayISO(); } }
   else if(t.dataset.cl==='d'){ c.d=t.value||c.d; }
   else if(t.dataset.cl==='s'){ c.s=t.value||c.s; }
+  else if(t.dataset.cref){ var p=t.dataset.cref.split('|'); c.ref[+p[0]]=p[1]; return; }   /* v157 */
   else if(t.dataset.cll!=null){ var q=c.lines[+t.dataset.cll], v=num(t.value,null); if(q&&v!=null&&v>=0)q.load=v; }
   renderCloseBox();
 });
@@ -10525,8 +10643,9 @@ function blockEditHTML(b){
     ss.map(function(q){ var k=q.w+'|'+q.d, f=fd[k]||{}, ka=a+' data-bk="'+esc(k)+'"';
       return '<div class="row bedrow" style="margin-top:6px;align-items:flex-end"><div class="field sm"><label>'+(q.w<0?'Deload':'S'+(q.w+1)+' '+esc(q.d))+'</label>'+
         '<label class="chk" style="margin:0"><input type="checkbox"'+ka+' data-ben="done"'+(q.done?' checked':'')+'>faite</label></div>'+
+        (srssN(f.srss)&&f.gen==null?'<div class="field sm"><label>Forme</label><p class="note" style="margin:6px 0">SRSS '+srssN(f.srss)+'/8</p></div>':   /* v157 */
         '<div class="field sm"><label>Forme</label><select'+ka+' data-ben="form"><option value="">—</option>'+[1,1.5,2,2.5,3,3.5,4,4.5,5].map(function(v){
-          return '<option value="'+v+'"'+(f.gen===v?' selected':'')+'>'+F(v)+'</option>';}).join('')+'</select></div>'+
+          return '<option value="'+v+'"'+(f.gen===v?' selected':'')+'>'+F(v)+'</option>';}).join('')+'</select></div>')+
         '<div class="field w" style="flex:1 1 55%"><label>Note de séance</label><input type="text"'+ka+' data-ben="dn" value="'+esc(dn[k]||'')+'"></div></div>';
     }).join('')+'<p class="note">Enregistré à chaque changement ; l\'export Markdown du bloc en tient compte.</p></details>';
 }
@@ -10567,6 +10686,15 @@ function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} de
   cui().open['fq'+S.blockId]=1;   /* lot 83 : le questionnaire de fin de bloc s'ouvre dans le Bilan */
   var bd=blockDescs(); if(bd.length)S.blocks[S.blocks.length-1].desc=bd;   /* lot 46 (R5) */   /* B21 */
   S.lifts.forEach(function(L){
+    var li=S.lifts.indexOf(L);
+    if(opt.ref&&li in opt.ref){   /* v157 : choix fait dans le panneau de clôture */
+      var r=opt.ref[li], fx=(L.refMode||'fixe')==='fixe', e0=fx?lastExploitable(L,true,S.blockId):null;
+      if(e0)L.refBlock=entryToRef(e0);   /* comme avant en mode fixe */
+      if(!r)return;
+      if(fx){ L.ref.load=r.load; L.ref.reps=r.reps; L.ref.rir=r.rir; L.ref.bw=r.bwe?null:r.bw; L.ref.date=r.date; L.ref.est=false; }
+      else L.refBlock=JSON.parse(JSON.stringify(r));
+      return;
+    }
     var e=lastExploitable(L,true,S.blockId);   /* D3 : meilleure s\u00e9rie du bloc cl\u00f4tur\u00e9 ; aucune \u2192 refBlock inchang\u00e9 */
     if(e)L.refBlock=entryToRef(e);          /* Iterative : reprise de fin de phase */
     if(e&&(L.refMode||'fixe')==='fixe')askRefTake(L,e);   /* D4 */
@@ -10578,14 +10706,21 @@ function closeBlock(after,msg,opt){   /* lot 59 : opt = {noAsk, dload, start} de
   draftPurge();   /* B7 : brouillons du bloc clôturé */
   S.start=opt.start||todayISO();
   if(opt.dload)S.dload={b:S.blockId,d:opt.dload.d,lines:opt.dload.lines}; else delete S.dload;   /* lot 59 */
-  dq().view='bilan';
+  dq().view='bilan'; BSEL=+S.blocks[S.blocks.length-1].id;   /* v157 : le Bilan s'ouvre sur le bloc clos */
   if(after)after();   /* lot 9 */
   save(); renderAll();
   if(after)return;    /* lot 9 : on reste sur Programme */
   var b=document.querySelector('#nav button[data-p=data]'); if(b)b.click();
+  window.scrollTo(0,0);   /* v157 : en haut, sur ce qui reste à faire */
 }
-$('newblock').addEventListener('click',function(){ if(CLOSEP&&CLOSEP.m==='close')CLOSEP=null; else closeOpen('close'); renderCloseBox(); });   /* lot 59 */
+$('newblock').addEventListener('click',function(){ if(CLOSEP&&CLOSEP.m==='close')CLOSEP=null; else closeOpen('close'); renderCloseBox();
+  var cb=$('closebox'); if(CLOSEP&&cb&&cb.firstChild)window.scrollTo(0,Math.max(0,cb.getBoundingClientRect().top+(window.pageYOffset||0)-8)); });   /* v157 : le panneau de clôture en haut de l'écran */   /* lot 59 */
 /* lot 55 : panneau d'export Markdown du bilan */
+$('bilan').addEventListener('click',function(ev){   /* v157 : choix du bloc affiché */
+  var sb=ev.target&&ev.target.closest?ev.target.closest('[data-bsel]'):null; if(!sb)return;
+  BSEL=+sb.dataset.bsel; renderBilan(); applyFolds();
+  var w=$('bilan'); if(w&&w.getBoundingClientRect().top<0)window.scrollTo(0,Math.max(0,w.getBoundingClientRect().top+(window.pageYOffset||0)-8));
+});
 $('bilan').addEventListener('click',function(ev){   /* lot 81 (A9) : le signal se retire ou se remet */
   var lb=ev.target&&ev.target.closest?ev.target.closest('[data-learn]'):null;
   if(lb){ (S.blocks||[]).forEach(function(b){ if(+b.id===+lb.dataset.learn)b.learn=b.learn?0:1; }); save(); renderData(); return; }
