@@ -1409,7 +1409,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v159';   /* lot 74 */
+var APPV='v164';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1517,6 +1517,7 @@ function save(){
   if(BRSWAP||LOADBAD)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon ; lot 119 : ni sur des données illisibles */
   if(STALE){ staleReload(); return; }   /* lot 119 */
   REFSTAMP++; REFC={};
+  if(!GHBOOT){ try{ syStamp(); }catch(e){} }   /* v164 : horodatage des changements, pour la fusion entre appareils */
   try{ localStorage.setItem(SK('cp-state'),JSON.stringify(S)); SAVEFAIL=false; ghMark(); }   /* lot 113 */
   catch(e){
     /* quota depasse ou stockage refuse : sans cet avertissement, tout continue de
@@ -1530,6 +1531,7 @@ function save(){
   }
 }
 function load(){
+  SYSIG=null;   /* v164 */
   try{
     LOADBAD=false;   /* lot 119 */
     var raw=localStorage.getItem(SK('cp-state')); if(!raw)return;
@@ -4925,8 +4927,15 @@ function pdcCard(k){
   var same=deps.length&&deps.every(function(x){return x.bw===deps[0].bw;});
   var ec=function(b){var e=Math.round((jour-b)*100)/100; return (e>0?'+':(e<0?'\u2212':'\u00b1'))+F(Math.abs(e));};
   var h;
+  var fut=sessFut(w,lab);   /* v164 (19/11, choix de Luka) : séance à venir → rien ne s'y enregistre, sauf « Faire cette séance aujourd'hui » */
+  if(fut)return '<div id="pdcline" class="open"><p class="note" style="margin:0 0 6px"><b>Séance prévue le '+frDate(fut)+'.</b> Rien ne s\'y enregistre avant ce jour-là.</p>'+
+    '<button type="button" class="act mini" data-avance="'+esc(k)+'">Faire cette séance aujourd\'hui</button></div>';
   var rec=pdcRec(w,lab);   /* lot 123 : séance passée → le PdC enregistré avec ses séries, pas celui d'aujourd'hui */
-  if(rec)return '<div id="pdcline"><span class="pdcbtn pdcrec" title="PdC noté avec les séries de cette séance">⚖ PdC enregistré <b>'+rec.txt+'</b> kg <span class="pdce">· le '+frDate(rec.d)+'</span></span></div>';
+  if(rec&&!PDCOPEN)return '<div id="pdcline"><button type="button" class="pdcbtn pdcrec" data-pdcopen="1" title="PdC noté avec les séries de cette séance" aria-label="PdC enregistré '+rec.txt+' kg le '+frDate(rec.d)+', toucher pour le corriger">⚖ PdC enregistré <b>'+rec.txt+'</b> kg <span class="pdce">· le '+frDate(rec.d)+'</span> ✎</button></div>';
+  if(rec)return '<div id="pdcline" class="open"><div class="pdcrow"><label for="pdcin">PdC du '+frDate(rec.d)+'</label>'+   /* v164 : corrigeable */
+    '<input id="pdcin" class="numin" type="text" inputmode="decimal" enterkeyhint="done" value="'+F(rec.bw)+'">'+
+    '<button type="button" class="act mini" data-pdcok="1">OK</button></div>'+
+    '<p class="note" id="pdcmsg" style="margin:4px 0 0">Corrige le PdC des séries de cette séance faites le '+frDate(rec.d)+', et la pesée de ce jour-là.</p></div>';
   if(!PDCOPEN)h='<div id="pdcline"><button type="button" class="pdcbtn" data-pdcopen="1" aria-label="PdC du jour '+F(jour)+' kg, toucher pour le changer">'+
     '⚖ PdC <b>'+F(jour)+'</b> kg'+(same&&deps[0].f?' <span class="pdce">· '+ec(deps[0].bw)+'</span>':'')+' ✎</button></div>';
   else h='<div id="pdcline" class="open"><div class="pdcrow"><label for="pdcin">PdC du jour</label>'+
@@ -4951,10 +4960,28 @@ function pdcRec(w,lab){
   S.log.forEach(function(e){ var q=String(e.key).split('|'); if(+q[2]!==w||q[3]!==lab||!inBlock(e.key)||e.state==='skip'||!e.date)return;
     if(!d||e.date>d)d=String(e.date).slice(0,10); if(+e.bw>0&&vs.indexOf(+e.bw)<0)vs.push(+e.bw); });
   if(!d||d>=t)return null;
+  var dp=dayISO(w,lab); if(dp&&dp>=t)return null;   /* v164 : séance prévue aujourd'hui (ou plus tard) : c'est la séance du jour, son PdC se saisit */
   if(!vs.length&&S.pesees&&+S.pesees[d]>0)vs.push(+S.pesees[d]);
   if(!vs.length)return null;
   vs.sort(function(x,y){return x-y;});
   return {d:d,bw:vs[Math.floor((vs.length-1)/2)],txt:vs.length>1?F(vs[0])+' à '+F(vs[vs.length-1]):F(vs[0])};
+}
+/* v164 : séance de la même semaine et du même jour, dans le bloc en cours */
+function sessOf(e,w,lab){ var q=String(e.key).split('|'); return +q[2]===w&&q[3]===lab&&inBlock(e.key); }
+/* v164 (19/11, choix de Luka) : date prévue d'une séance à venir pas encore commencée ; '' sinon.
+   Le 17/11, deux ajouts notés par erreur dans J3 avaient figé le PdC de J3 le 19/11. */
+function sessFut(w,lab){
+  if(SIM)return '';
+  var k=w+'|'+lab, d=dayISO(w,lab), t=todayISO();
+  if(!d||d<=t||(S.done&&S.done[k])||(S.avance&&S.avance[k+BK()]))return '';
+  if(S.log.some(function(e){ return sessOf(e,w,lab)&&String(e.date||'').slice(0,10)===t; }))return '';
+  return d;
+}
+function futBloc(w,lab){
+  var d=sessFut(w,lab); if(!d)return false;
+  msgBar('Séance prévue le '+frDate(d)+' : rien n\'est enregistré. En haut de la séance : « Faire cette séance aujourd\'hui ».');
+  var l=$('pdcline'); if(l&&l.scrollIntoView)l.scrollIntoView({block:'center',behavior:'smooth'});
+  return true;
 }
 function pdcKept(jour){ var k=S.pdcKeep; return !!(k&&k.b===S.blockId&&Math.abs(+k.bw-(+jour))<1e-9); }
 function pdcKeep(){ S.pdcKeep={b:S.blockId,bw:(S.tbw!=null?S.tbw:S.bw)}; save(); renderToday(); }
@@ -7194,6 +7221,7 @@ function toggleFail(key){
 }
 function saveLine(p,key){
   var f=findLine(key); if(!f)return;
+  if(!entryOf(key)&&futBloc(f.w,f.day))return;   /* v164 */
   var x=f.line, L=S.lifts[x.li];
   var loadEl=p.querySelector('[data-fld=load]'), noteEl=p.querySelector('[data-fld=note]');
   var repsEl=p.querySelector('[data-fld=reps]');
@@ -7290,6 +7318,7 @@ function openNext(key){
    Enregistrer normalement une ligne sautee annule le saut. */
 function skipLine(p,key){
   var f=findLine(key); if(!f)return;
+  if(!entryOf(key)&&futBloc(f.w,f.day))return;   /* v164 */
   var x=f.line, L=S.lifts[x.li], noteEl=p.querySelector('[data-fld=note]');
   undoKeep(entryOf(key)&&entryOf(key).state!=='skip'?'Série remplacée par « sautée ».':'Ligne marquée sautée.');   /* lot 63 */
   keepJuge(key);
@@ -7433,6 +7462,83 @@ function ghCfg(){ try{ var c=JSON.parse((GUEST&&sessionStorage.getItem('cp-gh'))
    return c&&c.repo&&c.tok?c:null; }catch(e){ return null; } }
 function ghSt(){ try{ return JSON.parse(localStorage.getItem(SK('cp-gh-st'))||'{}')||{}; }catch(e){ return {}; } }
 function ghSet(o){ var s=ghSt(); for(var k in o)s[k]=o[k]; try{ localStorage.setItem(SK('cp-gh-st'),JSON.stringify(s)); }catch(e){} return s; }
+/* ===== v164 (19/11, demande de Luka) : synchronisation sans question =====
+   « Quand j'enregistre des données quelque part, elles sont enregistrées et synchro partout. » Chaque série, analyse vidéo et
+   pesée hors séance reçoit l'heure de sa dernière modification (mt) ; une suppression est notée dans S.suppr. Quand GitHub a
+   reçu une version d'un autre appareil pendant que celui-ci a des changements en attente, les deux sont FUSIONNÉES :
+   tout ce qui n'existe que d'un côté est gardé, pour un même élément la modification la plus récente gagne, une suppression
+   l'emporte sur une version plus ancienne ; programme et réglages viennent de l'appareil modifié en dernier (S.majAt).
+   Puis la version fusionnée est envoyée. Sauvegarde › Annuler l'import ramène l'état d'avant. */
+var SYSIG=null;
+var SYCOLS=[['log',function(e){ return String(e.key!=null?e.key:e.id); }],['velo',function(v){ return 'v:'+v.id; }],['pesLibre',function(x){ return 'p:'+x.id; }]];
+function sySig(e){ var m=e.mt; delete e.mt; var t=JSON.stringify(e); if(m!==undefined)e.mt=m; return t; }
+function sySigs(o){ var g={}; SYCOLS.forEach(function(c){ (o&&Array.isArray(o[c[0]])?o[c[0]]:[]).forEach(function(e){ if(e)g[c[1](e)]=sySig(e); }); }); return g; }
+function syStamp(){
+  if(!SYSIG){ var old=null; try{ old=JSON.parse(localStorage.getItem(SK('cp-state'))||'null'); }catch(e){} SYSIG=sySigs(old); }
+  var now=Date.now(), seen={}, ch=false;
+  if(!S.suppr||typeof S.suppr!=='object')S.suppr={};
+  SYCOLS.forEach(function(c){ (Array.isArray(S[c[0]])?S[c[0]]:[]).forEach(function(e){ if(!e)return;
+    var k=c[1](e), g=sySig(e); seen[k]=1;
+    if(SYSIG[k]!==g){ e.mt=now; SYSIG[k]=g; delete S.suppr[k]; ch=true; } }); });
+  Object.keys(SYSIG).forEach(function(k){ if(!seen[k]){ S.suppr[k]=now; delete SYSIG[k]; ch=true; } });
+  Object.keys(S.suppr).forEach(function(k){ if(now-S.suppr[k]>200*86400000)delete S.suppr[k]; });   /* 200 jours */
+  S.majAt=now;
+}
+function syClone(x){ return JSON.parse(JSON.stringify(x)); }
+function syFusion(ro){   /* ro : contenu de GitHub ; rend {o, nRecu, nIci} */
+  var lo=S, remoteNewer=(+ro.majAt||0)>(+lo.majAt||0);
+  var base=syClone(remoteNewer?ro:lo), other=syClone(remoteNewer?lo:ro);
+  var nm=function(x){ return String(x==null?'':x).trim().toLowerCase(); }, by={};
+  if(!Array.isArray(base.lifts))base.lifts=[];
+  base.lifts.forEach(function(L,i){ if(L)by[nm(L.name)]=i; });
+  var liMap=function(li){ var L=other.lifts&&other.lifts[li]; if(li==null||!L)return li;
+    var i=by[nm(L.name)]; if(i==null){ base.lifts.push(syClone(L)); i=base.lifts.length-1; by[nm(L.name)]=i; } return i; };
+  var sup={}, k;
+  [base.suppr,other.suppr].forEach(function(o){ if(o&&typeof o==='object')for(k in o)sup[k]=Math.max(sup[k]||0,+o[k]||0); });
+  base.suppr=sup;
+  var nOther=0;
+  SYCOLS.forEach(function(c){
+    var f=c[0], kf=c[1]; if(!Array.isArray(base[f]))base[f]=[];
+    var at={}; base[f].forEach(function(e,i){ if(e)at[kf(e)]=i; });
+    (Array.isArray(other[f])?other[f]:[]).forEach(function(e){ if(!e)return;
+      var key=kf(e), x=syClone(e); if(x.li!=null)x.li=liMap(x.li);
+      if(at[key]==null){ base[f].push(x); at[key]=base[f].length-1; nOther++; }
+      else if((+x.mt||0)>(+base[f][at[key]].mt||0))base[f][at[key]]=x;
+    });
+    base[f]=base[f].filter(function(e){ var t=e&&sup[kf(e)]; return !(t&&t>=(+e.mt||0)); });
+  });
+  /* dictionnaires de données : union, l'appareil modifié en dernier l'emporte sur une même clé */
+  ['pesees','dayNotes','done','form','veloJuge','warmDay','dayTags','wkb','skip','rapFait'].forEach(function(f){
+    var o=other[f]; if(!o||typeof o!=='object'||Array.isArray(o))return;
+    if(!base[f]||typeof base[f]!=='object')base[f]={};
+    for(var q in o)if(!(q in base[f]))base[f][q]=o[q];
+  });
+  /* lignes ajoutées aux séances : union par id */
+  if(other.extra&&typeof other.extra==='object'){ if(!base.extra||typeof base.extra!=='object')base.extra={};
+    for(var sk in other.extra){ var bl=base.extra[sk]||(base.extra[sk]=[]), ids={};
+      bl.forEach(function(x){ if(x)ids[x.id]=1; });
+      (other.extra[sk]||[]).forEach(function(x){ if(x&&!ids[x.id]){ var y=syClone(x); if(y.li!=null)y.li=liMap(y.li); bl.push(y); } }); } }
+  /* petites listes : union */
+  [['finPdc',function(x){ return x.k+'|'+x.b+'|'+x.d; }],['nuPdc',function(x){ return x.k+'|'+x.b+'|'+x.d; }],['veloRefus',function(x){ return x.id; }],['blocks',function(x){ return x.id; }]].forEach(function(c){
+    var o=other[c[0]]; if(!Array.isArray(o))return; if(!Array.isArray(base[c[0]]))base[c[0]]=[];
+    var have={}; base[c[0]].forEach(function(x){ if(x)have[c[1](x)]=1; });
+    o.forEach(function(x){ if(x&&!have[c[1](x)])base[c[0]].push(syClone(x)); });
+  });
+  base.majAt=Math.max(+lo.majAt||0,+ro.majAt||0)||Date.now();
+  var nLog=function(o){ return Array.isArray(o.log)?o.log.length:0; };
+  return {o:base,nRecu:remoteNewer?0:nOther,nIci:remoteNewer?nOther:0,remoteNewer:remoteNewer,n:nLog(base)};
+}
+function ghFusionne(rm){   /* remplace le bandeau « Reprendre / Garder cet appareil » */
+  var r=syFusion(rm.o), was=JSON.stringify(S);
+  try{ localStorage.setItem(SK('cp-state-backup'),was); localStorage.setItem(SK('cp-state'),JSON.stringify(r.o)); }
+  catch(e){ try{ localStorage.removeItem(SK('cp-state-backup')); }catch(e2){} ghSet({err:'stockage plein : fusion impossible'}); renderBackup(); return; }
+  ghSet({sha:rm.sha,cs:rm.cs||'',dirty:true,err:'',block:null,undo:true,fus:new Date().toISOString()});
+  GHCONF=null; renderGhConf();
+  load(); renderAll(); renderBackup();
+  msgBar('Données de l\'autre appareil réunies avec celles de ce téléphone.');
+  ghPush(true);
+}
+
 function ghPath(){ return encodeURIComponent(PROF.cur)+'.json'; }
 function ghMark(){
   if(!ghCfg()||GHBOOT)return;   /* lot S1 : les enregistrements du démarrage (migrations) ne comptent pas comme un changement à envoyer */
@@ -7510,6 +7616,7 @@ function renderGh(busy){
   if($('ghnow'))$('ghnow').disabled=!c; if($('ghforget'))$('ghforget').disabled=!c;
   el.textContent=busy||(!c?'Pas encore réglée : rien n\'est envoyé.':
     (s.at?'Dernier envoi : '+frDate(s.at.slice(0,10))+' à '+new Date(s.at).toTimeString().slice(0,5)+'.':'Aucun envoi encore.')+
+    (s.fus?' Dernière réunion avec un autre appareil : '+frDate(s.fus.slice(0,10))+' à '+new Date(s.fus).toTimeString().slice(0,5)+' (Annuler l\'import la défait).':'')+   /* v164 */
     (GHCONF?' Envoi suspendu : les données ont changé sur un autre appareil, choisissez en haut de l\'écran ce qu\'il faut garder.':
      s.block?' Envoi bloqué : la sauvegarde sur GitHub compte '+s.block.n+' séries, ce téléphone '+s.block.loc+'. Pour ne pas écraser la copie la plus complète, rien n\'est envoyé. Si ce téléphone a raison (séries supprimées exprès), touchez « Envoyer quand même ».':
      s.err?' Échec du dernier essai : '+s.err+'.':s.dirty?' Changements en attente d\'envoi.':''));   /* lot 119 */
@@ -7579,8 +7686,8 @@ function ghDecide(rm,h){
   var st=ghSt(), nLoc=(S.log||[]).length;
   rm.ok=!!(rm.o&&typeof rm.o==='object'&&Array.isArray(rm.o.lifts)&&rm.o.lifts.length);
   if(rm.ok&&((st.sha&&!st.dirty)||(!st.sha&&nLoc===0))){ ghAdopt(rm,false); return; }
-  rm.ex=rm.ok?ghLocalExtra(rm.o):{n:0,p:0,lost:0};
-  GHCONF=rm; renderGhConf(); renderBackup();
+  if(rm.ok){ ghFusionne(rm); return; }   /* v164 : fusion sans question */
+  ghPush(true,true);   /* v164 : version de GitHub illisible : celle de cet appareil la remplace (GitHub garde l'historique) */
 }
 function ghLocalExtra(o){   /* ce qui n'existe qu'ici : séries (clé absente de GitHub) et pesées hors séance (id absent) */
   var nm=function(x){ return String(x==null?'':x).trim().toLowerCase(); }, have={}, ph={}, by={}, log=[], lost=0;
@@ -8725,6 +8832,7 @@ function xlPrevHTML(){
 function xlRefresh(){ var w=$('xlprev'); if(w)w.innerHTML=xlPrevHTML(); }
 /* enregistrement : la ligne s'ajoute à la séance (ajout ponctuel) et elle est enregistrée faite, d'un geste */
 function xlAdd(k){
+  var kq0=String(k).split('|'); if(futBloc(+kq0[0],kq0[1]))return;   /* v164 */
   var ls=xlLines(), msg=document.querySelector('#cardextra [data-xlmsg]');
   var bad=ls.filter(function(x){return x.err.length;});
   if(bad.length){ if(msg)msg.textContent='Rien n\'est enregistré : à corriger en rouge.'; return; }
@@ -8987,9 +9095,20 @@ var PDCOPEN=false;   /* lot 74 : ligne PdC ouverte (champ + OK) */
 function pdcApply(){
   var inp=$('pdcin'); if(!inp)return;
   var t=String(inp.value||'').trim(), v=num(t,null);
+  var kq=S.tsel?String(S.tsel).split('|'):null, w=kq?+kq[0]:null, lab=kq?kq[1]:null, rec=kq?pdcRec(w,lab):null;
+  if(rec){   /* v164 : séance passée, PdC corrigé sur ses séries de ce jour-là et sur la pesée du jour */
+    if(v===null||v<30||v>250){ var m0=$('pdcmsg'); if(m0)m0.innerHTML='<b style="color:var(--bad)">✗ Entre 30 et 250 kg.</b>'; inp.focus(); return; }
+    var bw=Math.round(v*100)/100;
+    S.log.forEach(function(e){ if(sessOf(e,w,lab)&&String(e.date||'').slice(0,10)===rec.d)e.bw=bw; });
+    if(!S.pesees)S.pesees={}; S.pesees[rec.d]=bw;
+    save(); bwFollow(); PDCOPEN=false; renderAll(); msgBar('PdC du '+frDate(rec.d)+' corrigé : '+F(bw)+' kg.'); return;
+  }
   if(t!==''&&(v===null||v<30||v>250)){ var m=$('pdcmsg'); if(m)m.innerHTML='<b style="color:var(--bad)">✗ Entre 30 et 250 kg.</b> Vide : le PdC courant.'; inp.focus(); return; }
   var tb=$('tbw'); tb.value=t===''?'':F(Math.round(v*100)/100);
   tb.dispatchEvent(new Event('input')); tb.dispatchEvent(new Event('change'));   /* comme une saisie dans les réglages de la séance */
+  if(kq&&v!==null&&v>=30&&v<=250){ var td=todayISO(), b2=Math.round(v*100)/100, n2=0;   /* v164 : les séries de cette séance faites aujourd'hui suivent */
+    S.log.forEach(function(e){ if(sessOf(e,w,lab)&&String(e.date||'').slice(0,10)===td&&e.state!=='skip'&&+e.bw!==b2){ e.bw=b2; n2++; } });
+    if(n2)save(); }
   PDCOPEN=false; renderToday();
 }
 $('todayout').addEventListener('keydown',function(e){
@@ -9001,6 +9120,8 @@ $('todayout').addEventListener('click',function(e){
   var po=e.target.closest?e.target.closest('[data-pdcopen]'):null;   /* lot 74 */
   if(po){ PDCOPEN=true; renderToday(); var pi=$('pdcin'); if(pi){ pi.focus(); if(pi.select)pi.select(); } return; }
   if(e.target.closest&&e.target.closest('[data-pdcok]')){ pdcApply(); return; }
+  var av=e.target.closest?e.target.closest('[data-avance]'):null;   /* v164 */
+  if(av){ if(!S.avance)S.avance={}; S.avance[av.dataset.avance+BK()]=todayISO(); save(); renderToday(); return; }
   var rb=e.target.closest?e.target.closest('[data-rapbok],[data-rapboff]'):null;   /* lot 74 : rappels de données */
   if(rb){ if(rb.dataset.rapboff)S.rapOff=1; else { if(!S.rapFait)S.rapFait={}; S.rapFait[(+S.blockId||1)+'|'+rb.dataset.rapbok]=1; }
     save(); renderToday(); return; }

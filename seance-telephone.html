@@ -245,6 +245,31 @@ function masqueRose(data, W, H, stride, etat) {
   return m;
 }
 
+// v164 (19/11/2026) : masque « vif », filtre de secours. Sur l'iPhone de Luka, le short kaki, les bras et le
+// visage passaient le masque rose (S 66 a 94, teinte 5 a 8) : 50 taches par image, suivi perdu (19/11). Le soir,
+// la gommette a l'ombre du toit tombait sous V = 100 (17/11). La gommette a S ~186 et une teinte ~172 : on exige
+// S >= 110 et une teinte >= 158 ou <= 4, et on accepte V >= 70. N'est employe que si l'analyse normale echoue.
+function masqueVif(data, W, H, stride, etat) {
+  const n = W * H;
+  const m = etat ? etat.m : new Uint8Array(n);
+  for (let i = 0, p = 0; i < n; i++, p += stride) {
+    const r = data[p], g = data[p + 1], b = data[p + 2];
+    let v = 0;
+    if (r >= g && r >= b && r >= 70) {
+      const mn = g < b ? g : b, d = r - mn;
+      if (d !== 0 && Math.round((255 * d) / r) >= 110) {
+        let h = (60 * (g - b)) / d;
+        if (h < 0) h += 360;
+        let hh = Math.round(h / 2);
+        if (hh >= 180) hh -= 180;
+        if (hh >= 158 || hh <= 4) v = 1;
+      }
+    }
+    m[i] = v;
+  }
+  return m;
+}
+
 // --- ouverture 3x3 creuse, bords comme cv2.morphologyEx(MORPH_OPEN) --------
 // Semantique identique a la version pleine du lot 12, bit pour bit :
 //   erosion    : exterieur considere a 1, donc er[i] = ET des voisins DANS l'image ;
@@ -380,8 +405,8 @@ function composantes(m, W, H, etat) {
 // remultiplie : x, y, h par k ; aire par k*k.
 // `aireMin` est deja mis a l'echelle par l'appelant (SEUILS.AIRE_MIN / (k*k), sans
 // arrondi). Sa valeur par defaut ne vaut donc que pour k = 1.
-function marques(data, W, H, stride, etat, aireMin = SEUILS.AIRE_MIN) {
-  const m = ouverture(masqueRose(data, W, H, stride, etat), W, H, etat);
+function marques(data, W, H, stride, etat, aireMin = SEUILS.AIRE_MIN, vif = false) {
+  const m = ouverture(vif ? masqueVif(data, W, H, stride, etat) : masqueRose(data, W, H, stride, etat), W, H, etat);
   const bl = composantes(m, W, H, etat);
   return bl.filter((b) => b.aire >= aireMin);
 }
@@ -4306,7 +4331,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"v132","note_v132":"02/11/2026 : seuil de luminosite de la marque 70 -> 100 et saut lateral du suivi borne a 150 px (series du 01/11 : 5 et 4 reps trouvees sur 7)","note_lot90_version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"v164","note_v164":"19/11/2026 : masque vif de secours (S >= 110, teinte <= 4 ou >= 158, V >= 70) quand le suivi normal echoue (iPhone : short et peau pris pour la gommette ; soir : gommette trop sombre au sommet) ; signale dans les alertes","note_v132":"02/11/2026 : seuil de luminosite de la marque 70 -> 100 et saut lateral du suivi borne a 150 px (series du 01/11 : 5 et 4 reps trouvees sur 7)","note_lot90_version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4450,9 +4475,9 @@ async function decoder(fichier) {
     else if (rot === 180) { ctx.translate(dispoW, dispoH); ctx.rotate(Math.PI); }
     else if (rot === 270) { ctx.translate(0, dispoH); ctx.rotate(-Math.PI / 2); }
   };
-  const etatM = nouvelEtat(cw, ch);
+  const etatM = nouvelEtat(cw, ch), etatV = nouvelEtat(cw, ch);   // v164 : etatV pour le masque vif
   const aireMin = SEUILS.AIRE_MIN / (K * K);
-  const tout = [], tus = [];
+  const tout = [], tus = [], toutV = [];
   let image0 = null, attente = [], fini = false, erreurDec = null, apresBoucle = 0;
   const dec = new VideoDecoder({ output: (f) => attente.push(f), error: (e) => { erreurDec = e; } });
   dec.configure(cfg);
@@ -4477,6 +4502,7 @@ async function decoder(fichier) {
     f.close();
     const px = cx.getImageData(0, 0, cw, ch).data;
     tout.push(marques(px, cw, ch, 4, etatM, aireMin).map((b) => [b.x, b.y, b.h, b.aire]));
+    toutV.push(marques(px, cw, ch, 4, etatV, aireMin, true).map((b) => [b.x, b.y, b.h, b.aire]));   // v164
     if (tout.length % 5 === 0) {
       const ms = (performance.now() - t1) / tout.length, reste = Math.max(0, (n - tout.length) * ms / 1000);
       barre(tout.length / n);
@@ -4489,13 +4515,23 @@ async function decoder(fichier) {
   try { dec.close(); } catch (e) {}
   if (attente.length) { apresBoucle = attente.length; for (const f of attente) f.close(); attente = []; }
   barre(1);
-  return { tout, tus, image0, n, apresBoucle, fc, fpsPage: dureeS > 0 ? (n - 1) / dureeS : 0, rot, cw, ch, m,
+  return { tout, toutV, tus, image0, n, apresBoucle, fc, fpsPage: dureeS > 0 ? (n - 1) / dureeS : 0, rot, cw, ch, m,
     duree_s: Math.round((performance.now() - t1) / 100) / 10 };
 }
 // ---- fin de l'emprunt ----
 
+// v164 : le suivi passe-t-il les controles de taux, d'aire et d'amplitude ? (sans echelle)
+function suiviPasse(tout, fps) {
+  try {
+    const t = tout.map((bl) => bl.map((q) => ({ x: q[0], y: q[1], h: q[2], aire: q[3] })));
+    SE.analyserSuivi({ suivi: SE.suivreTaches({ tout: t, fps: fps }), fil_cm: null });
+    return true;
+  } catch (e) { return false; }
+}
+let vifs = {};
 async function analyser(entrees, analyseLe, saisie) {
   const videos = [], controles = [];
+  vifs = {};
   for (let i = 0; i < fichiers.length; i++) {
     const f = fichiers[i];
     prefixe = 'Vidéo ' + (i + 1) + ' / ' + fichiers.length + ' — ';
@@ -4509,10 +4545,13 @@ async function analyser(entrees, analyseLe, saisie) {
       err = e; d = null;
     }
     if (d) {
-      videos.push({ nom: f.name, tout: d.tout, fps: d.fc.fps });
+      // v164 : si le suivi normal echoue et que le masque vif passe, on analyse avec le masque vif (signale)
+      const vif = !suiviPasse(d.tout, d.fc.fps) && suiviPasse(d.toutV, d.fc.fps);
+      if (vif) vifs[SE.basename(f.name).replace(/\.[^.]*$/, '')] = 1;
+      videos.push({ nom: f.name, tout: vif ? d.toutV : d.tout, fps: d.fc.fps });
       controles.push({ video: f.name, taille_octets: f.size, fps: d.fc, fps_page: d.fpsPage, images_annoncees: d.n, images_mesurees: d.tout.length,
         images_rendues_apres_la_boucle: d.apresBoucle, rotation: { tkhd: d.m.rot, appliquee: d.rot }, canevas: { largeur: d.cw, hauteur: d.ch },
-        codec: d.m.codec, image0: d.image0, duree_s: d.duree_s, tout: d.tout, t_us: d.tus });
+        codec: d.m.codec, image0: d.image0, duree_s: d.duree_s, tout: d.tout, t_us: d.tus, masque_vif: vif, tout_vif: d.toutV });
     } else {
       const titre = err instanceof Echec ? err.titre : 'erreur imprévue';
       const msg = 'video illisible sur ce telephone (' + titre + ')';
@@ -4531,6 +4570,9 @@ async function analyser(entrees, analyseLe, saisie) {
 function finir(entrees, saisie, echange) {
   const videos = memo.videos, controles = memo.controles, analyseLe = memo.analyseLe;
   const r = S34.analyserSeance({ videos, entrees, analyseLe, cal: CAL });
+  (r.sortie.series || []).forEach((sr) => {   // v164
+    if (vifs[sr.id] && sr.alertes) sr.alertes.push('Analysée avec le filtre de secours (couleur vive) : vérifiez le nombre de reps.');
+  });
   const vs = S34.vues(r.sortie);
   afficher(vs, r.sortie);
   // le fichier de seance (toutes les series) : seulement si au moins une serie est analysee
