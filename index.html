@@ -1409,7 +1409,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v164';   /* lot 74 */
+var APPV='v165';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -12455,7 +12455,7 @@ function vScrChoix(){
   var sel=U.csel.map(vById).sort(byD), mes=U.cmes==='v'?'v':'h';
   var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(sel.length>=2){
-    var st=sel.map(function(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); return o; }), R=st[0];
+    var st=sel.map(function(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); o.v=v; return o; }), R=st[0], KC=vbK(st);   /* v165 : reps communes */
     var cs=st.map(function(o){return o.cs;}), diff=sel.some(function(v){return String(v.variante||'')!==String(sel[0].variante||'');})||
       cs.some(function(c){return c==null||cs[0]==null||Math.abs(c-cs[0])>1.25+1e-6;});
     if(diff)h+='<details class="flag"><summary><b>Charges différentes</b> : comparez par la ligne « vs droite » ›</summary>'+
@@ -12467,15 +12467,15 @@ function vScrChoix(){
         return '<th>'+(i===0?'réf. ':'')+perDs(v.date)+'<small>'+esc(typeLab(v))+'</small><small>'+(+v.lest_kg?'+'+F(v.lest_kg):'PdC')+'×'+v.reps.length+'</small></th>'; }).join('')+'</tr></thead><tbody>'+
       row('1re rep',function(o,i,ref){ return td(o.v1,v2(o.v1),vcDelta(dd(o.v1,R.v1,ref),100,1,0.07)); })+
       row('vs droite',function(o){ return '<td>'+(o.dw==null?'<small>'+(o.dwhy||'—')+'</small>':(Math.abs(o.dw)<=0.07?'habituelle':(o.dw>0?'<b class="vsok">+'+v2(o.dw)+'</b>':'<b class="vswarn">−'+v2(-o.dw)+'</b>')))+'</td>'; })+
-      row('Moyenne',function(o,i,ref){ return td(o.mv,v2(o.mv),vcDelta(dd(o.mv,R.mv,ref),100,1,0.07)); })+
-      row('Dern. rep',function(o,i,ref){ return td(o.vl,v2(o.vl),o.fin?'<small>après pause</small>':vcDelta(R.fin?null:dd(o.vl,R.vl,ref),100,1,0.07)); })+
+      row(KC.eq?'Moyenne':'Moy. 1-'+KC.k,function(o,i,ref){ return td(o.mv,v2(o.mv),vcDelta(dd(o.mv,R.mv,ref),100,1,0.07)); })+
+      row(KC.eq?'Dern. rep':'Rep '+KC.k,function(o,i,ref){ return td(o.vl,v2(o.vl),o.fin?'<small>après pause</small>':vcDelta(R.fin?null:dd(o.vl,R.vl,ref),100,1,0.07)); })+
       row('Perte',function(o,i,ref){ return td(o.pe,F(Math.round(o.pe))+' %',vcDelta(dd(o.pe,R.pe,ref),1,-1)); })+
       row('Mini cm',function(o,i,ref){ return td(o.mn,F(o.mn),vRef(sel[i])!==vRef(sel[0])?'':vcDelta(dd(o.mn,R.mn,ref),10,1,VBANDE)); })+
       row('Valides',function(o){ return td(o.nv,o.nv+'/'+o.n); })+
       row('Réserve',function(o){ return td(o.rir,F(o.rir)); })+
       row('Total kg',function(o){ return td(o.cs,F(o.cs)); })+
       '</tbody></table></div>';
-    h+='<p class="note">Vitesses en m/s. Écarts avec la plus ancienne (réf.). Vert = mieux, rouge = moins bien, en gris : sous la marge de mesure (0,07 m/s ; '+F(VBANDE)+' cm).</p>';
+    h+='<p class="note">Vitesses en m/s.'+(KC.eq?'':' Séries de longueurs différentes : moyenne, rep '+KC.k+' et perte sur les reps 1 à '+KC.k+', les seules communes.')+' Écarts avec la plus ancienne (réf.). Vert = mieux, rouge = moins bien, en gris : sous la marge de mesure (0,07 m/s ; '+F(VBANDE)+' cm).</p>';
     var sc=scaleOf(sel,mes);
     h+='<details class="chd" data-chd="vcbars"><summary>Barres rep par rep</summary>'+sel.map(function(v){
         return '<div class="vccard"><div class="vsvh"><b>'+frDate(v.date)+' · '+serieLab(v)+'</b><button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></div>'+barsSvg(v,sc.lo,sc.hi,mes)+'</div>'; }).join('')+
@@ -12508,6 +12508,174 @@ function vScrChoix(){
 /* lot 125 (demande de Luka 04/11) : vue Bloc. Les top sets d'un bloc à la suite, filtrables par jour (J1, J3 : conditions
    différentes), ce qui change d'un top set à l'autre, rep par rep, et un bloc après l'autre. Rien de nouveau n'est mesuré :
    1re rep, moyenne, dernière rep, perte (meilleure rep → dernière), écart à la droite des séances d'avant (vfDw). */
+/* v165 (fil « Comparer vos vitesses » 19/11, réponses de Luka) : comparer par charge, quel que soit le type de série ;
+   seulement sur les reps communes (reps en plus à part) ; les séries d'une séance à la même charge moyennées rep par rep ;
+   marge tirée de votre bruit de mesure ; réserve réelle d'après un AMRAP à la même charge ; carte « Comparée à » dans
+   l'écran Séance ; vue Bloc = la charge la plus lourde de chaque séance. */
+var VC_TOL=1.25;
+function vWorkOf(v){ return !isWarm(v)&&!isFixe(v)&&!v.variante&&!vIsDl(v)&&typeLab(v)!=='Deload'&&v.charge_systeme_kg!=null&&vOk(v).length>0&&!tpOutE(lienEntry(v)); }
+function vGrpDay(mv,date){   /* séries de travail d'un jour, groupées par charge totale (à 1,25 kg près), la plus lourde d'abord */
+  var out=[];
+  (S.velo||[]).filter(function(v){ return v.mouvement===mv&&v.date===date&&vWorkOf(v); }).sort(vSortN).forEach(function(v){
+    var c=+v.charge_systeme_kg, g=null;
+    out.forEach(function(G){ if(!g&&Math.abs(G.c0-c)<=VC_TOL+1e-9)g=G; });
+    if(!g){ g={date:date,mv:mv,c0:c,sets:[]}; out.push(g); }
+    g.sets.push(v);
+  });
+  out.forEach(function(G){ G.cs=vMoyA(G.sets.map(function(v){return +v.charge_systeme_kg;})); G.v=G.sets[0]; });
+  return out.sort(function(a,b){ return b.cs-a.cs; });
+}
+function vGrpN(G){ return Math.min.apply(null,G.sets.map(function(v){return vOk(v).length;})); }
+function vGrpNx(G){ return Math.max.apply(null,G.sets.map(function(v){return vOk(v).length;})); }
+function vGrpReps(G,k){   /* vitesse de chaque rep (1 à k), moyenne sur les séries du groupe qui l'ont */
+  var out=[];
+  for(var i=0;i<k;i++){ var xs=G.sets.map(function(v){ var o=vOk(v); return o[i]?+o[i].vitesse_moy_ms:null; }).filter(function(x){return x!=null;}); out.push(xs.length?vMoyA(xs):null); }
+  return out;
+}
+function vGrpLab(G){   /* « S1 J3 · +26,25 × 9 » ou « +26,25 · 3 × 3 » */
+  var v=G.v, n=G.sets.length, a=vGrpN(G), b=vGrpNx(G), l=(+v.lest_kg?'+'+F(v.lest_kg):'PdC');
+  return (v.semaine?'S'+v.semaine+(v.seance!=null?' J'+v.seance:'')+' · ':'')+(n>1?l+' · '+n+' × '+(a===b?a:a+'-'+b):l+' × '+a);
+}
+function vGrpVirt(G){   /* une « série » moyenne pour les vues qui prennent une série : reps = moyenne rep par rep */
+  if(G.sets.length===1){ var o=G.v; o._grp=G; return o; }
+  var v=Object.assign({},G.v); v.reps=vGrpReps(G,vGrpN(G)).map(function(x,i){ return {rep:i+1,vitesse_moy_ms:x}; });
+  v.charge_systeme_kg=G.cs; v._grp=G; return v;
+}
+function vSetsLab(v){ var G=v._grp; return (+v.lest_kg?F(v.lest_kg):'PdC')+(G&&G.sets.length>1?' · '+G.sets.length+'×'+vGrpN(G):'×'+v.reps.length); }
+function vHeavies(mv){   /* la charge la plus lourde de chaque séance (vue Bloc, single témoin) */
+  var ds={}; (S.velo||[]).forEach(function(v){ if(v.mouvement===mv)ds[v.date]=1; });
+  return Object.keys(ds).sort().map(function(d){ return vGrpDay(mv,d)[0]; }).filter(Boolean).map(vGrpVirt);
+}
+function vGrpPrev(G){   /* la dernière séance d'avant à la même charge totale, quel que soit le jour ou le type */
+  var ds={}; (S.velo||[]).forEach(function(v){ if(v.mouvement===G.mv&&String(v.date)<String(G.date))ds[v.date]=1; });
+  var l=Object.keys(ds).sort().reverse();
+  for(var i=0;i<l.length;i++){ var g=vGrpDay(G.mv,l[i]).filter(function(x){ return Math.abs(x.cs-G.cs)<=VC_TOL+1e-9; })[0]; if(g)return g; }
+  return null;
+}
+/* bruit : écart type, d'une série à l'autre le même jour à la même charge, de la moyenne des k premières reps
+   (votre mesure du 19/11 : 0,023 m/s pour la 1re rep, 0,017 pour les reps 1 à 3) ; publié sinon (0,07 / 2√2) */
+function vNoise(mv,k){
+  var ds={}, ss=0, df=0; (S.velo||[]).forEach(function(v){ if(v.mouvement===mv)ds[v.date]=1; });
+  Object.keys(ds).forEach(function(d){ vGrpDay(mv,d).forEach(function(G){
+    var m=G.sets.filter(function(v){ return vOk(v).length>=k; }).map(function(v){ return vMoyA(vOk(v).slice(0,k).map(function(r){return +r.vitesse_moy_ms;})); });
+    if(m.length<2)return; var mo=vMoyA(m); m.forEach(function(x){ ss+=(x-mo)*(x-mo); }); df+=m.length-1; }); });
+  return df>=8?{sd:Math.sqrt(ss/df),df:df}:{sd:0.025,df:df,pub:true};
+}
+function vMarge(mv,k,na,nb){ var z=vNoise(mv,k); return {m:Math.max(0.02,2*z.sd*Math.sqrt(1/na+1/nb)),sd:z.sd,df:z.df,pub:z.pub}; }
+function vIsMax(G){   /* une seule série menée à l'échec : notée 0, AMRAP ou série max */
+  if(G.sets.length!==1)return false; var v=G.v, e=lienEntry(v);
+  return vRir(v)===0||!!(e&&e.role==='amrap')||typeLab(v)==='Série max';
+}
+/* réserve réelle d'une séance O d'après un AMRAP X à la même charge : par les reps (reps max − reps faites) et par la vitesse
+   (rep de l'AMRAP, après sa plus rapide, où la vitesse tombe à celle de la dernière rep de O) */
+function vResAmrap(O,X){
+  var a=vOk(X.v).map(function(r){return +r.vitesse_moy_ms;}), N=a.length, ec=vEchec(X.mv);
+  if(!(vRir(X.v)===0||a[N-1]<=ec.v+0.05))return null;   /* il faut un vrai échec */
+  var nO=vMoyA(O.sets.map(function(v){return vOk(v).length;})); if(nO>=N)return null;
+  var t=vMoyA(O.sets.map(function(v){return vLastOk(v);})), p=a.indexOf(Math.max.apply(null,a)), pv=null;
+  for(var j=p+1;j<N;j++){ if(a[j]<=t){ pv=(j-1)+(a[j-1]-t)/((a[j-1]-a[j])||1); break; } }
+  var q=O.sets.map(vRir).filter(function(x){return x!=null;});
+  return {N:N,reps:N-nO,vit:pv==null?null:N-(pv+1),note:q.length?vMoyA(q):null,t:t};
+}
+function vCmpSvg(G,R,k,ec){
+  var all=[]; [G,R].forEach(function(g){ g.sets.forEach(function(v){ vOk(v).forEach(function(r){ all.push(+r.vitesse_moy_ms); }); }); });
+  var nx=Math.max(vGrpNx(G),vGrpNx(R),2), lo=Math.min(Math.min.apply(null,all),ec)-0.03, hi=Math.max.apply(null,all)+0.03;
+  var W=340,H=170,ml=34,mr=10,mt=10,mb=24, X=function(i){ return ml+(W-ml-mr)*(i-1)/(nx-1); }, Y=function(y){ return mt+(H-mt-mb)*(hi-y)/(hi-lo); };
+  var s='<svg class="vsprof" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Vitesse de chaque rep, cette séance contre la séance d’avant à la même charge">';
+  s+='<rect x="'+(X(1)-6).toFixed(1)+'" y="'+mt+'" width="'+(X(k)-X(1)+12).toFixed(1)+'" height="'+(H-mt-mb)+'" fill="var(--soft)"/>';
+  niceTicks(lo,hi,4).t.forEach(function(g){ if(g<lo-1e-9||g>hi+1e-9)return; var y=Y(g).toFixed(1);
+    s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y+'" y2="'+y+'" stroke="currentColor" opacity=".1"/><text x="'+(ml-4)+'" y="'+(+y+3.5)+'" text-anchor="end" class="lb">'+tickLab(g)+'</text>'; });
+  for(var i=1;i<=nx;i++)s+='<text x="'+X(i).toFixed(1)+'" y="'+(H-mb+13)+'" text-anchor="middle" class="lb">'+i+'</text>';
+  s+='<text x="'+(W-mr)+'" y="'+(H-1)+'" text-anchor="end" class="lb">rep</text>';
+  var ye=Y(ec).toFixed(1);
+  s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+ye+'" y2="'+ye+'" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".8"/><text x="'+(ml+3)+'" y="'+(+ye-4)+'" class="lb">échec '+v2(ec)+'</text>';
+  var line=function(v,col,w,r){ var o=vOk(v), pts=o.map(function(q,i){ return X(i+1).toFixed(1)+','+Y(+q.vitesse_moy_ms).toFixed(1); }).join(' ');
+    return '<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="'+w+'"/>'+o.map(function(q,i){ return '<circle cx="'+X(i+1).toFixed(1)+'" cy="'+Y(+q.vitesse_moy_ms).toFixed(1)+'" r="'+r+'" fill="'+col+'"/>'; }).join(''); };
+  R.sets.forEach(function(v){ s+=line(v,'var(--muted)',1.2,2.4); });
+  G.sets.forEach(function(v){ s+=line(v,'var(--a2)',2,3.2); });
+  return s+'</svg>';
+}
+function vCmpCard(G){
+  var R=vGrpPrev(G), lab=vGrpLab(G);
+  if(!R)return '<div class="vsv"><div class="vsvh"><b>Comparée à</b><span class="muted">'+esc(lab)+'</span></div><p class="note" style="margin:4px 0 0">Aucune séance d’avant à cette charge ('+F(Math.round(G.cs*10)/10)+' kg au total, à 1,25 kg près).</p></div>';
+  var k=Math.min(vGrpN(G),vGrpN(R)), a=vGrpReps(G,k), b=vGrpReps(R,k), ma=vMoyA(a), mb=vMoyA(b);
+  var M=vMarge(G.mv,k,G.sets.length,R.sets.length), M1=vMarge(G.mv,1,G.sets.length,R.sets.length), ec=vEchec(G.mv).v;
+  var dl=function(d,mg){ var r=Math.round(d*100)/100; return ' <b class="'+(Math.abs(d)<mg?'':(d>0?'vsok':'vswarn'))+'">'+(d>=0?'+':'−')+v2(Math.abs(d))+'</b>'+
+      ' <small>'+(Math.abs(d)<mg?'dans la marge':(d>0?'nettement plus rapide':'nettement plus lent'))+'</small>'; };
+  var h='<div class="vsv vcmpc"><div class="vsvh"><b>'+esc(lab)+'</b><span class="muted">'+F(Math.round(G.cs*10)/10)+' kg au total</span></div>'+
+    '<p class="note" style="margin:2px 0 6px">Comparée à <b>'+frDate(R.date)+'</b> · '+esc(vGrpLab(R))+' · '+F(Math.round(R.cs*10)/10)+' kg'+(R.sets.length>1||G.sets.length>1?' <small>(séries d’une même séance moyennées rep par rep)</small>':'')+'</p>'+
+    vCmpSvg(G,R,k,ec)+
+    '<p class="note" style="margin:2px 0 4px"><span style="color:var(--a2)">●</span> cette séance <span style="color:var(--muted)">●</span> le '+perDs(R.date)+' · bande claire : reps communes</p>'+
+    '<dl class="vsvl"><dt>'+(k>1?'Reps 1 à '+k+', moyenne':'Rep 1')+'</dt><dd>'+v2(mb)+' → '+v2(ma)+dl(ma-mb,M.m)+' <small>(marge '+v2(M.m)+')</small></dd>'+
+    (k>1?'<dt>Rep '+k+'</dt><dd>'+v2(b[k-1])+' → '+v2(a[k-1])+dl(a[k-1]-b[k-1],M1.m)+'</dd>':'');
+  var X=vGrpNx(G)>k?G:(vGrpNx(R)>k?R:null);
+  if(X){ var xs=vGrpReps(X,vGrpNx(X)).slice(k).filter(function(x){return x!=null;}), last=xs[xs.length-1];
+    h+='<dt>Au-delà <small>('+(X===G?'cette séance':'le '+perDs(R.date))+', reps '+(k+1)+' à '+vGrpNx(X)+')</small></dt><dd>'+v2(xs[0])+(xs.length>1?' → '+v2(last):'')+
+      (last<=ec+0.05&&X.sets.length===1?' <small>dernière rep à votre vitesse d’échec : série à l’échec</small>':'')+'</dd>'; }
+  var am=vIsMax(G)&&!vIsMax(R)?vResAmrap(R,G):(vIsMax(R)&&!vIsMax(G)?vResAmrap(G,R):null);
+  if(am){ var O=vIsMax(G)?R:G, rd=function(x){ return F(Math.round(x*2)/2); };
+    h+='<dt>Réserve '+(O===R?'le '+perDs(R.date):'cette séance')+'</dt><dd>notée <b>'+(am.note==null?'—':rd(am.note))+'</b> · d’après l’AMRAP à '+am.N+' reps : <b>'+rd(am.reps)+'</b> par les reps'+
+      (am.vit!=null?', <b>'+rd(am.vit)+'</b> par la vitesse':'')+(am.note==null?' <small>(série non rattachée : pas de réserve notée)</small>':'')+'</dd>'; }
+  h+='</dl><details class="chd" data-chd="vcmpd"><summary>Série par série</summary><div class="note">'+
+    [G,R].map(function(g,gi){ return '<p style="margin:4px 0"><b>'+(gi?frDate(R.date):'Cette séance')+'</b></p>'+g.sets.map(function(v,i){
+      return '<div>'+(g.sets.length>1?'Série '+(i+1)+' : ':'')+vOk(v).map(function(r){return v2(+r.vitesse_moy_ms);}).join(' · ')+' <button class="linkbtn" data-vopen="'+esc(v.id)+'">détail ›</button></div>'; }).join(''); }).join('')+
+    '</div></details>'+
+    '<p class="note" style="margin:4px 0 0"><small>Seules les reps communes se comparent : au-delà, la fatigue n’est plus la même. Marge : 2 écarts types de la différence, tirés de vos séries répétées le même jour à la même charge'+
+    (M.pub?' (pas encore assez : valeur publiée)':' ('+v2(M.sd)+' m/s par série, sur '+M.df+' degrés de liberté)')+'.</small></p></div>';
+  return h;
+}
+function vbK(st,kf){   /* v165 : moyenne, dernière rep et perte sur les reps communes quand les séries n'ont pas le même nombre de reps */
+  var ns=st.map(function(o){ return vOk(o.v).length; }), K=kf||Math.min.apply(null,ns), KX=Math.max.apply(null,ns);
+  if(K<KX&&K>0)st.forEach(function(o){ var x=vOk(o.v).slice(0,K).map(function(r){return +r.vitesse_moy_ms;}), b=Math.max.apply(null,x);
+    o.mv=vMoyA(x); o.vl=x[K-1]; o.pe=K>1&&b>0?(1-x[K-1]/b)*100:null; o.fin=false; });
+  return {k:K,eq:K===KX};
+}
+/* v165 (fil Relentless 19/11, protocole de Florent Blanc) : single témoin. Un échauffement d'une seule rep à la charge totale du
+   top set d'avant (à 1,25 kg près, 8 jours au plus : la semaine d'avant), comparé à la 1re rep de ce top set. Marge de mesure 0,07 m/s (votre bruit
+   le 19/11 : 0,023 m/s d'une série à l'autre à charge égale, soit 0,065 à 2√2). Dès 3 tests d'avant, l'écart habituel entre un
+   single et une 1re rep (biais) est retiré avant le verdict. Lecture seulement : aucun conseil de charge (choix de Luka : observer au bloc 3). */
+var TEM_TOL=1.25, TEM_J=8, TEM_MG=0.07, TEM_NB=3;
+function vTemoins(mv){
+  var all=(S.velo||[]).filter(function(v){ return v.mouvement===mv&&!v.variante&&v.charge_systeme_kg!=null; });
+  var tops=vHeavies(mv);   /* charge la plus lourde de chaque séance, séries moyennées (Intermediate : pas de top set au J1) */
+  var out=[];
+  all.filter(function(v){ return isWarm(v)&&vOk(v).length===1&&(v.reps||[]).length===1; }).forEach(function(w){
+    var cs=+w.charge_systeme_kg, d0=Date.parse(w.date);
+    var p=tops.filter(function(t){ var dd=(d0-Date.parse(t.date))/864e5; return t.date<w.date&&dd<=TEM_J&&Math.abs(+t.charge_systeme_kg-cs)<=TEM_TOL+1e-9; })
+      .sort(function(a,b){ return String(b.date).localeCompare(String(a.date))||vSortN(b,a); })[0];
+    if(!p)return;
+    var day=tops.filter(function(t){ return t.date===w.date; })[0]||null;
+    out.push({w:w,p:p,day:day,vs:+vOk(w)[0].vitesse_moy_ms,vp:+vOk(p)[0].vitesse_moy_ms,g:+vOk(w)[0].vitesse_moy_ms-(+vOk(p)[0].vitesse_moy_ms)});
+  });
+  out.sort(function(a,b){ return String(a.w.date).localeCompare(String(b.w.date)); });
+  out.forEach(function(o,i){ var av=out.slice(0,i); o.nb=av.length;
+    o.bi=av.length>=TEM_NB?vMoyA(av.map(function(x){return x.g;})):null;
+    o.gc=o.g-(o.bi||0);
+    o.c=Math.abs(o.gc)<TEM_MG?0:(o.gc<0?-1:1); });
+  return out;
+}
+function vTemoinHTML(mv,bbl){
+  var T=vTemoins(mv);
+  var h='<p class="note" style="margin-top:10px"><b>Single témoin</b> <small>(avant la série la plus lourde, à sa charge de la semaine d’avant)</small></p>';
+  if(!T.length)return h+'<p class="note">Aucun pour l’instant. Au dernier échauffement, faites <b>une seule rep</b> à la charge totale de votre série la plus lourde de la semaine d’avant (même lest, à 1,25 kg près PdC compris) et filmez-la en « échauffement » : elle sera comparée ici à la 1re rep de cette série (moyenne si plusieurs séries).</p>';
+  var l=T.filter(function(o){ return String(vBloc(o.w))===String(bbl); }), autres=T.length-l.length;
+  if(!l.length)h+='<p class="note">Aucun dans ce bloc'+(autres?' ('+autres+' dans d’autres blocs)':'')+'.</p>';
+  else h+='<div class="vctw"><table class="vct"><thead><tr><th>Séance</th><th>Single</th><th>1re rep d’avant</th><th>Écart</th><th>Lecture</th></tr></thead><tbody>'+
+    l.map(function(o){ var w=o.w, p=o.p, dy=o.day, v1d=dy&&vOk(dy).length?+vOk(dy)[0].vitesse_moy_ms:null;
+      var lab=o.c===0?'dans la marge':(o.c<0?'<b class="vswarn">nettement plus lent</b>':'<b class="vsok">nettement plus rapide</b>');
+      return '<tr data-vopen="'+esc(w.id)+'" style="cursor:pointer"><td><b>'+(w.semaine?'S'+w.semaine+(w.seance!=null?' J'+w.seance:''):perDs(w.date))+'</b><small>'+perDs(w.date)+' · '+(+w.lest_kg?F(w.lest_kg):'PdC')+' kg · '+F(Math.round(+w.charge_systeme_kg*10)/10)+' total</small>'+
+          (dy?'<small>plus lourde du jour '+vSetsLab(dy)+(v1d!=null?', 1re '+v2(v1d):'')+'</small>':'')+'</td>'+
+        '<td>'+v2(o.vs)+'</td>'+
+        '<td>'+v2(o.vp)+'<small>'+perDs(p.date)+' · '+vSetsLab(p)+' · '+F(Math.round(+p.charge_systeme_kg*10)/10)+' total</small></td>'+
+        '<td>'+(o.g>=0?'+':'−')+v2(Math.abs(o.g))+(o.bi!=null?'<small>sans biais '+(o.gc>=0?'+':'−')+v2(Math.abs(o.gc))+'</small>':'')+'</td>'+
+        '<td>'+lab+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  var bi=T.length>=TEM_NB?vMoyA(T.map(function(x){return x.g;})):null;
+  h+='<p class="note">'+T.length+' single'+(T.length>1?'s':'')+' témoin'+(T.length>1?'s':'')+' en tout. '+
+    (bi!=null?'Écart habituel entre un single et une 1re rep : <b>'+(bi>=0?'+':'−')+v2(Math.abs(bi))+' m/s</b> (moyenne de vos '+T.length+' tests) ; il est retiré avant la lecture dès le '+(TEM_NB+1)+'<sup>e</sup> test. ':
+      'Dès '+TEM_NB+' tests, l’écart habituel entre un single et une 1re rep (un single peut aller plus vite) sera retiré avant la lecture. ')+
+    'Lecture : sous 0,07 m/s d’écart, c’est la marge de mesure. Rien n’est conseillé sur la charge : à décider après le bloc 3, avec ces mesures.</p>';
+  return h;
+}
 function vIsDl(v){ return /^d\|/.test(String(v.lien&&v.lien.key||'')); }   /* lot 126 : série du deload entre deux blocs */
 function vbStats(v){ var o=vcStats(v,null), w=vfDw(v); o.dw=w.d; o.dwhy=w.why; o.mv=vMoyV(v); o.v=v; return o; }
 function vbMoy(a,k){ return vMoyA(a.map(function(o){return o[k];}).filter(function(x){return x!=null;})); }
@@ -12517,9 +12685,9 @@ function vScrBloc(){
   if(!mvs.length)return '<div class="card"><p class="note">Rien à comparer : aucune analyse importée.</p></div>';
   if(mvs.indexOf(U.cmv)<0)U.cmv=mvs[0];
   var byD=function(a,b){return String(a.date).localeCompare(String(b.date))||vSortN(a,b);};
-  var tops=S.velo.filter(function(v){return v.mouvement===U.cmv&&typeLab(v)==='Top set'&&!vIsDl(v);}).sort(byD);   /* lot 126 : sans le deload */
+  var tops=vHeavies(U.cmv).sort(byD);   /* v165 : la charge la plus lourde de chaque séance, séries moyennées (lot 126 : sans le deload) */
   var h='<div class="card">'+(mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
-  if(!tops.length)return h+'<p class="note">Aucun top set filmé pour ce mouvement.</p></div>';
+  if(!tops.length)return h+'<p class="note">Aucune série de travail filmée pour ce mouvement.</p></div>';
   var bl=[]; tops.forEach(function(v){ var b=String(vBloc(v)); if(bl.indexOf(b)<0)bl.push(b); });
   bl.sort(function(a,b){return +b-+a;});
   if(bl.indexOf(String(U.bbl))<0)U.bbl=bl[0];
@@ -12527,10 +12695,10 @@ function vScrBloc(){
   var js=[]; inB.forEach(function(v){ if(v.seance!=null&&js.indexOf(String(v.seance))<0)js.push(String(v.seance)); }); js.sort();
   if(U.bj&&js.indexOf(String(U.bj))<0)U.bj='';
   var jOk=function(v){ return !U.bj||String(v.seance)===String(U.bj); };
-  var l=inB.filter(jOk), st=l.map(vbStats);
+  var l=inB.filter(jOk), st=l.map(vbStats), KK=vbK(st), mlab=KK.eq?'Moy.':'Moy. 1-'+KK.k, dlab=KK.eq?'Dern.':'Rep '+KK.k;   /* v165 : reps communes */
   h+='<div class="row" style="margin-top:6px"><div class="field md"><label>Bloc</label>'+vSel('bbl',bl,U.bbl,vBlocLab)+'</div>'+
     '<div class="field md"><label>Jour</label>'+vSel('bj',[''].concat(js),U.bj||'',function(j){return j===''?'tous les jours':'J'+j+' seulement';})+'</div></div>';
-  if(!l.length)return h+'<p class="note">Aucun top set filmé ce jour-là dans ce bloc.</p></div>';
+  if(!l.length)return h+'<p class="note">Aucune série filmée ce jour-là dans ce bloc.</p></div>';
   /* résumé : premier → dernier */
   var A=st[0], Z=st[st.length-1];
   var ch=function(lab,a,z,k,unit,good,mg){
@@ -12540,27 +12708,27 @@ function vScrBloc(){
     return '<li>'+lab+' : '+fmt(a)+' → '+fmt(z)+unit+' <b class="'+col+'">('+(r>0?'+':r<0?'−':'±')+fmt(Math.abs(d))+')</b></li>';
   };
   if(st.length>=2){
-    h+='<p class="note" style="margin-top:8px"><b>Du premier au dernier top set</b> ('+perDs(A.v.date)+' → '+perDs(Z.v.date)+', '+st.length+' top sets) :</p><ul class="note" style="margin:2px 0 0">'+
+    h+='<p class="note" style="margin-top:8px"><b>De la première à la dernière séance</b> ('+perDs(A.v.date)+' → '+perDs(Z.v.date)+', '+st.length+' séances, la charge la plus lourde de chacune) :</p><ul class="note" style="margin:2px 0 0">'+
       ch('Lest',+A.v.lest_kg,+Z.v.lest_kg,100,' kg',1)+
       ch('1re rep',A.v1,Z.v1,100,' m/s',1,0.07)+
-      ch('Vitesse moyenne',A.mv,Z.mv,100,' m/s',1,0.07)+
-      ch('Dernière rep',A.vl,Z.vl,100,' m/s',1,0.07)+
+      ch(KK.eq?'Vitesse moyenne':'Vitesse moyenne des reps 1 à '+KK.k,A.mv,Z.mv,100,' m/s',1,0.07)+
+      ch(KK.eq?'Dernière rep':'Rep '+KK.k,A.vl,Z.vl,100,' m/s',1,0.07)+
       ch('Perte de vitesse',A.pe,Z.pe,1,' %',-1)+
       (vbMoy(st,'dw')!=null?'<li>Écart moyen à votre droite : '+(function(m){return (m>=0?'+':'−')+v2(Math.abs(m))+' m/s ('+(Math.abs(m)<=0.07?'habituel':m>0?'plus rapide':'plus lent')+')';})(vbMoy(st,'dw'))+'</li>':'')+
       '</ul>';
   }
   /* tableau : un top set par ligne, écart avec celui d'avant sous chaque valeur */
   var dl=function(o,i,k,mul,good,mg){ if(!i)return ''; var p=st[i-1][k]; return o[k]==null||p==null?'':vcDelta(o[k]-p,mul,good,mg); };
-  h+='<div class="vctw"><table class="vct"><thead><tr><th>Top set</th><th>1re</th><th>Moy.</th><th>Dern.</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+
+  h+='<div class="vctw"><table class="vct"><thead><tr><th>Séance</th><th>1re</th><th>'+mlab+'</th><th>'+dlab+'</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+
     st.map(function(o,i){ var v=o.v;
-      return '<tr data-vopen="'+esc(v.id)+'" style="cursor:pointer"><td><b>'+(v.semaine?'S'+v.semaine+(v.seance!=null?' J'+v.seance:''):perDs(v.date))+'</b><small>'+perDs(v.date)+' · '+(+v.lest_kg?F(v.lest_kg):'PdC')+'×'+v.reps.length+(o.nv!=null&&o.nv<o.n?' ('+o.nv+' val.)':'')+'</small>'+(o.rir!=null?'<small>réserve '+F(o.rir)+'</small>':'')+'</td>'+
+      return '<tr data-vopen="'+esc(v.id)+'" style="cursor:pointer"><td><b>'+(v.semaine?'S'+v.semaine+(v.seance!=null?' J'+v.seance:''):perDs(v.date))+'</b><small>'+perDs(v.date)+' · '+vSetsLab(v)+(o.nv!=null&&o.nv<o.n?' ('+o.nv+' val.)':'')+'</small>'+(o.rir!=null?'<small>réserve '+F(o.rir)+'</small>':'')+'</td>'+
         '<td>'+(o.v1==null?'—':v2(o.v1))+dl(o,i,'v1',100,1,0.07)+'</td>'+
         '<td>'+(o.mv==null?'—':v2(o.mv))+dl(o,i,'mv',100,1,0.07)+'</td>'+
         '<td>'+(o.vl==null?'—':v2(o.vl))+(o.fin?'<small>pause</small>':dl(o,i,'vl',100,1,0.07))+'</td>'+
         '<td>'+(o.pe==null?'—':F(Math.round(o.pe))+' %')+dl(o,i,'pe',1,-1)+'</td>'+
         '<td>'+(o.dw==null?'<small>—</small>':(Math.abs(o.dw)<=0.07?'hab.':(o.dw>0?'<b class="vsok">+'+v2(o.dw)+'</b>':'<b class="vswarn">−'+v2(-o.dw)+'</b>')))+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
-    '<p class="note">Vitesses en m/s. Sous chaque valeur : l’écart avec le top set de la ligne d’avant (gris = sous la marge de mesure, 0,07 m/s). Perte = de la meilleure rep à la dernière. Touchez une ligne pour le détail.</p>';
+    '<p class="note">Vitesses en m/s. Sous chaque valeur : l’écart avec la ligne d’avant (gris = sous la marge de mesure, 0,07 m/s). Une ligne = la charge la plus lourde de la séance, séries moyennées rep par rep'+(KK.eq?'':' ; moyenne, rep '+KK.k+' et perte sur les reps 1 à '+KK.k+', communes à toutes les lignes')+'. Perte = de la meilleure rep à la dernière. Touchez une ligne pour le détail.</p>';
   /* rep par rep */
   var gm=U.bgr==='p'?'p':'v', nmax=Math.max.apply(null,l.map(function(v){return v.reps.length;}));
   var head='<tr><th>Rep</th>'; for(var r=1;r<=nmax;r++)head+='<th>'+r+'</th>'; head+='</tr>';
@@ -12574,15 +12742,17 @@ function vScrBloc(){
     }).join('')+'</tbody></table></div>'+
     '<p class="note">Une rep isolée varie d’environ 0,07 m/s d’une mesure à l’autre : lisez la tendance d’une colonne, pas un chiffre seul.</p>';
   /* bloc après bloc */
+  var KA=Math.min.apply(null,tops.filter(jOk).map(function(v){return vOk(v).length;}).concat([99]));   /* v165 : reps communes à tous les blocs */
   var rowsB=bl.slice().sort(function(a,b){return +a-+b;}).map(function(b){
     var lb=tops.filter(function(v){return String(vBloc(v))===b&&jOk(v);}); if(!lb.length)return '';
-    var sb=lb.map(vbStats), le=lb.map(function(v){return +v.lest_kg||0;}), m=function(k,mul){ var x=vbMoy(sb,k); return x==null?'—':(mul===100?v2(x):F(Math.round(x))); };
+    var sb=lb.map(vbStats); vbK(sb,KA); var le=lb.map(function(v){return +v.lest_kg||0;}), m=function(k,mul){ var x=vbMoy(sb,k); return x==null?'—':(mul===100?v2(x):F(Math.round(x))); };
     var dwm=vbMoy(sb,'dw');
-    return '<tr'+(b===String(U.bbl)?' style="font-weight:600"':'')+'><td>'+esc(vBlocLab(b)).replace(/, .*$/,'')+'<small>'+lb.length+' top sets</small></td><td>'+F(Math.min.apply(null,le))+'–'+F(Math.max.apply(null,le))+'</td><td>'+m('v1',100)+'</td><td>'+m('vl',100)+'</td><td>'+m('pe',1)+' %</td><td>'+(dwm==null?'—':(dwm>=0?'+':'−')+v2(Math.abs(dwm)))+'</td></tr>';
+    return '<tr'+(b===String(U.bbl)?' style="font-weight:600"':'')+'><td>'+esc(vBlocLab(b)).replace(/, .*$/,'')+'<small>'+lb.length+' séances</small></td><td>'+F(Math.min.apply(null,le))+'–'+F(Math.max.apply(null,le))+'</td><td>'+m('v1',100)+'</td><td>'+m('vl',100)+'</td><td>'+m('pe',1)+' %</td><td>'+(dwm==null?'—':(dwm>=0?'+':'−')+v2(Math.abs(dwm)))+'</td></tr>';
   }).join('');
   h+='<p class="note" style="margin-top:10px"><b>Bloc après bloc</b>'+(U.bj?' (J'+esc(U.bj)+' seulement)':'')+'</p>'+
-    '<div class="vctw"><table class="vct"><thead><tr><th>Bloc</th><th>Lest</th><th>1re</th><th>Dern.</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+rowsB+'</tbody></table></div>'+
-    '<p class="note">Moyennes des top sets de chaque bloc. « vs droite » : écart moyen de la 1re rep à la vitesse attendue à sa charge (droite des séances d’avant) ; c’est la seule colonne qui se compare quand les charges diffèrent d’un bloc à l’autre.</p>';
+    '<div class="vctw"><table class="vct"><thead><tr><th>Bloc</th><th>Lest</th><th>1re</th><th>'+(KA<99?'Rep '+KA:'Dern.')+'</th><th>Perte</th><th>vs droite</th></tr></thead><tbody>'+rowsB+'</tbody></table></div>'+
+    '<p class="note">Moyennes de la série la plus lourde de chaque séance du bloc. « vs droite » : écart moyen de la 1re rep à la vitesse attendue à sa charge (droite des séances d’avant) ; c’est la seule colonne qui se compare quand les charges diffèrent d’un bloc à l’autre.</p>';
+  h+=vTemoinHTML(U.cmv,U.bbl);   /* v165 */
   return h+'</div>';
 }
 function vScrSerie(v){
@@ -12771,6 +12941,7 @@ function vsSeance(){
     '<details class="chd" data-chd="vfilt"><summary>Filtres : bloc, type de séance</summary>'+fl+'</details>'+
     fx.map(vFixeRow).join('')+   /* lot 82 (A15) */
     work.map(function(v){ return vsRow(v,P,mx); }).join('')+
+    (function(){ var g=vGrpDay(U.mv,U.date); return g.length?'<div class="vtitle" style="margin-top:12px">Même charge, séance d’avant</div>'+g.map(vCmpCard).join(''):''; })()+   /* v165 */
     (warm.length?'<button class="vwarm" data-vwarm="1">Échauffements ('+warm.length+') '+(U.warm?'▾':'▸')+'</button>'+
       (U.warm?warm.map(function(v){ return vsRow(v,P,mx); }).join(''):''):'')+
     '<p class="note chex"><b>Reps valides</b> : votre jugement quand vous en avez donné un (😀 😎 valide ; 😑 ❌ et trichée non ; 🤔 suit la hauteur), sinon la hauteur au-dessus du seuil (écran Réglages). '+
@@ -12794,7 +12965,8 @@ function vsProfil(){
   var h='<div class="card" data-chk="vprofil"><div class="vtitle">Profil charge-vitesse'+chIB('vprofil')+'</div>'+
     (mvs.length>1?'<div class="row"><div class="field md"><label>Mouvement</label>'+vSel('cmv',mvs,U.cmv)+'</div></div>':'');
   if(!P)return h+'<p class="note">Il faut au moins 6 séries filmées sans variante, avec le PdC, pour tracer votre droite ('+pts.length+' pour l’instant).</p>'+cmp+'</div>';
-  var x1=P.xAt(0.20), xa=P.xAt(0.25), xb=P.xAt(0.15), ext=P.sur;
+  var EC=vEchec(U.cmv), v0=EC.v, v0t=v2(v0)+' m/s';   /* v165 (fil Relentless 19/11, q6) : jusqu'à votre vitesse d'échec, 0,20 publiée tant qu'il y a moins de 5 séries notées 0 */
+  var x1=P.xAt(v0), xa=P.xAt(v0+0.05), xb=P.xAt(Math.max(0.05,v0-0.05)), ext=P.sur;
   var ys=pts.map(function(o){return o.y;});
   var xlo=Math.floor((P.x0-4)/5)*5, xhi=Math.ceil(((ext?Math.max(P.x9,x1):P.x9)+4)/5)*5, yhi=Math.max.apply(null,ys)*1.12;
   var W=340, H=210, ml=34, mr=8, mt=10, mb=26;
@@ -12805,9 +12977,9 @@ function vsProfil(){
   niceTicks(xlo,xhi,4).t.forEach(function(g){ if(g<xlo-1e-9||g>xhi+1e-9)return;
     s+='<text x="'+X(g).toFixed(1)+'" y="'+(H-mb+13)+'" text-anchor="middle" class="lb">'+F(g)+'</text>'; });
   s+='<text x="'+(W-mr)+'" y="'+(H-2)+'" text-anchor="end" class="lb">charge totale, kg</text>';
-  var y20=Y(0.20).toFixed(1);
+  var y20=Y(v0).toFixed(1);
   s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y20+'" y2="'+y20+'" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".8"/>'+
-     '<text x="'+(ml+3)+'" y="'+(+y20-4)+'" class="lb">1RM 0,20 m/s</text>';
+     '<text x="'+(ml+3)+'" y="'+(+y20-4)+'" class="lb">1RM '+v0t+'</text>';
   s+='<line x1="'+X(P.x0).toFixed(1)+'" y1="'+Y(P.a+P.b*P.x0).toFixed(1)+'" x2="'+X(P.x9).toFixed(1)+'" y2="'+Y(P.a+P.b*P.x9).toFixed(1)+'" stroke="var(--ink)" stroke-width="1.6"/>';
   if(ext)s+='<line x1="'+X(P.x9).toFixed(1)+'" y1="'+Y(P.a+P.b*P.x9).toFixed(1)+'" x2="'+X(x1).toFixed(1)+'" y2="'+y20+'" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="3 3"/>'+
     '<circle cx="'+X(x1).toFixed(1)+'" cy="'+y20+'" r="4.5" fill="none" stroke="var(--bad)" stroke-width="2"/>';
@@ -12822,14 +12994,14 @@ function vsProfil(){
   var fr=function(x){ return F(Math.round(x)); };
   var ec10=ext&&rr&&Math.abs(x1-rr)/rr>0.10;   /* v148, lot B Vitesse (questionnaire du 27/10, audit Vitesse 7) : écart > 10 % → signalé, pas de chiffre */
   if(ec10)h+='<p class="vssub" style="margin:4px 0 0"><b style="color:var(--warn)">! Pas de 1RM par la vitesse : la droite et vos reps ne sont pas d’accord.</b> '+
-      'Prolongée jusqu’à 0,20 m/s, elle donnerait '+F(Math.round(Math.abs(x1-rr)/rr*100))+' % '+(x1>rr?'de plus':'de moins')+' que le 1RM par les reps (≈ '+fr(rr)+' kg de charge totale, celui de Séance du jour). '+
+      'Prolongée jusqu’à '+v0t+', elle donnerait '+F(Math.round(Math.abs(x1-rr)/rr*100))+' % '+(x1>rr?'de plus':'de moins')+' que le 1RM par les reps (≈ '+fr(rr)+' kg de charge totale, celui de Séance du jour). '+
       'Au-delà de 10 % d’écart, l’un des deux est faux, le plus souvent la droite : séries trop proches en charge, ou une vidéo à alerte.</p>';
-  else if(ext)h+='<div class="vsbig"><b>≈ '+fr(x1)+'</b><span>kg de charge totale à 0,20 m/s</span></div>'+
-    '<div class="vssub">De '+fr(xa)+' à '+fr(xb)+' kg selon que la vitesse du 1RM vaut 0,25 ou 0,15 m/s'+
+  else if(ext)h+='<div class="vsbig"><b>≈ '+fr(x1)+'</b><span>kg de charge totale à '+v0t+'</span></div>'+
+    '<div class="vssub">De '+fr(xa)+' à '+fr(xb)+' kg selon que la vitesse du 1RM vaut '+v2(v0+0.05)+' ou '+v2(Math.max(0.05,v0-0.05))+' m/s'+
       (L&&L.useBw?', soit ≈ '+F(rnd(x1-S.bw,0.25))+' kg de lest au PdC courant ('+F(S.bw)+' kg)':'')+'.'+
       (rr?' Par les reps (1RM de Séance du jour) : ≈ '+fr(rr)+' kg.':'')+'</div>';
   else h+='<p class="vssub" style="margin:4px 0 0"><b style="color:var(--ink)">Pas encore de 1RM par la vitesse.</b> Vos séries filmées vont de '+fr(P.x0)+' à '+fr(P.x9)+' kg : '+
-      'trop proches les unes des autres pour prolonger la droite jusqu’à 0,20 m/s'+(P.r>-0.8?' (r = '+F(Math.round(P.r*100)/100)+')':'')+'. '+
+      'trop proches les unes des autres pour prolonger la droite jusqu’à '+v0t+(P.r>-0.8?' (r = '+F(Math.round(P.r*100)/100)+')':'')+'. '+
       'La prolonger quand même donnerait de '+fr(xa)+' à '+fr(xb)+' kg : trop large pour servir.'+
       (rr?' Par les reps (1RM de Séance du jour) : ≈ '+fr(rr)+' kg.':'')+'</p>';
   var nal=pts.filter(function(o){return (o.v.alertes||[]).length;}).length;
@@ -12838,7 +13010,7 @@ function vsProfil(){
     (ext?'':'<p class="note">Pour que la droite aille jusqu’au 1RM, filmez aussi des séries <b>plus légères</b> en tractions normales : les échauffements de la 1re séance du bloc (poids du corps, +10, +20, +30 kg). '+
       'Les tractions hautes et « haut et vite » sont des variantes : elles ne comptent pas.</p>')+
     '<p class="note chex">Un point par série filmée sans variante, échauffements compris : la vitesse moyenne de la 1re rep contre la charge totale (PdC du jour + lest). '+
-    'La droite est la vôtre. Prolongée jusqu’à 0,20 m/s, la vitesse moyenne du 1RM aux tractions (Sánchez-Moreno 2017, 0,20 ± 0,05 m/s), elle donne un '+
+    'La droite est la vôtre. Prolongée jusqu’à '+(EC.pub?'0,20 m/s, la vitesse moyenne du 1RM aux tractions (Sánchez-Moreno 2017, 0,20 ± 0,05 m/s ; la vôtre dès 5 séries notées 0, '+EC.n+' pour l’instant)':'votre vitesse d’échec, '+v0t+' (médiane de la dernière rep de vos '+EC.n+' séries filmées notées 0 en réserve ; 0,20 ± 0,05 m/s en moyenne publiée, Sánchez-Moreno 2017)')+', elle donne un '+
     '<b>second avis</b> sur le 1RM, moins fiable qu’un 1RM tiré des reps (Weakley 2021) ; il n’est montré que si la droite est nette (r ≤ −0,8) et couvre au moins 25 kg. '+
     'Entre vos charges habituelles, la droite sert déjà : c’est elle qui dit, dans l’écran Séance, si la 1re rep était plus lente que d’habitude.</p>'+cmp+'</div>';
   return h;
