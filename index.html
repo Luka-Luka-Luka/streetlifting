@@ -846,6 +846,26 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
 .profrow .pn small{display:block;color:var(--muted);font-weight:400}
 .profdel{flex:1 1 100%;background:var(--soft);border-left:4px solid var(--bad);border-radius:8px;padding:8px 10px}
 #chnout b{font-size:1.25em}
+/* v166 (P1 grand écran, 20/11) : au-delà de 1100 px, onglets en colonne à gauche, contenu sur toute la largeur,
+   modules sur deux colonnes (rangés en briques par dkLay) ; rien ne change en dessous de 1100 px (téléphone) */
+@media (min-width:1100px){
+  :root{--rail:96px}
+  body{padding-bottom:32px;padding-left:var(--rail)}
+  .wrap{max-width:1560px;padding:0 28px}
+  :root[data-dir] .wrap{padding:0 28px}
+  nav,:root[data-dir] nav{top:0;right:auto;bottom:0;width:var(--rail);display:flex;flex-direction:column;gap:6px;
+    padding:18px 8px;box-shadow:1px 0 0 color-mix(in srgb,var(--ink) 22%,transparent)}
+  nav button{min-height:68px;flex:0 0 auto;font-size:11.5px;gap:5px}
+  nav button svg{width:24px;height:24px}
+  body.navmin nav{transform:none}
+  #navtog{display:none}
+  .undobar{bottom:20px;left:calc(var(--rail) + 12px)}
+  #rkbadge{left:calc(var(--rail) + 10px)}
+  section.page.on.dk2,#todayout.dk2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px;grid-auto-rows:4px;align-items:start}
+  .dk2>*{grid-column:1/-1}
+  .dk2>.dkh{grid-column:auto}
+  body.reorg section.page.on.dk2,body.reorg #todayout.dk2{display:block}
+}
 </style>
 </head>
 <body>
@@ -1409,7 +1429,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v165';   /* lot 74 */
+var APPV='v166';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -13331,6 +13351,41 @@ if('serviceWorker' in navigator){
       '<button class="act ghost" onclick="this.closest(\'#updban\').remove()">Plus tard</button></div>';
     document.body.appendChild(d);
   });
+}
+
+/* v166 (P1 grand écran) : au-delà de 1100 px, les modules d'un onglet (cartes, liste des semaines, lignes de la séance…)
+   se rangent en briques sur deux colonnes. Les modules restent enfants directs de leur onglet : « Ranger » et l'ordre
+   enregistré marchent comme avant (l'ordre se lit ligne par ligne, gauche puis droite). Le reste (en-tête de séance,
+   boutons, bandeaux) prend toute la largeur. En dessous de 1100 px, rien ne change. */
+var DKQ=window.matchMedia?window.matchMedia('(min-width:1100px)'):null, DKRO=null, DKMO=null, dkT=0;
+function dkConts(){ var a=[]; document.querySelectorAll('section.page').forEach(function(sec){ if(sec.id!=='p-today')a.push(sec); }); var t=$('todayout'); if(t)a.push(t); return a; }   /* Séance : les modules sont dans #todayout, l'onglet lui-même reste en une colonne (pas de grille imbriquée) */
+function dkHalf(el,c){
+  if(el.id==='pdcline'||el.hasAttribute('data-pdcflag')||el.classList.contains('fpend'))return false;
+  return el.classList.contains('card')||el.classList.contains('tsess')||el.classList.contains('wk')||el.id==='progplan'||el.id==='velolist'||el.id==='liftlist';
+}
+function dkSpan(el){
+  var h=el.getBoundingClientRect().height; if(!h){ el.style.gridRowEnd=''; return; }
+  var cs=getComputedStyle(el), m=(parseFloat(cs.marginTop)||0)+(parseFloat(cs.marginBottom)||0);
+  var n=Math.max(1,Math.ceil((h+m)/4)); if(el.style.gridRowEnd!=='span '+n)el.style.gridRowEnd='span '+n;
+}
+function dkLay(){
+  var on=!!(DKQ&&DKQ.matches);
+  dkConts().forEach(function(c){
+    c.classList.toggle('dk2',on);
+    Array.prototype.forEach.call(c.children,function(el){
+      if(!on){ el.classList.remove('dkh'); el.style.gridRowEnd=''; return; }
+      el.classList.toggle('dkh',dkHalf(el,c));
+      if(DKRO)DKRO.observe(el);
+      dkSpan(el);
+    });
+  });
+}
+function dkSoon(){ if(dkT)return; dkT=requestAnimationFrame(function(){ dkT=0; dkLay(); }); }
+if(DKQ){
+  if(window.ResizeObserver)DKRO=new ResizeObserver(function(es){ if(!DKQ.matches)return; es.forEach(function(e){ dkSpan(e.target); }); });
+  if(window.MutationObserver){ DKMO=new MutationObserver(dkSoon); dkConts().forEach(function(c){ DKMO.observe(c,{childList:true}); }); }
+  try{ DKQ.addEventListener('change',dkLay); }catch(e){ try{ DKQ.addListener(dkLay); }catch(e2){} }
+  dkLay();
 }
 </script>
 </body>
