@@ -549,6 +549,8 @@ details.brmodif{border-top:1px solid var(--sbxr);margin-top:14px;padding-top:2px
 svg.plot{width:100%;height:190px;display:block;margin-top:8px}
 svg.plot.rkplot{height:auto;aspect-ratio:340/210;max-height:300px}   /* lot 56 B */
 .mk{font:400 12px/1 var(--txt);margin-left:4px;white-space:nowrap}
+.drp{white-space:nowrap}
+.drow{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:nowrap}.drow input.numin{width:auto;flex:1 1 0;min-width:0;max-width:6em}.drow select{width:auto;flex:0 0 auto}.drow .dar{font-weight:600}.drow button{flex:0 0 auto}
 .rirset{display:flex;gap:6px;align-items:center;margin-top:5px}
 .rirset>span{font:600 12px/1 var(--num);color:var(--muted);flex:0 0 22px}
 .rirset .pill{flex:1 1 0;min-width:0;padding:9px 0}
@@ -1429,7 +1431,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v167';   /* lot 74 */
+var APPV='v168';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -6643,6 +6645,7 @@ function lineMarks(key){
   var ec=0;
   if(e&&e.valid)e.valid.forEach(function(a){(a||[]).forEach(function(c){if(c==='ko')ko++; if(c==='ec')ec++; if(c==='dt')dt++;});});
   if(veloOfKey(key).length)h+=' \ud83c\udfa5';
+  if(e&&dropAny(e))h+=' <span class="drp" title="'+esc('drop set : '+dropLine(e))+'">↘'+dropsOf(e).reduce(function(n,a){ return n+(a?a.length:0); },0)+'</span>';   /* v168 : court sur la ligne ; le détail dans la saisie et dans Données */
   if(failPend(key))h+=' <b title="décision d\'échec à confirmer" style="color:var(--warn)">\u26a0</b>';
   if(dt)h+=' '+VJ.dt.e+dt; if(ko)h+=' '+VJ.ko.e+ko; if(ec)h+=' '+VJ.ec.e+ec;
   return h?'<span class="mk">'+h+'</span>':'';
@@ -6988,6 +6991,7 @@ function panelHTML(key){
         :'<div class="field sm"><label>'+uW(L,'Mètres faits','Secondes tenues','Reps réussies')+'</label><input data-fld="reps" class="numin"'+atAttr(e,0)+' type="text" inputmode="numeric" value="'+(e&&saisieOf(e)[0]!=null?saisieOf(e)[0]:(repDflt(x.reps)==null?'':repDflt(x.reps)))+'"></div>')+
     '</div>'+
     '<div data-presc>'+prescHTML(x,e&&e.load!=null?e.load:x.load)+'</div>'+   /* lot 64 (réponse 9) */
+    dropHTML(x,L,e)+   /* v168 */
     (x.sets>1?'<div class="row" data-pickwrap style="display:none;margin-top:6px"><div class="field w">'+
       '<label data-picklab>Reps</label><div class="pillrow" data-pickrow></div></div></div>':'')+
     vidSummary(key)+rirBlock+limHTML(x,L,e,key)+vQuick+   /* lot 48 (R12) ; lot 52 ; lot 73 : T / C, EMOM, validité complète sous Détails */
@@ -7036,6 +7040,8 @@ function draftRead(p){
   el=p.querySelector('[data-ech]'); if(el)o.ech={on:el.checked,m:p.querySelector('[data-ecm]').value,s:p.querySelector('[data-ecs]').value,
     r:p.querySelector('[data-ecr]').value,n:p.querySelector('[data-ecn]').value,w:p.querySelector('[data-ecw]').value,tx:p.querySelector('[data-ecnote]').value};   /* lot 57 bis ; lot 58 */
   el=p.querySelector('[data-lim]'); o.lim=el?el.getAttribute('aria-pressed')==='true':null;   /* lot 52 */
+  o.drops=Array.prototype.map.call(p.querySelectorAll('[data-drow]'),function(r){ var se=r.querySelector('[data-dset]');   /* v168 */
+    return [se?+se.value:0,r.querySelector('[data-dload]').value,r.querySelector('[data-dreps]').value]; });
   return o;
 }
 function draftApply(p,o){
@@ -7064,6 +7070,9 @@ function draftApply(p,o){
   el=p.querySelector('[data-ech]'); if(el&&o.ech){ el.checked=!!o.ech.on; p.querySelector('[data-ecm]').value=o.ech.m;   /* lot 57 bis */
     if(o.ech.s)p.querySelector('[data-ecs]').value=o.ech.s; p.querySelector('[data-ecr]').value=o.ech.r; p.querySelector('[data-ecn]').value=o.ech.n;
     if(o.ech.w)p.querySelector('[data-ecw]').value=o.ech.w; if(o.ech.tx!=null)p.querySelector('[data-ecnote]').value=o.ech.tx; finShow(p); }   /* lot 58 */
+  var dw=p.querySelector('[data-dropwrap]');   /* v168 */
+  if(dw&&o.drops){ var dfl=findLine(p.dataset.panel), dL=dfl?S.lifts[dfl.line.li]:null, dn=+dw.dataset.dn||1;
+    dw.querySelector('[data-drows]').innerHTML=o.drops.map(function(q){ return dropRowHTML(dn,Math.min(+q[0]||0,dn-1),q[1],q[2],dL); }).join(''); }
   PV=o.pv||[]; refreshV(p);
   var h=p.querySelector('h4');
   if(h)h.insertAdjacentHTML('afterend','<p class="note draftnote">Saisie non enregistrée, reprise telle que vous l\'aviez laissée. '+
@@ -7153,6 +7162,8 @@ function panelClick(e){
   if(p){
     if(e.target.closest('h4[data-ptit]')){LASTOPEN=null;closePanel();e.stopPropagation();return;}   /* lot 58 : le nom du mouvement referme */
     var b=e.target.closest('button'); if(!b)return;
+    if(b.dataset.dropadd!=null){ dropAdd(p); e.stopPropagation(); return; }   /* v168 */
+    if(b.dataset.drm!=null){ var drw=b.closest('[data-drow]'); if(drw)drw.remove(); e.stopPropagation(); return; }
     if(b.dataset.set!=null){
       var f=findLine(p.dataset.panel), min=tgtAt(f.line,+b.dataset.set), dft=f.line.tgt?min:repDflt(f.line.reps);   /* lot 96 */   /* D2 : borne haute */
       if(b.classList.contains('done')||b.classList.contains('short')||dft==null)showPick(p,b,f.line);
@@ -7265,6 +7276,7 @@ function saveLine(p,key){
   else Array.prototype.forEach.call(p.querySelectorAll('[data-set]'),function(b){
     var t=b.textContent.replace(/ (reps?|m|s)$/,''); sets.push(/^\d+$/.test(t)?+t:null);
   });
+  var drp=dropRead(p,sets); if(drp.err){ fieldMsg(drp.el,drp.err); return; }   /* v168 */
   var chk=p.querySelector('[data-rireach]'), each=!!(chk&&chk.checked), rir, rirs=null;
   if(each){
     rirs=Array.prototype.map.call(p.querySelectorAll('[data-rireachwrap] [data-rirrow]'),function(r){
@@ -7286,6 +7298,7 @@ function saveLine(p,key){
     role:x.role,presLoad:kp?o0.presLoad:x.load,presReps:kp?o0.presReps:x.reps,presSets:kp?o0.presSets:x.sets,load:load,sets:sets,rir:rir,
     bw:kp?o0.bw:num($('tbw').value,(S.tbw!=null?S.tbw:S.bw)),note:noteEl.value.trim(),setNotes:setNotes,state:state};
   if(rirs)e.rirs=rirs;
+  if(drp.d)e.drops=drp.d;   /* v168 */
   if(x.tempo)e.tempo=x.tempo;   /* lot 118 : tempo prévu = tempo fait */
   if(!each&&rirq)e.rirq=1;   /* lot 59 : « ? » choisi, réserve jugée non estimable */
   if(valid)e.valid=valid;
@@ -7370,13 +7383,86 @@ function skipLine(p,key){
    de l'onglet Charges) ; lest seul pour un mouvement ou le poids du corps ne compte pas.
    Les reps 😑 ne comptent pas (e.sets est deja net), les lignes sautees non plus.
    1RM estime : le modele de l'outil (predRM), exprime en lest, seulement si la reserve est notee. */
+/* ===== v168 : drop set (réponses de Luka du 22/11) =====
+   e.drops[st] = [{load, reps}, ...] : paliers enchaînés sans repos après la série st, à la charge qui reste (lest ou charge).
+   Ils comptent dans le tonnage et les reps du bilan seulement ; 1RM estimé, records, vitesse, réussite ou échec de la ligne :
+   la série de départ seule (e.load, e.sets inchangés). Réserve : celle de la série de départ, au moment de baisser. */
+function dropsOf(e){ return e&&Array.isArray(e.drops)?e.drops:[]; }
+function dropAny(e){ return dropsOf(e).some(function(a){ return a&&a.length; }); }
+function dropTxt(L,a){ return (a||[]).map(function(d){ return '↘ '+loadLab(L,d.load)+' '+S.sep+' '+d.reps; }).join(' '); }
+function dropLine(e){ var L=S.lifts[e.li], n=(e.sets||[]).length;
+  return dropsOf(e).map(function(a,st){ return a&&a.length?(n>1?'S'+(st+1)+' ':'')+dropTxt(L,a):''; }).filter(Boolean).join(' · '); }
+function dropCSV(e){ return dropsOf(e).map(function(a,st){ return a&&a.length?'S'+(st+1)+':'+a.map(function(d){ return d.load+'x'+d.reps; }).join('>'):''; }).filter(Boolean).join(' '); }
+/* un palier écrit en texte libre : « 15 kg 6 », « 15 x 6 », « +10 x 6 », « pdc x 5 », « 15 kg 6 reps » */
+function dropSeg(t){
+  var s=' '+xlNorm(t)+' ', r={load:null,reps:null,err:null};
+  var cut=function(re,f){ s=s.replace(re,function(){ f.apply(null,arguments); return ' '; }); };
+  cut(/\b(?:pdc|poids du corps|poids de corps|bodyweight|body weight|bw|sans lest|au pdc)\b/g,function(){ r.load=0; });
+  cut(/(?:@|\+)?\s*(-?\d+(?:[.,]\d+)?)\s*(?:kg|kgs|kilos?)\b/g,function(m,v){ r.load=xlNum(v); });
+  cut(/(?:@|\+)\s*(\d+(?:[.,]\d+)?)/g,function(m,v){ r.load=xlNum(v); });
+  cut(/(?:^|\s)-\s?(\d+(?:[.,]\d+)?)\b/g,function(m,v){ r.load=-xlNum(v); });
+  cut(/\b(\d+(?:[.,]\d+)?)\s*x\s*(\d+)\b/g,function(m,a,b){ if(r.load==null)r.load=xlNum(a); r.reps=+b; });
+  cut(/(?:^|\s)x\s*(\d+)\b/g,function(m,b){ r.reps=+b; });
+  cut(/\b(\d+)\s*(?:reps|rep|repetitions|repetition|fois)\b/g,function(m,a){ r.reps=+a; });
+  var lone=[]; cut(/(?:^|\s)(\d+(?:[.,]\d+)?)(?=\s|$)/g,function(m,a){ lone.push(xlNum(a)); });
+  lone.forEach(function(v){ if(r.load==null&&lone.length>1&&r.reps==null&&v===lone[0])r.load=v; else if(r.reps==null)r.reps=v; else if(r.load==null)r.load=v; });
+  if(r.load==null)r.err='charge non écrite (la charge qui reste, par exemple « drop 15 kg 6 » ou « drop pdc x 5 »)';
+  else if(!(r.reps>=1)||Math.round(r.reps)!==r.reps||r.reps>100)r.err='reps non écrites (un nombre entier, par exemple « drop 15 kg 6 »)';
+  else if(Math.abs(r.load)>500)r.err='charge au-delà de 500 kg';
+  return r;
+}
+/* panneau de saisie : une ligne par palier ; le menu S1…Sn dit après quelle série */
+function dropRowHTML(n,st,lv,rv,L){
+  var o=''; for(var i=0;i<n;i++)o+='<option value="'+i+'"'+(i===st?' selected':'')+'>après S'+(i+1)+'</option>';
+  return '<div class="drow" data-drow>'+(n>1?'<select data-dset aria-label="Après quelle série">'+o+'</select>':'')+
+    '<span class="dar" aria-hidden="true">↘</span><input data-dload class="numin" type="text" inputmode="decimal" aria-label="'+(L&&L.useBw?'Lest du palier (0 = PdC)':'Charge du palier')+'" placeholder="'+(L&&L.useBw?'lest':'kg')+'" value="'+esc(lv==null?'':lv)+'">'+
+    '<span class="dx">'+S.sep+'</span><input data-dreps class="numin" type="text" inputmode="numeric" aria-label="Reps du palier" placeholder="reps" value="'+esc(rv==null?'':rv)+'">'+
+    '<button class="act ghost mini" data-drm="1" aria-label="Retirer ce palier">×</button></div>';
+}
+function dropHTML(x,L,e){
+  if(!L||fmtOf(L)||isU(L))return '';
+  var n=Math.max(1,x.sets||1), rows='';
+  dropsOf(e).forEach(function(a,st){ (a||[]).forEach(function(d){ rows+=dropRowHTML(n,Math.min(st,n-1),F(d.load),d.reps,L); }); });
+  return '<div class="row" style="margin-top:8px"><div class="field w" data-dropwrap data-dn="'+n+'"><div data-drows>'+rows+'</div>'+
+    '<div class="btnrow" style="margin-top:4px"><button class="act ghost mini" data-dropadd="1">↘ Drop</button> '+
+    whyHTML('Drop set : vous enlevez du poids et continuez sans repos. Notez la charge qui reste'+(L.useBw?' (lest ; 0 = PdC)':'')+' et les reps de chaque palier. '+
+      'Les paliers comptent dans le tonnage et les reps du bilan, pas dans le 1RM, les records ni la réussite de la ligne : seule la série de départ compte, avec sa réserve au moment de baisser.','c\'est quoi ?')+'</div></div></div>';
+}
+function dropAdd(p){
+  var w=p.querySelector('[data-dropwrap]'); if(!w)return;
+  var n=+w.dataset.dn||1, rs=w.querySelectorAll('[data-drow]'), last=rs.length?rs[rs.length-1]:null, st=n-1;
+  if(last&&last.querySelector('[data-dset]'))st=+last.querySelector('[data-dset]').value;
+  w.querySelector('[data-drows]').insertAdjacentHTML('beforeend',dropRowHTML(n,st,'','',S.lifts[(findLine(p.dataset.panel)||{line:{}}).line.li]));
+  var r=w.querySelectorAll('[data-drow]'), inp=r[r.length-1].querySelector('[data-dload]'); if(inp&&inp.focus)inp.focus();
+}
+function dropRead(p,sets){   /* {d} ou {err, el} ; rien d'écrit = {d:null} */
+  var out=[], any=false, bad=null;
+  Array.prototype.forEach.call(p.querySelectorAll('[data-drow]'),function(r){
+    if(bad)return;
+    var le=r.querySelector('[data-dload]'), re=r.querySelector('[data-dreps]'), se=r.querySelector('[data-dset]');
+    var lt=String(le.value||'').trim().replace(',','.'), rt=String(re.value||'').trim();
+    if(lt===''&&rt==='')return;
+    if(/^pdc$/i.test(lt))lt='0';
+    if(!/^[-+]?(\d+(\.\d*)?|\.\d+)$/.test(lt)){ bad={el:le,err:'Charge du palier illisible : « '+le.value+' » ; la charge qui reste, en kg. Rien n\'est enregistré.'}; return; }
+    if(!/^\d+$/.test(rt)||+rt<1){ bad={el:re,err:'Reps du palier : un nombre entier, 1 ou plus. Rien n\'est enregistré.'}; return; }
+    var st=se?+se.value:0;
+    if(sets[st]==null){ bad={el:re,err:'S'+(st+1)+' n\'est pas notée : un drop suit une série faite. Rien n\'est enregistré.'}; return; }
+    (out[st]=out[st]||[]).push({load:+lt,reps:+rt}); any=true;
+  });
+  if(bad)return bad;
+  if(!any)return {d:null};
+  for(var i=0;i<sets.length;i++)if(!out[i])out[i]=null;
+  return {d:out.slice(0,sets.length)};
+}
 function entryStats(e){
   var L=S.lifts[e.li]; if(!L||e.state==='skip'||e.doubt||!e.sets)return null;   /* lot 80 (A8) */
-  var sys=(L.useBw?bwOf(e):0)+(+e.load||0), reps=0, sets=0;
+  var sys=(L.useBw?bwOf(e):0)+(+e.load||0), reps=0, sets=0, dr=0, dton=0;
   e.sets.forEach(function(r){ if(r!=null&&r>0){reps+=r; sets++;} });
   reps+=finPlus(e);   /* lot R3 : la fin d'une série ratée (fractionné, EMOM) compte aussi */
+  dropsOf(e).forEach(function(a,st){ if(!a||e.sets[st]==null)return;   /* v168 : paliers du drop set, tonnage et reps seulement */
+    a.forEach(function(d){ if(d&&d.reps>0){ dr+=d.reps; dton+=d.reps*((L.useBw?bwOf(e):0)+(+d.load||0)); } }); });
   var rm=null; try{ var p=predRM(L,e); if(p!=null)rm=p-eff(L,bwOf(e)); }catch(x){}
-  return isM(L)?{sets:sets,reps:0,ton:0,rm:null}:{sets:sets,reps:reps,ton:reps*sys,rm:rm,rs:rm==null?null:rm+(L.useBw?bwOf(e):0)};   /* lot 46 */   /* lot 66 (Q20) : rs = système */
+  return isM(L)?{sets:sets,reps:0,ton:0,rm:null}:{sets:sets,reps:reps+dr,ton:reps*sys+dton,rm:rm,rs:rm==null?null:rm+(L.useBw?bwOf(e):0)};   /* lot 46 */   /* lot 66 (Q20) : rs = système */
 }
 function sessStats(w,lab){
   var wk=PLAN.filter(function(x){return x.w===w;})[0]; if(!wk)return null;
@@ -8667,7 +8753,7 @@ function warmCard(weeks){
 function extraCard(k){
   var ln=S.lifts.map(function(L,i){return '<option value="'+i+'">'+esc(L.name)+'</option>';}).join('');
   return '<div class="card mini" id="cardextra" data-xlk="'+esc(k)+'"><h2 data-ic="＋">Ajouter<i class="xlong"> un mouvement</i> <em>à cette séance seulement</em></h2>'+
-    '<textarea id="xltxt" data-xltxt rows="'+Math.max(2,Math.min(8,XLT.split('\n').length))+'" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Ce que vous avez fait, une ligne par mouvement" placeholder="wide grip pull ups 1 set de 14 reps&#10;rowing 3x8 @70 kg">'+esc(XLT)+'</textarea>'+   /* v149, saisie libre */
+    '<textarea id="xltxt" data-xltxt rows="'+Math.max(2,Math.min(8,XLT.split('\n').length))+'" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Ce que vous avez fait, une ligne par mouvement" placeholder="wide grip pull ups 1 set de 14 reps&#10;rowing 3x8 @70 kg&#10;curl 8 @20 kg drop 15 kg 6 drop 10 kg 5">'+esc(XLT)+'</textarea>'+   /* v149, saisie libre */
     '<div id="xlprev">'+xlPrevHTML()+'</div>'+
     '<details class="chd"><summary>Saisie détaillée</summary>'+
     '<div class="row"><div class="field w"><label>Mouvement</label><select data-xli>'+ln+'</select></div></div>'+
@@ -8743,6 +8829,7 @@ var XLRE={
 };
 function xlNum(s){ return +String(s).replace(',','.'); }
 function xlParse(line){
+  var dsg=String(line||'').split(/\bdrop\b|↘/i); line=dsg.shift();   /* v168 : « … drop 15 kg 6 drop 10 kg 5 » */
   var raw=String(line||''), s=' '+xlNorm(raw)+' ', r={raw:raw.trim(),load:null,bwl:false,sets:null,rir:undefined,unit:null,amb:false,warn:[],err:[]};
   var cut=function(re,f){ s=s.replace(re,function(){ f.apply(null,arguments); return ' '; }); };
   /* réserve */
@@ -8794,6 +8881,7 @@ function xlParse(line){
   else if(r.sets.length>20)r.err.push(r.sets.length+' séries : au-delà de 20, c\'est sans doute une faute de frappe.');
   if(r.load!=null&&Math.abs(r.load)>500)r.err.push('Charge : au-delà de 500 kg, c\'est une faute de frappe.');
   if(r.rir!=null&&(r.rir<0||r.rir>10))r.rir=undefined;
+  r.drops=dsg.map(function(t,i){ var q=dropSeg(t); if(q.err)r.err.push('Drop '+(i+1)+' : '+q.err+'.'); return {load:q.load,reps:q.reps}; });
   return r;
 }
 
@@ -8823,6 +8911,7 @@ function xlLines(){
     if(nw&&!nw.name)err.push('Donnez un nom au nouveau mouvement.');
     if(L&&fmtOf(L))err.push('EMOM ou Tabata : passez par la saisie détaillée.');
     var unit=L?(isU(L)?L.unit:null):(nw?nw.unit||null:null), bw=L?!!L.useBw:(nw?nw.bw:false);
+    if(r.drops.length&&unit)err.push('Drop : seulement pour un mouvement en reps.');   /* v168 */
     if(L&&r.unit&&r.unit!==unit)err.push(L.name+' se mesure en '+uW(L,'mètres','secondes','reps')+', pas en '+(r.unit==='s'?'secondes':'mètres')+'.');
     if(sets&&unit&&sets.some(function(v){return v>ACCMMAX;}))err.push('Au-delà de '+ACCMMAX+(unit==='s'?' s':' m')+'.');
     if(sets&&!unit&&sets.some(function(v){return v>100;}))err.push('Reps : au-delà de 100, c\'est une faute de frappe.');
@@ -8835,7 +8924,8 @@ function xlLines(){
 function xlPres(x){   /* même écriture que les lignes de la séance : 70×8×3, PdC×14, 20×6, 6, 5 */
   var u=x.unit==='s'?' s':x.unit==='m'?' m':'', s=x.sets||[], same=s.length&&s.every(function(v){return v===s[0];});
   var ld=x.load==null?'?':(Math.abs(x.load)<0.01&&(x.bw||x.unit)?'PdC':F(x.load));
-  return ld+S.sep+(same?s[0]+u+(s.length>1?S.sep+s.length:''):s.join(', ')+u);
+  return ld+S.sep+(same?s[0]+u+(s.length>1?S.sep+s.length:''):s.join(', ')+u)+
+    ((x.r&&x.r.drops)||[]).map(function(d){ return ' ↘ '+(Math.abs(+d.load||0)<0.01&&x.bw?'PdC':F(d.load))+S.sep+d.reps; }).join('');   /* v168 */
 }
 function xlPrevHTML(){
   var ls=xlLines();
@@ -8897,6 +8987,7 @@ function xlAdd(k){
     var e={v:SCHEMA,id:key,key:key,date:todayISO(),li:li,lift:L2.name,tpl:L2.prog.tpl,week:w+1,day:lab,role:'extra',
       presLoad:x.load,presReps:reps,presSets:x.sets.length,load:x.load,sets:x.sets.slice(),rir:rir,bw:bw0,
       note:'',setNotes:[],state:null,xl:x.txt};
+    if(x.r.drops.length){ e.drops=x.sets.map(function(){ return null; }); e.drops[x.sets.length-1]=x.r.drops.map(function(d){ return {load:d.load,reps:d.reps}; }); }   /* v168 : après la dernière série */
     if(rir===null&&x.st.rir===null)e.rirq=1;   /* « ? » choisi */
     e.tries=e.sets.slice(); recount(e); e.state=stateOf(e);
     S.log=S.log.filter(function(z){return z.key!==key;}); S.log.push(e);
@@ -11516,7 +11607,7 @@ function logRowHTML(e){   /* lot 100 : une série, dans sa séance */
       if(e.state!=='skip')lk.push('<button class="linkbtn" data-doubtk="'+esc(e.key)+'">'+(e.doubt?'n’est plus douteuse':'saisie douteuse')+'</button>');   /* lot 80 (A8) */
       veloOfKey(e.key).forEach(function(v){lk.push('<button class="linkbtn" data-vgo="'+esc(v.id)+'">\ud83c\udfa5 vidéo S'+(v.lien.set+1)+'</button>');});
       return '<div class="logrow'+(LGOPEN[e.key]||DCOM===e.key?' lgopen':'')+'" data-lk="'+esc(e.key)+'"><span class="d">'+(e.date||'')+'</span>'+
-        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b>'+rkMark(e)+' '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+uM(S.lifts[e.li])+   /* R12 */
+        '<span class="t"><b class="n'+col(e.li||0)+'">'+(e.lift||'')+'</b>'+rkMark(e)+' '+loadLab(S.lifts[e.li],e.load)+' '+S.sep+' '+reps+uM(S.lifts[e.li])+(dropAny(e)?' <span class="drp">'+esc(dropLine(e))+'</span>':'')+   /* R12 ; v168 */
         (e.rirs?' · réserve '+e.rirs.map(function(v){return v==null?'?':F(v);}).join('/'):(e.rir!=null?' · '+F(e.rir)+' en réserve':' · réserve inconnue'))+
         ((e.rir!=null||e.rirs)&&learnE(e)?' <span class="lrn">(apprentissage)</span>':'')+   /* lot 81 (A9) */
         (e.doubt?' <span class="dout">⚠ douteuse</span>':'')+(aComp(e)?' <span class="acomp">à compléter</span>':'')+   /* lot 80 */
@@ -13165,11 +13256,11 @@ $('exportj').addEventListener('click',function(){
   renderBackup();
 });
 function seriesCSV(list){   /* lot 60 (Q5) : commun a la sauvegarde CSV et a l'export de ce qui est affiche ; colonne bloc en plus */
-  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','heures','note','bloc'];
+  var cols=['date','lift','tpl','week','day','role','bw','presLoad','presReps','presSets','load','sets','tries','rir','rirs','valid','state','heures','note','bloc','drops'];
   var VL={ko:'R',dt:'D',ok:'V',franc:'F'};
   var rows=[cols.join(';')].concat(list.map(function(e){
     return cols.map(function(c){
-      var v=c==='heures'?atList(e):(c==='bloc'?blockOfEntry(e):e[c]);   /* lot 43 (C2) */
+      var v=c==='heures'?atList(e):(c==='bloc'?blockOfEntry(e):(c==='drops'?dropCSV(e):e[c]));   /* lot 43 (C2) ; v168 */
       if(c==='valid'&&v)v=v.map(function(a){return (a||[]).map(function(q){return q?VL[q]:'-';}).join('');}).join('/');
       else if(Array.isArray(v))v=v.map(function(q){return q==null?'':q;}).join('/');
       if(v==null)v=''; return String(v).replace(/;/g,',');
