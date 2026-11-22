@@ -4336,7 +4336,7 @@ function demuxerMaison(buf) {
 /* ==================== page : plusieurs videos, un fichier de seance (lot 34 ; ordre et echange : lot 36) ==================== */
 (function () {
 'use strict';
-const PAGE = {"version":"v167","note_v167":"22/11/2026 : seance et series a analyser choisies (cases), serie du journal transmise a l'outil (rattachement direct), types serie / serie max, date lue dans le fichier si le nom n'en porte pas ; calcul inchange","note_v164":"19/11/2026 : masque vif de secours (S >= 110, teinte <= 4 ou >= 158, V >= 70) quand le suivi normal echoue (iPhone : short et peau pris pour la gommette ; soir : gommette trop sombre au sommet) ; signale dans les alertes","note_v132":"02/11/2026 : seuil de luminosite de la marque 70 -> 100 et saut lateral du suivi borne a 150 px (series du 01/11 : 5 et 4 reps trouvees sur 7)","note_lot90_version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
+const PAGE = {"version":"v169","note_v169":"22/11/2026 : a-coups au sommet (arret >= 0,3 s a la hauteur valide puis remontee >= 2 cm) : montee coupee au premier arret, alerte ; mesurer inchange","note_v167":"22/11/2026 : seance et series a analyser choisies (cases), serie du journal transmise a l'outil (rattachement direct), types serie / serie max, date lue dans le fichier si le nom n'en porte pas ; calcul inchange","note_v164":"19/11/2026 : masque vif de secours (S >= 110, teinte <= 4 ou >= 158, V >= 70) quand le suivi normal echoue (iPhone : short et peau pris pour la gommette ; soir : gommette trop sombre au sommet) ; signale dans les alertes","note_v132":"02/11/2026 : seuil de luminosite de la marque 70 -> 100 et saut lateral du suivi borne a 150 px (series du 01/11 : 5 et 4 reps trouvees sur 7)","note_lot90_version":"lot 90","note_lot90":"18/10/2026 : bouton Envoyer vers l'outil (cp-inbox), type Deload ; calcul inchange","note_lot82":"16/10/2026 : type Montee fixe (forme du jour), passe comme une ligne secondaire ; calcul inchange","note_lot74b":"15/10/2026 : reglage des echauffements filmes avant le top set, pre-remplissage decale, alertes de type ; calcul inchange","note_lotR3":"09/10/2026 : variantes pausees et tempo, durees (montee, descente, pauses) affichees ; calcul inchange","note_lot40":"06/10/2026 : pre-remplissage depuis l'app, variante pour toute la seance, recopie des back-offs ; calcul inchange","note_lot39":"05/10/2026 : option Dips retiree du menu Mouvement (pas d'analyse video des dips), calcul inchange","note_lot37":"05/10/2026 : blocs RESUME, SEANCE et SERIE31 modifies (suivi par programmation dynamique, cadrage, tentative ratee) ; empreintes ci-dessous non recalculees","page31_scripts_sha256":"546feb91cfc92a7eff7bc3472a2d18f6e5349cf75940677edeced7b47afdf7ab","decodeur31_sha256":"9de96080119e90ec2202922d92d8a38a4f79a7be21ea869d920eb526664c38e5","S33_sha256":"6b99e5b63dd606424f513fb71c6a1c2a44b2bd25baf297a6f8bae24d26c8a8ae","S34_sha256":"b8065895538f8d7a4dd82a909f63607c3c5e2f6a357baab2f90560105c263fc5","S36_sha256":"124f561fb759e70d632f113eeb4a61e9c1f13b0bed1f84ca0aa7da6e42cd05cc"};
 const CAL = JSON.parse(document.getElementById('calibration').textContent);
 const K = 1;                                  // definitif depuis le lot 15
 const COMMUNS = S34.COMMUNS, PAR_VIDEO = S36.PAR_VIDEO;   // + variante (lot 36)
@@ -4580,6 +4580,8 @@ function finir(entrees, saisie, echange) {
   });
   const lj = S40.liensParId ? S40.liensParId(fichiers.map((f) => f.name)) : {};   // v167 : série du journal choisie en 1
   (r.sortie.series || []).forEach((sr) => { if (lj[sr.id]) sr.serie_journal = lj[sr.id]; });
+  { let su = null; try { su = (JSON.parse(localStorage.getItem('cp-seances-page') || 'null') || {}).seuils || null; } catch (e) { su = null; }   // v169 : à-coups au sommet
+    (r.sortie.series || []).forEach((sr) => { try { SA.corrigerSerie(sr, su); } catch (e) {} }); }
   const vs = S34.vues(r.sortie);
   afficher(vs, r.sortie);
   // le fichier de seance (toutes les series) : seulement si au moins une serie est analysee
@@ -4965,6 +4967,82 @@ function afficher(vs, sortie) {
   globalThis.SR3 = { COLS: COLS, durees: durees, cellule: cellule, valeurs: valeurs };
 })();
 // <<< BLOC R3 - FIN >>>
+</script>
+<script>
+// <<< BLOC ACOUPS - DEBUT >>>
+// v169 (22/11/2026, choix de Luka) : à-coups au sommet. Une rep qui s'arrête en haut (au moins 0,3 s quasi immobile,
+// |v| < 0,06 m/s) PUIS remonte de 2 cm ou plus a sa montée coupée à ce premier arrêt, comme si la rep finissait là,
+// à condition que l'arrêt soit à la course des autres reps de la série (il faut 2 autres reps) et à la hauteur valide (votre seuil écrit par l'outil, sinon 35,3 cm de l'étalon du
+// 19/09 ; sans suspension de référence : à moins de 8 cm du sommet). Un arrêt plus bas (point dur d'une rep grindée,
+// à-coup d'une rep trichée) ne coupe rien. Travaille APRÈS le calcul (mesurer n'est pas touché), sur le profil de la rep :
+// même règle que mesurer pour la fin de la montée (sommet = point le plus haut avant l'arrêt, recul tant que la
+// vitesse est dans le bruit et à moins de 2 cm). Expose : SA.
+(function () {
+  "use strict";
+  const V_ARRET = 0.06, T_ARRET = 0.3, REMONTE_CM = 2, SANS_REF_CM = 8, SEUIL_ETALON = 35.3;
+  const r1 = (x) => Math.round(x * 10) / 10, r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000;
+  const fr = (x, d) => x.toFixed(d).replace(".", ",");
+  // rend la rep corrigée (copie) ou null si rien à couper
+  function couper(r, fps, seuil, courseAutres) {
+    const H = r.profil_hauteur_cm, V = r.profil_vitesse_ms;
+    if (!Array.isArray(H) || !Array.isArray(V) || H.length !== V.length || H.length < 6 || !(fps > 0) || r.tentative_ratee) return null;
+    const n = H.length, top = H[n - 1], nArr = Math.max(2, Math.round(T_ARRET * fps));
+    let p1 = 0; for (let q = 1; q < n; q++) if (V[q] > V[p1]) p1 = q;
+    let f = -1;
+    for (let q = p1 + 1; q + nArr <= n && f < 0; q++) {
+      let ok = true; for (let z = q; z < q + nArr; z++) if (!(Math.abs(V[z]) < V_ARRET)) { ok = false; break; }
+      if (ok) f = q;
+    }
+    if (f < 0) return null;
+    let t = 0; for (let q = 1; q <= f; q++) if (H[q] >= H[t]) t = q;                // sommet avant l'arrêt
+    if (top - H[t] < REMONTE_CM) return null;                                      // pause normale au sommet : mesurer la gère déjà
+    // l'arrêt doit être à la hauteur d'une rep finie : course au moins celle des autres reps de la série (médiane) − 1 cm.
+    // Vérifié sur vos 173 reps à profil : les dernières reps grindées (ralenties près du sommet, 27/09, 08/10, 05/11, 08/11,
+    // 19/11) s'arrêtent 2,7 à 8,7 cm sous la course des autres reps ; le 22/11 (à-coups) 1,0 cm au-dessus.
+    if (!(typeof courseAutres === "number") || H[t] < courseAutres - 1) return null;
+    const hRef = typeof r.hauteur_cm === "number" ? r.hauteur_cm - (top - H[t]) : null;
+    if (hRef !== null ? hRef < seuil : top - H[t] > SANS_REF_CM) return null;    // arrêt sous la hauteur valide : point dur, on garde
+    let ps = t; while (ps > 2 && Math.abs(V[ps - 1]) < V_ARRET && H[t] - H[ps - 1] < 2) ps -= 1;
+    const duree = ps / fps, course = H[t];
+    if (!(duree > 0) || !(course > 0)) return null;
+    let sous = 0; for (let q = p1; q < Math.max(p1, ps - 3); q++) if (V[q] < 0.2) sous += 1;
+    const o = Object.assign({}, r), dh = top - H[t];
+    o.montee_s = r2(duree); o.course_cm = r1(course); o.vitesse_moy_ms = r3(course / 100 / duree);
+    o.temps_sous_02_s = r2(sous / fps);
+    if (typeof r.hauteur_cm === "number") o.hauteur_cm = r1(r.hauteur_cm - dh);
+    if (typeof r.hauteur_sommet_cm === "number") o.hauteur_sommet_cm = r1(r.hauteur_sommet_cm - dh);
+    if (typeof r.puissance_moy_w === "number" && r.montee_s > 0 && r.course_cm > 0) o.puissance_moy_w = Math.round(r.puissance_moy_w * (course / r.course_cm) * (r.montee_s / duree));
+    o.profil_hauteur_cm = H.slice(0, t + 1); o.profil_vitesse_ms = V.slice(0, t + 1);
+    o.acoups = { montee_s: r.montee_s, course_cm: r.course_cm, vitesse_moy_ms: r.vitesse_moy_ms, hauteur_cm: r.hauteur_cm };
+    return o;
+  }
+  // corrige une série de la sortie (en place) ; rend le nombre de reps coupées
+  function corrigerSerie(sr, seuils) {
+    if (!sr || !Array.isArray(sr.reps) || !sr.reps.length) return 0;
+    const fps = sr.video && sr.video.fps, aRef = sr.reps.some((r) => typeof r.hauteur_cm === "number");
+    const su = seuils && seuils[(sr.mouvement || "tractions") + "|" + (aRef ? "depart" : "bas")];
+    const seuil = su && typeof su.valide === "number" ? su.valide : SEUIL_ETALON;
+    let nb = 0;
+    const med = (xs) => { if (xs.length < 2) return null; const a = xs.slice().sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+    sr.reps = sr.reps.map((r, i) => {
+      const ca = med(sr.reps.filter((x, j) => j !== i && !x.tentative_ratee && typeof x.course_cm === "number").map((x) => x.course_cm));
+      const o = couper(r, fps, seuil, ca); if (!o) return r;
+      nb++;
+      (sr.alertes = sr.alertes || []).push("Rep " + r.rep + " : à-coups au sommet après un arrêt ; montée coupée au premier arrêt (" +
+        fr(r.vitesse_moy_ms, 3) + " → " + fr(o.vitesse_moy_ms, 3) + " m/s, " + fr(r.montee_s, 2) + " → " + fr(o.montee_s, 2) + " s).");
+      return o;
+    });
+    if (nb && globalThis.RS) {
+      const c = sr.reps.filter((r) => !r.tentative_ratee);
+      try { const hm = sr.resume && sr.resume.hauteur_mini_cm; sr.resume = Object.assign({}, globalThis.RS.resume(c));
+        const hs = c.map((r) => r.hauteur_cm).filter((x) => typeof x === "number");
+        sr.resume.hauteur_mini_cm = hs.length === c.length && hs.length ? Math.min.apply(null, hs) : (hm === undefined ? null : hm); } catch (e) {}
+    }
+    return nb;
+  }
+  globalThis.SA = { couper: couper, corrigerSerie: corrigerSerie };
+})();
+// <<< BLOC ACOUPS - FIN >>>
 </script>
 </body>
 </html>
