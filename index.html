@@ -1429,7 +1429,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v166';   /* lot 74 */
+var APPV='v167';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -6243,22 +6243,32 @@ function seancesPage(){
   if(SIM)return null;
   var li=-1; S.lifts.forEach(function(L,i){ if(li<0&&(L.catId==='pullup'||/traction/i.test(L.name||'')))li=i; });
   var out=[];
+  /* v167 : gabarit Zlat sans top set ni back-off (intermediate) : « serie » (straight set) et « serie max », pas top set / back-off
+     (demande de Luka du 15/11, reprise de la v163 mise de côté) */
+  var tp=li>=0?tplOf(S.lifts[li].prog&&S.lifts[li].prog.tpl):null;
+  var droit=!!(tp&&isZlat(S.lifts[li].prog.tpl)&&!tp.days.some(function(d){return d.lines.some(function(l){return l.tag==='top'||l.tag==='back';});}));
+  var filmee=function(key,k){ return (S.velo||[]).some(function(v){return v.lien&&v.lien.key===key&&v.lien.set===k;}); };
   if(li>=0)PLAN.forEach(function(wk){ wk.days.forEach(function(dd,di){   /* lot 59 ; lot 121 (audit Vitesse, 15) : le deload aussi */
     var L=S.lifts[li], leger=!wk.dl&&jourLeger(L,dd.label);   /* J2 de Zlat / Helms : toutes les series en « secondaire » */
-    var ty=function(x){return wk.dl?'deload':leger?'secondaire':(PROLE[x.role]||(x.role==='work'?'back-off':null));};
+    var ty=function(x){return wk.dl?'deload':leger?'secondaire':droit&&(x.role==='work'||x.role==='amrap'||x.role==='top'||x.role==='back')?(x.role==='amrap'?'serie max':'serie'):(PROLE[x.role]||(x.role==='work'?'back-off':null));};
     var xs=dd.lines.filter(function(x){return x.li===li&&ty(x);}); if(!xs.length)return;
     var series=[], fait=false, pdc=null, dfait='';
     xs.forEach(function(x){
       var e=entryOf(x.key), ok=!!(e&&e.state!=='skip'&&e.sets&&e.sets.length), n=ok?e.sets.length:Math.max(1,+x.sets||1);
       if(ok){ fait=true; if(pdc==null&&+e.bw>0)pdc=+e.bw; if(!dfait&&e.date)dfait=String(e.date).slice(0,10); }
       for(var k=0;k<n;k++)series.push({type:ty(x),lest:ok?(e.load==null?0:+e.load):(x.load==null?0:+x.load),
-        reps:ok?(e.sets[k]==null?null:+e.sets[k]):repHaut(x.reps),variante:varPage(L,x,leger)||(tpOut(ok&&e.tempo?e.tempo:x.tempo)?'tempo':'')});   /* lot 121 (16) : tempo imposé */
+        reps:ok?(e.sets[k]==null?null:+e.sets[k]):repHaut(x.reps),variante:varPage(L,x,leger)||(tpOut(ok&&e.tempo?e.tempo:x.tempo)?'tempo':''),   /* lot 121 (16) : tempo imposé */
+        cle:x.key,set:k,fait:ok,video:ok&&filmee(x.key,k),at:ok&&e.at&&e.at[k]?+e.at[k]:null});   /* v167 : la série du journal, pour que la page vidéo rattache sans deviner */
     });
+    /* v167 : séries faites dans l'ordre où elles ont été notées (heure de chaque série), les prévues ensuite */
+    series=series.map(function(s,i){return {s:s,i:i};}).sort(function(a,b){
+      var ta=a.s.at, tb=b.s.at; if(ta!=null&&tb!=null&&ta!==tb)return ta-tb; if((ta!=null)!==(tb!=null))return ta!=null?-1:1; return a.i-b.i;
+    }).map(function(o){return o.s;});
     /* series de travail sans top set (Helms) : la premiere tient lieu de top set */
-    if(!leger&&!series.some(function(s){return s.type==='top set';})&&series[0].type==='back-off')series[0].type='top set';
+    if(!leger&&!droit&&!series.some(function(s){return s.type==='top set';})&&series[0].type==='back-off')series[0].type='top set';
     var date=dfait||dayISO(wk.w,dd.label), j=['J1','J2','J3','J4'].indexOf(dd.label);
-    out.push({date:date,semaine:wk.dl?null:wk.w+1,seance:wk.dl?null:(j>=0?j+1:di+1),label:wk.dl?'Deload':dd.label,
-      type:series.some(function(s){return s.type==='top set';})?'principale':'secondaire',
+    out.push({date:date,semaine:wk.dl?null:wk.w+1,seance:wk.dl?null:(j>=0?j+1:di+1),label:wk.dl?'Deload':dd.label,id:wk.w+'|'+dd.label,
+      type:series.some(function(s){return s.type==='top set'||s.type==='serie'||s.type==='serie max';})?'principale':'secondaire',
       pdc:pdc!=null?pdc:(date===todayISO()&&S.tbw!=null?+S.tbw:+S.bw),fait:fait,series:series});
   });});
   var r={v:1,app:APPV,ecrit:todayISO(),mouvement:'tractions',seances:out,seuils:vSeuilsPage()};   /* v148, lot B Vitesse (audit Vitesse, 19) */
@@ -8571,7 +8581,10 @@ function renderToday(){
   pdcPlace();   /* lot 73 */
   if(document.body.classList.contains('reorg'))drawBars();
   xFill(null);
-  seancesPage();   /* lot 40 (Q8) */
+  var spg=seancesPage();   /* lot 40 (Q8) */
+  /* v167 : analyser en séance : la page vidéo s'ouvre sur cette séance, séries enregistrées sans vidéo cochées */
+  if(spg&&!simpleOn()&&spg.seances.some(function(x){return x.id===k;}))$('todayout').insertAdjacentHTML('beforeend',
+    '<p class="note" id="tvidlink" style="margin:4px 0 0"><a class="linkbtn" href="seance-telephone.html#s='+encodeURIComponent(k)+'">Analyser les vidéos de cette séance ›</a></p>');
   var nd=0; sess.forEach(function(q){if(S.done[q])nd++;});
   /* la date prevue au programme, que l'en-tete de jour affichait avant d'etre retire de la seance */
   var dd=String(dayDate(wIdx,sel)||'').replace(/<[^>]*>/g,'').replace(/^[\s\u2014\u00b7,-]+/,'').trim();
@@ -11732,6 +11745,13 @@ function veloImport(d){
      « aucune ») ; un rattachement automatique n'est gardé que si le lest et le type n'ont pas changé, sinon il se refait. */
   var old=(S.velo||[]).filter(function(x){return x.id===t.id;})[0];
   if(old&&old.lien&&(!old.lien.auto||(+old.lest_kg===+t.lest_kg&&String(old.type_serie||'')===String(t.type_serie||''))))t.lien=old.lien;
+  /* v167 : série du journal choisie sur la page vidéo (séance et séries cochées) : rattachement direct, sans deviner par le type,
+     si la série existe et n'est pas déjà prise par une autre vidéo ; un rattachement choisi ici à la main n'est pas écrasé */
+  var pj=d.serie_journal;
+  if(pj&&pj.cle&&!(old&&old.lien&&!old.lien.auto)&&!isWarm(t)&&!isFixe(t)){
+    var pe=entryOf(pj.cle), ps=+pj.set;
+    if(pe&&pe.sets&&ps>=0&&ps<pe.sets.length&&!(S.velo||[]).some(function(o){return o.id!==t.id&&o.lien&&o.lien.key===pj.cle&&o.lien.set===ps;}))t.lien={key:pj.cle,set:ps,page:1};
+  }
   S.velo=(S.velo||[]).filter(function(x){return x.id!==t.id;});
   S.velo.push(t); bwFollow();   /* lot 40 */
   S.velo.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
