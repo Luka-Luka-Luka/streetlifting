@@ -1318,7 +1318,7 @@ nav button[aria-selected="true"],:root[data-dir] nav button[aria-selected="true"
       <div class="field sm" style="flex:0 0 auto"><label>&nbsp;</label><button class="act ghost mini" id="profadd">Ajouter</button></div>
     </div>
     <div id="profmodel"></div>   <!-- lot 111 (P3) -->
-    <p class="note" id="profnote">Chaque personne a ses propres mouvements, programme, séances et sauvegardes. Les analyses vidéo arrivent seulement chez Luka.</p>
+    <p class="note" id="profnote">Chaque personne a ses propres mouvements, programme, séances et sauvegardes. Les analyses vidéo arrivent seulement chez Luka. Avec la sauvegarde GitHub, la liste des personnes et leurs données suivent sur tous vos appareils.</p>
   </div>
 
   <div class="card" id="cardsauve">
@@ -1431,7 +1431,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v169';   /* lot 74 */
+var APPV='v170';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -7774,12 +7774,109 @@ function ghHead(c){   /* {cs, at} du dernier commit du fichier ; cs '' s'il n'ex
       return x?{cs:x.sha||'',at:(x.commit&&x.commit.committer&&x.commit.committer.date)||''}:{cs:''}; });
 }
 function ghSync(mode){   /* mode : 'key' (clé enregistrée), 'now' (Envoyer maintenant), sinon automatique */
-  return ghPull().then(function(){
+  return prSync().then(function(rl){ if(rl)return; return ghPull().then(function(){ prPushOthers(); }); }).then(function(){
     cppFetch();   /* v159 */
     if(GHCONF)return;
     var s=ghSt();
     if(mode==='now'||(mode==='key'&&!s.sha))return ghPush(true);
     if(s.dirty){ if(GHT){ clearTimeout(GHT); GHT=null; } ghPlan(5000); }
+  });
+}
+/* ===== v170 (25/11, demande de Luka) : les personnes synchronisées partout =====
+   « Je veux avoir accès aux mêmes données partout, tout le temps. » Jusqu'ici, seule la liste des personnes restait dans
+   l'appareil (cp-profiles) : un autre appareil ne connaissait que Luka, et une personne ajoutée à la main y recevait un autre
+   identifiant, donc un autre fichier sur GitHub. Maintenant :
+   - personnes.json à la racine du dépôt = {list:[{id,name,at}], del:[ids]}, lu à chaque synchro (démarrage, retour sur
+     l'app, réseau, toutes les 5 min) ; les personnes absentes ici y sont ajoutées, celles d'ici y sont envoyées ;
+   - une personne d'ici qui porte le même prénom qu'une personne de GitHub sous un autre identifiant est rattachée à
+     celui de GitHub : ses données d'ici passent sous cet identifiant puis sont FUSIONNÉES avec le fichier de GitHub
+     (même fusion qu'en v164 : rien n'est perdu) ;
+   - un nom changé l'emporte s'il est plus récent (at) ; une suppression (del) retire la personne des autres appareils,
+     sauf si elle y a des changements pas encore envoyés ; son fichier reste sur GitHub ;
+   - changer de personne envoie d'abord ce qui attend ; au démarrage, ce qui attend chez les autres personnes est envoyé. */
+var PRSYNC=false;
+function prKey(n){ return profSlug(n); }
+function prApi(c,path,method,body){
+  return fetch('https://api.github.com/repos/'+c.repo+'/contents/'+path,{method:method,cache:'no-store',
+    headers:{'Authorization':'Bearer '+c.tok,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+    body:body?JSON.stringify(body):undefined});
+}
+function prGet(c,path){   /* {sha, o} ; sha '' si absent */
+  return prApi(c,path,'GET').then(function(r){
+    if(r.status===404)return {sha:'',o:null};
+    if(!r.ok)throw {st:r.status};
+    return r.json().then(function(j){ return {sha:j.sha||'',o:j.content&&j.encoding==='base64'?ghParse(j.content):null}; });
+  });
+}
+function prStOf(id){ try{ return JSON.parse(localStorage.getItem(SKof(id,'cp-gh-st'))||'{}')||{}; }catch(e){ return {}; } }
+function prSetOf(id,o){ var s=prStOf(id); for(var k in o)s[k]=o[k]; try{ localStorage.setItem(SKof(id,'cp-gh-st'),JSON.stringify(s)); }catch(e){} }
+function prHas(id){ try{ return !!localStorage.getItem(SKof(id,'cp-state')); }catch(e){ return false; } }
+function prMove(from,to){   /* données d'ici de « from » rangées sous l'identifiant « to » (qui n'a rien ici) */
+  PKEYS.forEach(function(k){ try{ var v=localStorage.getItem(SKof(from,k)); if(v!=null)localStorage.setItem(SKof(to,k),v); }catch(e){} });
+  PKEYS.forEach(function(k){ try{ localStorage.removeItem(SKof(from,k)); }catch(e){} });
+  try{ localStorage.removeItem(SKof(from,'cp-gh-st')); }catch(e){}
+  prSetOf(to,{sha:'',cs:'',dirty:true,err:''});   /* pas de sha : la prochaine lecture fusionne avec GitHub, puis envoie */
+}
+function prSync(){
+  var c=ghCfg(); if(!c||PRSYNC||LOADBAD||STALE||BRSWAP)return Promise.resolve(false);
+  PRSYNC=true;
+  return prGet(c,'personnes.json').then(function(rm){
+    var o=rm.o&&typeof rm.o==='object'?rm.o:{}, R=Array.isArray(o.list)?o.list.filter(function(p){ return p&&p.id&&p.id!=='luka'&&p.name; }):[];
+    var del=Array.isArray(o.del)?o.del.slice():[], ldel=Array.isArray(PROF.del)?PROF.del:[];
+    var changed=false, reload=false, send=!rm.sha, inR={};
+    R.forEach(function(p){ inR[p.id]=p; });
+    /* 1. suppressions venues d'ailleurs */
+    del.forEach(function(id){
+      if(id==='luka'||!PROF.list.some(function(x){ return x.id===id; }))return;
+      if(prStOf(id).dirty&&prHas(id)){ del=del.filter(function(d){ return d!==id; }); send=true; return; }   /* changements pas envoyés : on la garde */
+      PKEYS.concat(['cp-gh-st']).forEach(function(k){ try{ localStorage.removeItem(SKof(id,k)); }catch(e){} });
+      PROF.list=PROF.list.filter(function(x){ return x.id!==id; }); changed=true;
+      if(PROF.cur===id){ PROF.cur='luka'; reload=true; }
+    });
+    /* 2. personnes de GitHub */
+    R.forEach(function(p){
+      if(del.indexOf(p.id)>=0||ldel.indexOf(p.id)>=0)return;
+      var loc=PROF.list.filter(function(x){ return x.id===p.id; })[0];
+      if(loc){
+        if(p.name!==loc.name){ if((+p.at||0)>(+loc.at||0)){ loc.name=p.name; loc.at=p.at; changed=true; } else send=true; }
+        return;
+      }
+      var same=PROF.list.filter(function(x){ return x.id!=='luka'&&!inR[x.id]&&prKey(x.name)===prKey(p.name); })[0];
+      if(same&&!prHas(p.id)){
+        var old=same.id; prMove(old,p.id); same.id=p.id; same.name=p.name; same.at=p.at||same.at; changed=true;
+        if(PROF.cur===old){ PROF.cur=p.id; reload=true; }
+        return;
+      }
+      PROF.list.push({id:p.id,name:p.name,at:p.at||0}); changed=true;
+    });
+    /* 3. ce qui n'est qu'ici part sur GitHub */
+    PROF.list.forEach(function(x){ if(x.id!=='luka'&&!inR[x.id])send=true; });
+    ldel.forEach(function(id){ if(del.indexOf(id)<0){ del.push(id); send=true; } });
+    if(changed||ldel.length){ PROF.del=[]; profStore(); }
+    var go=send?prApi(c,'personnes.json','PUT',{message:'Personnes ('+APPV+')',sha:rm.sha||undefined,
+        content:ghB64(JSON.stringify({list:PROF.list.filter(function(x){ return x.id!=='luka'&&del.indexOf(x.id)<0; }).map(function(x){ return {id:x.id,name:x.name,at:+x.at||0}; }),del:del},null,2))})
+      .then(function(r){ if(!r.ok&&ldel.length){ PROF.del=ldel; profStore(); } })   /* refus (autre appareil au même moment) : nouvel essai à la prochaine synchro */
+      :Promise.resolve();
+    return go.then(function(){ if(reload){ STALE=true; location.reload(); } return reload; });
+  }).catch(function(){ return false; })
+    .then(function(rl){ PRSYNC=false; if(!rl)renderProf(); return rl; });
+}
+function prPushOthers(){   /* changements restés en attente chez une autre personne que celle affichée */
+  var c=ghCfg(); if(!c||LOADBAD||STALE)return;
+  PROF.list.forEach(function(p){
+    if(p.id===PROF.cur)return;
+    var st=prStOf(p.id), raw=null; if(!st.dirty)return;
+    try{ raw=localStorage.getItem(SKof(p.id,'cp-state')); }catch(e){}
+    if(!raw)return;
+    var path=encodeURIComponent(p.id)+'.json', o=null; try{ o=JSON.parse(raw); }catch(e){ return; }
+    prGet(c,path).then(function(rm){
+      if(rm.sha&&rm.sha!==st.sha)return;   /* GitHub a changé ailleurs : la fusion se fera en passant sur cette personne */
+      var now=new Date(), msg='Sauvegarde '+p.name+' du '+todayISO()+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' ('+APPV+')';
+      return prApi(c,path,'PUT',{message:msg,content:ghB64(JSON.stringify(o,null,2)),sha:rm.sha||undefined}).then(function(r){
+        if(!r.ok)return;
+        return r.json().then(function(j){ prSetOf(p.id,{sha:j.content&&j.content.sha||'',cs:j.commit&&j.commit.sha||'',at:now.toISOString(),dirty:false,err:''}); });
+      });
+    }).catch(function(){});
   });
 }
 function ghPull(){
@@ -8149,8 +8246,11 @@ function profKo(n){ return n<1024?'moins de 1 Ko':F(Math.round(n/1024))+' Ko'; }
 function profEsc(t){ return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function profGo(id){
   if(id===PROF.cur)return;
+  var was=ghCfg()&&ghSt().dirty;   /* v170 : seulement ce qui attendait déjà (save() ci-dessous marque toujours « en attente ») */
   save(); if(typeof draftWrite==='function')draftWrite();
-  PROF.cur=id; if(!profStore())return; location.reload();
+  var go=function(){ if(go.done)return; go.done=1; PROF.cur=id; if(!profStore())return; location.reload(); };
+  if(was&&!GHCONF){ msgBar('Envoi de ce qui attend…'); ghPush(true).then(go,go); setTimeout(go,6000); }   /* v170 : rien ne reste en attente derrière */
+  else go();
 }
 /* lot 111 (P3) : modèle de départ de Sylwia (choix de Luka du 23/10, jours de la fiche des profils). Que des accessoires :
    double progression, +0,5 kg par haltère ; sac de sable à charge fixe ; bloc d'apprentissage de 2 semaines à 2 séries.
@@ -8217,7 +8317,7 @@ document.addEventListener('click',function(ev){
   if((b=t.closest('[data-profren]'))){ PROFREN=b.dataset.profren; PROFDEL=null; renderProf(); var i=$('profren'); if(i&&i.focus)i.focus(); return; }
   if(t.closest('[data-profrenx]')){ PROFREN=null; renderProf(); return; }
   if((b=t.closest('[data-profrenok]'))){ var nm=String($('profren').value||'').trim().slice(0,30);
-    if(nm){ PROF.list.forEach(function(p){ if(p.id===b.dataset.profrenok)p.name=nm; }); profStore(); } PROFREN=null; renderProf(); return; }
+    if(nm){ PROF.list.forEach(function(p){ if(p.id===b.dataset.profrenok){ p.name=nm; p.at=Date.now(); } }); profStore(); if(ghCfg())prSync(); } PROFREN=null; renderProf(); return; }
   if((b=t.closest('[data-profdel]'))){ PROFDEL=b.dataset.profdel; PROFREN=null; renderProf(); return; }
   if(t.closest('[data-profdelx]')){ PROFDEL=null; renderProf(); return; }
   if((b=t.closest('[data-profexp]'))){ var raw=null; try{ raw=localStorage.getItem(SKof(b.dataset.profexp,'cp-state')); }catch(e){}
@@ -8225,15 +8325,18 @@ document.addEventListener('click',function(ev){
   if((b=t.closest('[data-profdelok]'))){ var id=b.dataset.profdelok; if(id==='luka')return;
     var name=(PROF.list.filter(function(p){return p.id===id;})[0]||{}).name;
     PKEYS.forEach(function(k){ try{ localStorage.removeItem(SKof(id,k)); }catch(e){} });
+    try{ localStorage.removeItem(SKof(id,'cp-gh-st')); }catch(e){}
     PROF.list=PROF.list.filter(function(p){return p.id!==id;}); PROFDEL=null;
+    PROF.del=(Array.isArray(PROF.del)?PROF.del:[]).concat([id]);   /* v170 : retirée aussi des autres appareils ; son fichier reste sur GitHub */
     if(PROF.cur===id){ PROF.cur='luka'; profStore(); location.reload(); return; }
-    profStore(); renderProf(); msgBar(name+' supprimé·e.'); return; }
+    profStore(); renderProf(); msgBar(name+' supprimé·e.'); if(ghCfg())prSync(); return; }
 });
 $('profadd').addEventListener('click',function(){
   var nm=String($('profnew').value||'').trim().slice(0,30); if(!nm){ $('profnew').focus(); return; }
   if(PROF.list.some(function(p){return p.name.toLowerCase()===nm.toLowerCase();})){ msgBar('Ce prénom existe déjà.'); return; }
-  PROF.list.push({id:'p'+Date.now().toString(36),name:nm}); if(!profStore())return;
+  PROF.list.push({id:'p'+Date.now().toString(36),name:nm,at:Date.now()}); if(!profStore())return;
   $('profnew').value=''; renderProf(); msgBar(nm+' ajouté·e : touchez « Choisir » pour passer sur ses données.');
+  if(ghCfg())prSync();   /* v170 : si ce prénom existe déjà sur GitHub, elle y est rattachée */
 });
 function bkCopy(){ try{ return localStorage.getItem(SK('cp-state-backup')); }catch(e){ return null; } }
 function bkDrop(){ try{ localStorage.removeItem(SK('cp-state-backup')); }catch(e){} }
@@ -13286,6 +13389,7 @@ $('importfile').addEventListener('change',function(){
         'tant que vous ne rechargez pas la page.'))return;
       try{localStorage.setItem(SK('cp-state-backup'),JSON.stringify(S));}catch(e2){}
       localStorage.setItem(SK('cp-state'),JSON.stringify(d)); load(); renderAll(); renderBackup();
+      if(ghCfg()&&!GHBOOT){ ghMark(); }   /* v170 : l'import part aussi sur GitHub (avant : seulement au prochain enregistrement) */
     }catch(e){alert("Ce fichier n'est pas une sauvegarde de cet outil.");}
   };
   r.readAsText(f);
