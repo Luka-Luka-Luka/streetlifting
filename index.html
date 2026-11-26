@@ -1431,7 +1431,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v170';   /* lot 74 */
+var APPV='v171';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -7572,7 +7572,7 @@ $('bkevery').addEventListener('change',function(){ S.bkEvery=+this.value; save()
    les 10 min. dirty survit à la fermeture : renvoi au démarrage et au retour du réseau.
    Fichier <id>.json (luka.json, sylwia….json) = JSON.stringify(S,null,2), identique à l'export.
    sha = verrou : si GitHub a une autre version (409/422), on relit le sha et on réécrit (l'historique garde l'autre). */
-var GHT=null, GHBUSY=false, GHGAP=180000, GHGEN=0;   /* lot S1 : 10 min -> 3 min */
+var GHT=null, GHBUSY=false, GHGAP=20000, GHGEN=0;   /* v171 : 3 min -> 20 s entre deux envois */   /* lot S1 : 10 min -> 3 min */
 var GHCONF=null, GHPULL=false, GHBOOT=true;   /* lot S1 : conflit en attente de votre choix ; lecture en cours ; démarrage (migrations) */   /* lot 119 : GHGEN compte les enregistrements, pour ne pas marquer « à jour » un changement fait pendant un envoi */
 function ghCfg(){ try{ var c=JSON.parse((GUEST&&sessionStorage.getItem('cp-gh'))||localStorage.getItem('cp-gh')||'null');   /* lot S2 : clé de session sur un appareil prêté */
    return c&&c.repo&&c.tok?c:null; }catch(e){ return null; } }
@@ -7661,7 +7661,7 @@ function ghMark(){
   GHGEN++;   /* lot 119 */
   if(!ghSt().dirty)ghSet({dirty:true});
   if(GHT){ clearTimeout(GHT); GHT=null; }   /* lot S1 : une minute après le DERNIER changement */
-  ghPlan(60000);
+  ghPlan(4000);   /* v171 (26/11, demande de Luka) : 4 s au lieu d'une minute : l'iPhone met la page en pause dès qu'on la quitte */
 }
 function ghPlan(min){
   if(GHT||GHBUSY||GHCONF)return;
@@ -7723,7 +7723,7 @@ function ghPush(manual,force){
       return put(rm.sha);
     })
     .catch(function(e){ ghSet({err:e&&e.st?ghErr(e.st):'pas de réseau, nouvel essai plus tard'}); })
-    .then(function(){ GHBUSY=false; renderBackup(); var s=ghSt(); if(s.dirty&&!s.err&&!s.block&&!GHCONF)ghPlan(60000); });
+    .then(function(){ GHBUSY=false; renderBackup(); var s=ghSt(); if(s.dirty&&!s.err&&!s.block&&!GHCONF)ghPlan(4000); });
 }
 function renderGh(busy){
   var c=ghCfg(), s=ghSt(), el=$('ghst'); if(!el)return;
@@ -7757,7 +7757,8 @@ $('ghforget').addEventListener('click',function(){
   try{ localStorage.removeItem('cp-gh'); sessionStorage.removeItem('cp-gh'); }catch(e){} if(GHT){ clearTimeout(GHT); GHT=null; } renderBackup();
 });
 window.addEventListener('online',function(){ if(ghCfg()){ ghSet({err:''}); ghSync(); } });   /* lot S1 */
-document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&ghCfg()&&!STALE)ghSync(); });   /* lot S1 */
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&ghCfg()&&!STALE)ghSync();
+  else if(document.visibilityState==='hidden'&&ghCfg()&&!STALE&&!GHBUSY&&ghSt().dirty&&!GHCONF)ghPush(true); });   /* v171 : on quitte l'app : on tente d'envoyer avant la mise en pause */   /* lot S1 */
 setInterval(function(){ if(document.visibilityState==='visible'&&ghCfg()&&!STALE)ghSync(); },300000);   /* lot S1 : toutes les 5 min, écran allumé */
 /* lot S1 (04/11) : récupérer depuis GitHub. À l'ouverture, au retour sur l'app, au retour du réseau et toutes les 5 min
    écran allumé, on demande le dernier commit du fichier (petite réponse). S'il n'est pas notre dernier échange (cs),
@@ -7779,7 +7780,7 @@ function ghSync(mode){   /* mode : 'key' (clé enregistrée), 'now' (Envoyer mai
     if(GHCONF)return;
     var s=ghSt();
     if(mode==='now'||(mode==='key'&&!s.sha))return ghPush(true);
-    if(s.dirty){ if(GHT){ clearTimeout(GHT); GHT=null; } ghPlan(5000); }
+    if(s.dirty){ if(GHT){ clearTimeout(GHT); GHT=null; } ghPlan(500); }   /* v171 : au retour sur l'app, tout de suite */
   });
 }
 /* ===== v170 (25/11, demande de Luka) : les personnes synchronisées partout =====
