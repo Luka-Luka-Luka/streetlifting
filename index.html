@@ -709,7 +709,13 @@ footer{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font:40
 #asglock .lkt{flex:1 1 14em}
 #asglock.unl{border:1.5px solid var(--warn);background:var(--hl)}
 #cardassign.lk #assign,#cardassign.lk #nwk,#cardassign.lk #jours{opacity:.6}
-#cardassign.lk>h2 em::before{content:"\1F512  "}   /* lot 45 ; lot 56 B : gris, plus le jaune */
+#cardassign.lk>h2 em::before{content:"\1F512  "}
+/* v173 : changement de réglage, séance de départ */
+.pfnote{margin:4px 0 6px;padding:5px 8px;border-left:3px solid var(--warn);background:var(--hl);border-radius:4px}
+.pfmk{font:600 11.5px/1 var(--txt);color:var(--ink);background:var(--hl);border:1px solid var(--warn);border-radius:9px;padding:1px 6px;margin-left:4px}
+.day.pfday{border-left:3px solid var(--warn);padding-left:6px}
+.line.pfc{box-shadow:inset 0 3px 0 var(--warn)}
+#asglock select{max-width:100%;margin:4px 0}   /* lot 45 ; lot 56 B : gris, plus le jaune */
 #cardsim .wkh{background:var(--soft)}
 .lastp.descp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* lot 46 (R5) */
 .logrow .dcom{margin-top:6px}   /* lot 46 (R10) */
@@ -1431,7 +1437,7 @@ var num=function(v,fb){
   return isFinite(n)?n:fb;
 };
 var RC=30/29, SCHEMA=4, BW0=85.5;   /* N6 (C1) : PdC par défaut avant la première pesée connue. Schéma 4 : voir load() */
-var APPV='v172';   /* lot 74 */
+var APPV='v173';   /* lot 74 */
 var PALS={'1':'1, Ardoise','2':'2, Piste de nuit','A':'A, Granit','B':'B, Sous-bois','C':'C, Encre et cuivre'}, PALORD=['1','2','A','B','C'];   /* lot 63 */   /* a changer avec CACHE dans sw.js a chaque mise en ligne */
 var DAYN={dim:0,lun:1,mar:2,mer:3,jeu:4,ven:5,sam:6};
 var DAYFULL={dim:'dimanche',lun:'lundi',mar:'mardi',mer:'mercredi',jeu:'jeudi',ven:'vendredi',sam:'samedi'};
@@ -1547,6 +1553,7 @@ function save(){
   if(BRSWAP||LOADBAD)return;   /* lot 45 : jamais d'ecriture pendant un calcul du brouillon ; lot 119 : ni sur des données illisibles */
   if(STALE){ staleReload(); return; }   /* lot 119 */
   REFSTAMP++; REFC={};
+  if(ASGUNL&&PFPEND){ try{ pfNote(); }catch(e){} }   /* v173 */
   if(!GHBOOT){ try{ syStamp(); }catch(e){} }   /* v164 : horodatage des changements, pour la fusion entre appareils */
   try{ localStorage.setItem(SK('cp-state'),JSON.stringify(S)); SAVEFAIL=false; ghMark(); }   /* lot 113 */
   catch(e){
@@ -1936,7 +1943,8 @@ function tpPlan(){
     if(x.role==='extra')return x.src&&by[x.src]&&by[x.src]!==x?base(by[x.src]):x.xtempo;
     if(x.vmod==='tempo')return {d:3};
     return (x.vmod||x.role==='var')?null:L.prog.tempo; };
-  PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){ var t=tpNorm(base(x)); if(t)x.tempo=t; else delete x.tempo; });});});
+  PLAN.forEach(function(wk){wk.days.forEach(function(d){d.lines.forEach(function(x){ if(x.pfz)return;   /* v173 : séance gardée, tempo d'alors */
+    var t=tpNorm(base(x)); if(t)x.tempo=t; else delete x.tempo; });});});
 }
 function descHTML(L){ var d=descOf(L); return d?'<p class="note descf">Exécution ('+d.src+') : <b>'+esc(d.t)+'</b></p>':''; }
 function descLine(x,day){
@@ -5755,7 +5763,7 @@ function buildPlan(){
   PLAN=[]; var HS={}, DPC={}, APC={};   /* Q3 : creneaux Helms (jour, ligne) d'une semaine a l'autre ; DPC : suites de double progression (D10) ; APC : accPlan, une fois par mouvement (R1) */
   var active=S.lifts.map(function(L,i){return {L:L,i:i};}).filter(function(o){return o.L.prog.tpl!=='off'&&tplOf(o.L.prog.tpl);});
   var DLW=dlWeek(); if(DLW)PLAN.push(DLW);   /* lot 59 : deload entre deux blocs, avant la semaine 1 */
-  if(!active.length)return;
+  if(!active.length){ pfApply(); pfCapture(); return; }
   var nw=S.nwk, maxW=0;
   active.forEach(function(o){
     var t=tplOf(o.L.prog.tpl);
@@ -5900,6 +5908,18 @@ function buildPlan(){
         x.info+=' · deload de tous les mouvements cette semaine (blocage de '+gw.join(', ')+', p. 244) : non prévu par ce gabarit, allégez si besoin'; });
       if(day.lines.length){
         /* ajouts ponctuels : rattaches a une seance precise du bloc, rien d'autre ne bouge */
+        xtraAdd(day,w,lab);
+        week.days.push(day);
+      }
+    });
+    if(week.days.length)PLAN.push(week);
+  }
+  pfApply();   /* v173 : séances d'avant un changement de réglage, gardées telles quelles */
+  tpPlan();   /* lot 118 */
+  pfCapture();   /* v173 */
+  topRepPlan();   /* lot 124 */
+}
+function xtraAdd(day,w,lab){   /* v173 : sorti de buildPlan, aussi pour les séances gardées telles quelles */
         (S.extra[w+'|'+lab+BK()]||[]).forEach(function(xa){
           var XL=S.lifts[xa.li]; if(!XL)return;
           var xl={li:xa.li,name:XL.name,role:'extra',sets:+xa.sets||1,reps:String(xa.reps),
@@ -5911,13 +5931,6 @@ function buildPlan(){
           }
           day.lines.push(xl);
         });
-        week.days.push(day);
-      }
-    });
-    if(week.days.length)PLAN.push(week);
-  }
-  tpPlan();   /* lot 118 */
-  topRepPlan();   /* lot 124 */
 }
 /* lot 124 (questionnaire du 27/10, piste P1 de l'audit des calculs) : un top set à une charge déjà faite ou déjà prévue dans le
    bloc pour ce mouvement est signalé sur sa ligne (au plus un avertissement, décision du 03/10). Charge faite si la série est
@@ -6085,7 +6098,7 @@ function pgGrid(){
   var rl={amrap:'série max',test:'test',extra:'ajout'};
   var cell=function(x,k){
     var st=lineState(x.key), e=entryOf(x.key);
-    return '<span class="line '+(k?'gs':'gt')+(st?' s-'+st:'')+(e&&e.doubt?' dbt':(aComp(e)?' acp':''))+'" data-key="'+x.key+'">'+
+    return '<span class="line '+(k?'gs':'gt')+(x.pfch&&!k?' pfc':'')+(st?' s-'+st:'')+(e&&e.doubt?' dbt':(aComp(e)?' acp':''))+'" data-key="'+x.key+'">'+
       (x.rx?rxOf(x):planLoad(x)+sep+x.reps+(x.sets>1?'<wbr>'+sep+x.sets:''))+(S.planPctOff?'':pctHTML(x))+
       (rl[x.role]?' <span class="rl">'+rl[x.role]+'</span>':'')+prTag(PRF[x.key],1)+lineMarks(x.key)+
       (DRAFTS[x.key]?' <b class="draftmk" title="saisie non enregistrée">\u270e</b>':'')+'</span>';
@@ -6109,6 +6122,8 @@ function pgGrid(){
       .filter(function(d){return d.lines.length;})}); }).filter(function(wk){return wk.days.length;});
     var box=document.createElement('div'); renderPlan(box,wks,'p','week'); h+='<div class="pgmany">'+box.innerHTML+'</div>';
   }
+  var pch=[]; PLAN.forEach(function(wk){ wk.days.forEach(function(d){ if(d.pfch)pch.push('<b>'+pfLab(wk.w+'|'+d.label)+'</b> (le '+frDate(d.pfch.d)+(d.pfch.l&&d.pfch.l.length?', '+esc(d.pfch.l.join(', ')):'')+')'); }); });
+  if(h&&pch.length)h='<p class="note pfnote">⚑ Réglages changés à partir de '+pch.join(' ; ')+'. Les séances d’avant restent comme elles étaient.</p>'+h;   /* v173 */
   return h?h+'<p class="bgn">En gras la 1re série du jour (top set), dessous les suivantes. Touchez une case pour la saisir.'+(Object.keys(PRF).length?' 🏆 : record si la série est faite comme prévu (comparée à vos records actuels).':'')+(hid?' Secondaires masquées.':'')+'</p>':
     '<p class="note">Rien à afficher'+(hid?' : seuls des mouvements secondaires sont prévus (puce « Secondaires »).':'.')+'</p>';
 }
@@ -6125,9 +6140,10 @@ function renderPlan(into,weeks,pfx,scope){
     txt+='\n['+wLab(week.w)+']\n';
     week.days.forEach(function(day){
       var kd=pfx+'d'+week.w+'-'+day.label;
-      html+=(pfx==='t')?'<div class="day dt">':
-        '<div class="day'+(fold(kd)?' folded':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
-        day.label+dayDate(week.w,day.label)+(!SIM&&S.done&&S.done[week.w+'|'+day.label]?' ✓':'')+'</div>';
+      var pfc=!SIM&&day.pfch;   /* v173 : séance de départ d'un changement de réglage */
+      html+=(pfx==='t')?'<div class="day dt'+(pfc?' pfday':'')+'">'+(pfc?pfNoteHTML(day.pfch):''):
+        '<div class="day'+(fold(kd)?' folded':'')+(pfc?' pfday':'')+'"><div class="dayn" data-fold="'+kd+'">'+chev(kd)+
+        day.label+dayDate(week.w,day.label)+(!SIM&&S.done&&S.done[week.w+'|'+day.label]?' ✓':'')+(pfc?' <span class="pfmk">⚑ réglages changés</span>':'')+'</div>'+(pfc?pfNoteHTML(day.pfch):'');
       txt+=day.label+'\n';
       var hid=0;
       day.lines.forEach(function(x){
@@ -6509,11 +6525,20 @@ function asgStarted(){ return (S.log||[]).some(function(e){ return inBlock(e.key
 function asgLockApply(){
   var c=$('cardassign'), bx=$('asglock'); if(!c||!bx||BRSWAP)return;
   var st=asgStarted(), lk=st&&!ASGUNL;
+  if(!st&&S.pfix&&+S.pfix.b===+(S.blockId||1)){ delete S.pfix; PFPEND=null; }   /* v173 : plus aucune série du bloc, plus rien à protéger */
   c.classList.toggle('lk',lk);
   bx.classList.toggle('on',st); bx.classList.toggle('unl',st&&!lk);
-  bx.innerHTML=!st?'':lk
+  if(st&&lk&&PFASK){ var pc=pfChoices();
+    bx.innerHTML='<span class="lkt">⚠ <b>Changer un réglage du bloc en cours</b><br>'+
+      (pc.last?'Dernière séance faite ou commencée : <b>'+pfLab(pc.last)+'</b>. Elle et celles d’avant ne changeront pas.':'Aucune séance faite : les séances d’avant le départ ne changeront pas.')+
+      '<br><label>Le changement commence à : <select id="pfsel">'+pc.list.map(function(k){ return '<option value="'+esc(k)+'"'+(k===pc.def?' selected':'')+'>'+esc(pfLab(k))+((S.skip&&S.skip[k])?' (sautée)':'')+'</option>'; }).join('')+
+      '</select></label><br><span class="note">Toutes les séances avant celle-ci gardent leur programme actuel, faites ou non. Le changement est marqué ⚑ dans Programme et Séance du jour.</span></span>'+
+      (pc.list.length?'<button type="button" class="act mini" data-asglk="go">Déverrouiller à partir de là</button>':'<span class="note">Plus aucune séance à venir dans ce bloc.</span>')+
+      '<button type="button" class="act ghost mini" data-asglk="no">Annuler</button>';
+  }
+  else bx.innerHTML=!st?'':lk
     ?'<span class="lkt">🔒 <b>Bloc en cours</b> : réglages verrouillés, pour ne pas changer le programme par mégarde. Pour essayer, passez par <b>Simuler</b>.</span><button type="button" class="act ghost mini" data-asglk="0">Déverrouiller</button>'
-    :'<span class="lkt">🔓 <b>Déverrouillé</b> : ce que vous changez ici modifie le <b>programme en cours</b>.</span><button type="button" class="act ghost mini" data-asglk="1">Reverrouiller</button>';
+    :'<span class="lkt">🔓 <b>Déverrouillé</b> : ce que vous changez ici modifie le <b>programme en cours</b>'+(pfOn()&&PFPEND?', à partir de <b>'+pfLab(S.pfix.cut)+'</b> ; les séances d’avant restent comme elles étaient':'')+'.</span><button type="button" class="act ghost mini" data-asglk="1">Reverrouiller</button>';
   var els=[].slice.call(document.querySelectorAll('#assign input,#assign select,#assign textarea,#assign button,#nwk,#jours input,#gen'));
   els.forEach(function(el){
     if(el.classList&&el.classList.contains('chi'))return;   /* les « i » restent lisibles */
@@ -6521,7 +6546,91 @@ function asgLockApply(){
     else if(el.getAttribute('data-vlk')){ el.disabled=false; el.removeAttribute('data-vlk'); }
   });
 }
-function asgRelock(){ if(ASGUNL){ ASGUNL=0; asgLockApply(); } }
+function asgRelock(){ if(ASGUNL||PFASK){ ASGUNL=0; PFASK=0; PFPEND=null; asgLockApply(); } }
+/* ===== v173 (27/11, demande de Luka) : un réglage du bloc en cours qui change ne touche pas aux séances d'avant =====
+   « Si l'on change un réglage au bloc en cours, ça ne change pas les séances déjà enregistrées, et visuellement ça signale le
+   changement. Le changement commence à la séance première après la dernière faite. Prévenir avec alerte avant le changement et
+   choix du départ. » Déverrouiller « Réglages du bloc » (lot 129) demande d'abord la séance de départ (par défaut la 1re après
+   la dernière faite ou commencée). Les séances d'avant sont alors copiées telles que le programme les donne (S.pfix.fz, lignes
+   prévues sans les ajouts ponctuels) et buildPlan les remet à l'identique, quoi qu'on change ensuite : charges, reps, séries,
+   lignes, et même les jours (une séance ajoutée ou retirée avant le départ ne l'est pas). S.pfix.ch note chaque changement
+   réellement fait (date, mouvements touchés) ; la séance de départ porte la marque ⚑ dans Programme et Séance du jour.
+   S.pfix = {b: bloc, cut: 'w|jour' du dernier départ, fz: {'w|jour': lignes}, ch: [{from, d, l:[noms], at}]}. Bloc suivant :
+   ignoré (b différent) ; rouvrir un bloc le restaure (SNAPK). Sauvegardé et fusionné avec le programme (S.majAt). */
+var PFASK=0, PFPEND=null, PFRAW={};
+function pfOn(){ return !BRSWAP&&!SIM&&S.pfix&&+S.pfix.b===+(S.blockId||1)&&S.pfix.cut; }
+function pfOrd(k){ var a=String(k).split('|'); return sessOrd(+a[0],a[1]); }
+function pfLab(k){ var a=String(k).split('|'), w=+a[0]; if(w<0)return 'Deload';
+  var dt=dayDt(w,a[1]); return 'S'+(w+1)+' '+a[1]+(dt?' ('+dt.getDate()+'/'+(dt.getMonth()+1)+')':''); }
+function pfApply(){
+  PFRAW={};
+  if(!pfOn())return;
+  var P=S.pfix, co=pfOrd(P.cut), fz=P.fz||{}, k, wk, i;
+  PLAN.forEach(function(wk){ if(wk.w<0)return;
+    wk.days=wk.days.filter(function(d){ return sessOrd(wk.w,d.label)>=co||fz[wk.w+'|'+d.label]; }); });
+  for(k in fz){ var a=k.split('|'), w=+a[0], lab=a[1]; if(!(w>=0)||sessOrd(w,lab)>=co)continue;
+    wk=null; for(i=0;i<PLAN.length;i++)if(PLAN[i].w===w&&!PLAN[i].dl){ wk=PLAN[i]; break; }
+    if(!wk){ wk={w:w,days:[]}; for(i=0;i<PLAN.length&&(PLAN[i].dl||PLAN[i].w<w);i++); PLAN.splice(i,0,wk); }
+    var day=null; wk.days.forEach(function(d){ if(d.label===lab)day=d; });
+    if(!day){ day={label:lab,lines:[]}; for(i=0;i<wk.days.length&&sessOrd(w,wk.days[i].label)<sessOrd(w,lab);i++); wk.days.splice(i,0,day); }
+    day.lines=JSON.parse(JSON.stringify(fz[k])).map(function(x){ x.pfz=1; return x; });
+    xtraAdd(day,w,lab);
+  }
+  for(i=PLAN.length-1;i>=0;i--)if(!PLAN[i].dl&&PLAN[i].w>=0&&!PLAN[i].days.length)PLAN.splice(i,1);
+  (P.ch||[]).forEach(function(c){ PLAN.forEach(function(wk){ wk.days.forEach(function(d){
+    if(wk.w+'|'+d.label===c.from){ d.pfch=c; d.lines.forEach(function(x){ x.pfch=1; }); } }); }); });
+}
+function pfCapture(){   /* lignes telles que prévues (avant les avertissements de topRepPlan), pour la copie */
+  PFRAW={}; if(BRSWAP||SIM)return;
+  PLAN.forEach(function(wk){ if(wk.w<0||wk.dl)return; wk.days.forEach(function(d){
+    PFRAW[wk.w+'|'+d.label]=JSON.parse(JSON.stringify(d.lines.filter(function(x){ return x.role!=='extra'; }).map(function(x){
+      var y=Object.assign({},x); delete y.pfz; delete y.pfch; return y; }))); }); });
+}
+function pfBusy(k){   /* séance faite ou commencée (au moins une série enregistrée) */
+  if(S.done&&S.done[k])return true;
+  var a=String(k).split('|'), b=false;
+  PLAN.forEach(function(wk){ if(String(wk.w)!==a[0])return; wk.days.forEach(function(d){ if(d.label!==a[1])return;
+    d.lines.forEach(function(x){ var e=entryOf(x.key); if(e&&e.state!=='skip')b=true; }); }); });
+  return b;
+}
+function pfChoices(){   /* séances proposées comme départ : de la 1re après la dernière faite à la fin du bloc */
+  var sess=sessions(), last=-1;
+  sess.forEach(function(k,i){ if(pfBusy(k))last=i; });
+  var out=sess.slice(last+1), def=out.filter(function(k){ return !(S.skip&&S.skip[k]); })[0]||out[0]||null;
+  return {list:out,def:def,last:last>=0?sess[last]:null};
+}
+function pfSig(){
+  var cl=function(L){ var p=Object.assign({},L.prog); BRJOURNAL.forEach(function(f){ delete p[f]; }); delete p.goal; delete p.desc;
+    return JSON.stringify([p,L.refMode||'',L.ref||null]); };
+  var per=S.lifts.map(cl);
+  return {all:JSON.stringify([S.nwk,S.jours])+'#'+per.join('#'), per:per, nm:S.lifts.map(function(L){ return L.name; }), g:JSON.stringify([S.nwk,S.jours])};
+}
+function pfNote(){   /* à chaque enregistrement pendant un déverrouillage : le changement est-il réel ? */
+  if(!PFPEND||!S.pfix||!Array.isArray(S.pfix.ch))return;
+  var g=pfSig(), ch=S.pfix.ch, at=-1;
+  ch.forEach(function(c,i){ if(c.at===PFPEND.at)at=i; });
+  if(g.all===PFPEND.sig.all){ if(at>=0)ch.splice(at,1); return; }
+  var l=[]; g.per.forEach(function(x,i){ if(PFPEND.sig.per[i]!==x)l.push(g.nm[i]); });
+  if(g.g!==PFPEND.sig.g)l.push('semaines ou jours');
+  var c={from:PFPEND.from,d:todayISO(),l:l,at:PFPEND.at};
+  if(at>=0)ch[at]=c; else ch.push(c);
+}
+function pfStart(k){   /* « Déverrouiller » confirmé, départ k */
+  buildPlan();
+  var co=pfOrd(k), P=(S.pfix&&+S.pfix.b===+(S.blockId||1))?S.pfix:{b:+(S.blockId||1),fz:{},ch:[]};
+  if(!P.fz)P.fz={}; if(!Array.isArray(P.ch))P.ch=[];
+  Object.keys(P.fz).forEach(function(q){ if(pfOrd(q)>=co)delete P.fz[q]; });
+  Object.keys(PFRAW).forEach(function(q){ if(pfOrd(q)<co)P.fz[q]=PFRAW[q]; });
+  P.cut=k; S.pfix=P;
+  PFPEND={from:k,at:Date.now(),sig:pfSig()};
+  PFASK=0; ASGUNL=1; save(); generate(); renderToday();
+}
+function pfNoteHTML(c,short){
+  if(!c)return '';
+  return '<p class="note pfnote">⚑ <b>Réglages changés le '+frDate(c.d)+'</b>'+(c.l&&c.l.length?' ('+esc(c.l.join(', '))+')':'')+
+    (short?'':' : appliqués à partir de cette séance. Les séances d’avant restent comme elles étaient.')+'</p>';
+}
+
 function progView(){
   var v=cui().prog==='sim'?'sim':'bloc'; $('p-prog').setAttribute('data-pv',v);
   if(v==='sim')asgRelock();   /* lot 129 */
@@ -6564,7 +6673,11 @@ function renderSync(){
 $('gen').addEventListener('click',function(){generate();});
 $('asglock').addEventListener('click',function(e){   /* lot 129 */
   var b=e.target.closest?e.target.closest('[data-asglk]'):null; if(!b)return;
-  ASGUNL=b.dataset.asglk==='0'?1:0; asgLockApply();
+  var a=b.dataset.asglk;   /* v173 : déverrouiller demande d'abord la séance de départ */
+  if(a==='0'){ PFASK=1; asgLockApply(); return; }
+  if(a==='no'){ PFASK=0; asgLockApply(); return; }
+  if(a==='go'){ var sl=$('pfsel'); if(sl&&sl.value)pfStart(sl.value); return; }
+  ASGUNL=0; PFASK=0; PFPEND=null; asgLockApply();
 });
 $('simout').addEventListener('change',function(ev){   /* lot 128 : max out simulé */
   var t=ev.target; if(!t||!t.dataset||!t.dataset.zs)return; var box=t.closest('[data-zsi]'); if(!box)return;
@@ -8763,7 +8876,7 @@ function renderToday(){
   }
   $('tday').innerHTML=sess.map(function(q){
     var a=q.split('|');
-    return '<option value="'+q+'"'+(q===k?' selected':'')+'>'+(+a[0]<0?'Deload':'Semaine '+(+a[0]+1)+' \u00b7 '+a[1]+(rbOn()?' \u00b7 '+rbSub(+a[0]):''))+(S.done[q]?' \u2713':(S.skip&&S.skip[q])?' (saut\u00e9e)':'')+'</option>';   /* lot 59 */   /* lot R1 (D8) */
+    return '<option value="'+q+'"'+(q===k?' selected':'')+'>'+(+a[0]<0?'Deload':'Semaine '+(+a[0]+1)+' \u00b7 '+a[1]+(rbOn()?' \u00b7 '+rbSub(+a[0]):''))+(S.done[q]?' \u2713':(S.skip&&S.skip[q])?' (saut\u00e9e)':'')+(pfOn()&&(S.pfix.ch||[]).some(function(c){ return c.from===q; })?' \u2691':'')+'</option>';   /* lot 59 */   /* lot R1 (D8) */
   }).join('');
   var wIdx=+k.split('|')[0], sel=k.split('|')[1];
   var weeks=PLAN.filter(function(wk){return wk.w===wIdx;}).map(function(wk){
@@ -11030,7 +11143,7 @@ function dlTxt(D){
 /* Lot 59 (réponse 7) : la clôture garde de quoi revenir en arrière (b.undo, sur le dernier bloc clos seulement).
    « Rouvrir » tant que rien n'est noté dans le nouveau bloc. Bloc clos avant la v61 : reprise de ce que le bilan a
    archivé, décisions après échec rejouées par la règle du gabarit (à confirmer). */
-var SNAPK=['blockId','done','skip','dayNotes','dayTags','tsel','blockNote','blockGoal','form','start','lifts','dload'];
+var SNAPK=['blockId','done','skip','dayNotes','dayTags','tsel','blockNote','blockGoal','form','start','lifts','dload','pfix'];
 function blockSnap(){ var o={}; SNAPK.forEach(function(k){ if(S[k]!==undefined)o[k]=JSON.parse(JSON.stringify(S[k])); }); return o; }
 function reopenable(){
   var bs=S.blocks||[], b=bs[bs.length-1]; if(!b||+b.id!==+S.blockId-1)return null;
